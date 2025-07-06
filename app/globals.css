@@ -282,3 +282,13 @@ input[type="text"] {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Safe area padding for iOS bottom nav */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Add padding to main content when bottom nav is present */
+.with-bottom-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}

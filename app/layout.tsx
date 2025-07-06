@@ -7,10 +7,11 @@ import { Header } from "@/components/header";
 import { PWAHead } from "@/components/pwa-head";
 import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { BottomNav } from "@/components/bottom-nav";
 
 export const metadata: Metadata = {
   title: "תור רם-אל",
-  description: "מערכת חיפוש תורים אוטומטית למרפאת רם-אל",
+  description: "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -24,12 +25,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "תור רם-אל",
     title: "תור רם-אל - מערכת חיפוש תורים",
-    description: "מערכת חיפוש תורים אוטומטית למרפאת רם-אל",
+    description: "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
   },
   twitter: {
     card: "summary",
     title: "תור רם-אל",
-    description: "מערכת חיפוש תורים אוטומטית למרפאת רם-אל",
+    description: "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
   },
 };
 
@@ -70,7 +71,8 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1">{children}</main>
+                  <main className="flex-1 with-bottom-nav">{children}</main>
+                  <BottomNav />
                 </div>
               </HeaderProvider>
               <Toaster position="top-center" dir="rtl" />

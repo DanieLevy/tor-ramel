@@ -5,8 +5,8 @@ import { useHeader } from '@/components/header-context'
 import { useAuth, withAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar, Bell, Search, LogOut, TrendingUp, Clock, CheckCircle } from 'lucide-react'
-import Link from 'next/link'
+import { LogOut, Clock, CheckCircle, TrendingUp, Calendar } from 'lucide-react'
+import { AppointmentBanner } from '@/components/appointment-banner'
 
 function HomePage() {
   const updateHeader = useHeader()
@@ -31,120 +31,92 @@ function HomePage() {
   }, [updateHeader, logout, user])
 
   return (
-    <div className="container py-8 px-4">
-      <div className="mx-auto max-w-4xl space-y-8">
-        {/* Hero Section */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-            ברוך הבא לתור רם-אל
+    <div className="container py-6 px-4">
+      <div className="mx-auto max-w-4xl space-y-6">
+        {/* Appointment Banner - Always at top */}
+        <AppointmentBanner />
+
+        {/* Welcome Section */}
+        <div className="text-center space-y-3 py-8">
+          <h1 className="text-3xl font-bold tracking-tight">
+            ברוך הבא, {user?.email?.split('@')[0]}
           </h1>
-          <p className="text-xl text-muted-foreground">
-            המערכת החכמה למציאת תורים במרפאה
+          <p className="text-muted-foreground text-lg">
+            המערכת שלך למציאת תורים במספרת רם-אל
           </p>
-          {user && (
-            <p className="text-sm text-muted-foreground">
-              מחובר כ: <span className="font-medium" dir="ltr">{user.email}</span>
-            </p>
-          )}
         </div>
 
-        {/* Main Actions */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <Link href="/search">
-            <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer border-primary/20 hover:border-primary/40">
-              <CardHeader>
-                <Search className="h-10 w-10 mb-2 text-primary" />
-                <CardTitle>חיפוש ידני</CardTitle>
-                <CardDescription>
-                  חפש תורים פנויים בתאריכים הקרובים
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="lg">
-                  התחל חיפוש
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/subscribe">
-            <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <Bell className="h-10 w-10 mb-2 text-primary" />
-                <CardTitle>התראות</CardTitle>
-                <CardDescription>
-                  הרשם לקבלת התראות על תורים פנויים
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full" size="lg" variant="outline">
-                  הגדר התראות
-                </Button>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Card>
-            <CardHeader>
-              <TrendingUp className="h-10 w-10 mb-2 text-primary" />
-              <CardTitle>סטטיסטיקות</CardTitle>
-              <CardDescription>
-                נתונים בזמן אמת
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">בדיקות היום:</span>
-                  <span className="font-medium">142</span>
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="border-muted">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">בדיקות היום</p>
+                  <p className="text-2xl font-bold mt-1">142</p>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">תורים שנמצאו:</span>
-                  <span className="font-medium text-green-600">18</span>
+                <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-muted">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">תורים שנמצאו</p>
+                  <p className="text-2xl font-bold mt-1 text-green-600">18</p>
                 </div>
+                <Calendar className="h-8 w-8 text-green-600/30" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Info Section */}
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        {/* How it Works */}
+        <Card className="bg-muted/30 border-muted">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              איך זה עובד?
+              איך המערכת עובדת?
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+              <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">חיפוש אוטומטי</p>
-                <p className="text-sm text-muted-foreground">
-                  המערכת סורקת את לוח התורים כל 5 דקות ומחפשת תורים פנויים
+                <p className="text-sm font-medium">סריקה אוטומטית כל 5 דקות</p>
+                <p className="text-xs text-muted-foreground">
+                  המערכת בודקת תורים פנויים באופן רציף
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+              <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">התראות מיידיות</p>
-                <p className="text-sm text-muted-foreground">
-                  קבל התראה ברגע שנמצא תור פנוי בתאריך שמעניין אותך
+                <p className="text-sm font-medium">התראות מיידיות</p>
+                <p className="text-xs text-muted-foreground">
+                  קבל הודעה ברגע שנמצא תור
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
+              <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-medium">חיפוש ידני</p>
-                <p className="text-sm text-muted-foreground">
-                  חפש תורים בעצמך בכל זמן שתרצה
+                <p className="text-sm font-medium">חיפוש ידני מהיר</p>
+                <p className="text-xs text-muted-foreground">
+                  חפש תורים בכל רגע נתון
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Footer Info */}
+        <div className="text-center text-sm text-muted-foreground pt-4">
+          <p>המערכת פועלת 24/7 ומחפשת עבורך תורים פנויים</p>
+          <p className="mt-1">השתמש בתפריט התחתון כדי לנווט במערכת</p>
+        </div>
       </div>
     </div>
   )

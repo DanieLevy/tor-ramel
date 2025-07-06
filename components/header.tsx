@@ -22,15 +22,15 @@ export function Header() {
   const pathname = usePathname()
   const [mounted, setMounted] = React.useState(false)
 
-  // Don't show header on auth pages
-  if (pathname === '/login' || pathname === '/verify-otp') {
-    return null
-  }
-
   // Avoid hydration mismatch
   React.useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Don't show header on auth pages
+  if (pathname === '/login' || pathname === '/verify-otp') {
+    return null
+  }
 
   return (
     <header className={cn(
