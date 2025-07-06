@@ -479,6 +479,20 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
             continue
           }
           
+          // Check if there's already a pending notification in the queue
+          const { data: existingPending } = await supabase
+            .from('notification_queue')
+            .select('id')
+            .eq('subscription_id', subscription.id)
+            .eq('appointment_date', appointment.date)
+            .eq('status', 'pending')
+            .single()
+          
+          if (existingPending) {
+            console.log(`Pending notification already exists for subscription ${subscription.id} on ${appointment.date}`)
+            continue
+          }
+          
           // Queue the notification
           const { error: queueError } = await supabase
             .from('notification_queue')

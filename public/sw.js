@@ -1,8 +1,8 @@
-// Service Worker for תור רם-אל PWA
-const SW_VERSION = '2025-01-28-v2.8'
-const CACHE_NAME = 'tor-ramel-v2.9'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v12';
-const API_CACHE = 'tor-ramel-api-v12';
+// Service Worker v3.1
+const SW_VERSION = '2025-01-28-v3.1'
+const CACHE_NAME = 'tor-ramel-v3.1'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v13';
+const API_CACHE = 'tor-ramel-api-v13';
 
 // Assets to cache on install
 const STATIC_ASSETS = [

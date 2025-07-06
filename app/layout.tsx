@@ -14,8 +14,6 @@ export const metadata: Metadata = {
   description: "מערכת חכמה לזימון תורים למספרת רם-אל",
   keywords: "תור, מספרה, רם-אל, זימון תורים",
   manifest: "/manifest.json",
-  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
-  themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
