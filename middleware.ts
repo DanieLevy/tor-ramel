@@ -10,7 +10,9 @@ const publicRoutes = [
   '/api/auth/verify-otp',
   '/sw.js',
   '/manifest.json',
-  '/browserconfig.xml'
+  '/browserconfig.xml',
+  '/.netlify/functions',  // Allow Netlify functions
+  '/test-function'  // Test page for function
 ]
 
 export function middleware(request: NextRequest) {

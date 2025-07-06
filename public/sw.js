@@ -1,7 +1,7 @@
 // Service Worker for תור רם-אל PWA
-const CACHE_NAME = 'tor-ramel-v5';
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v5';
-const API_CACHE = 'tor-ramel-api-v5';
+const CACHE_NAME = 'tor-ramel-v6';
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v6';
+const API_CACHE = 'tor-ramel-api-v6';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -55,6 +55,11 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET requests (POST, PUT, DELETE, etc.)
   if (request.method !== 'GET') {
+    return;
+  }
+
+  // Skip Netlify functions
+  if (url.pathname.includes('/.netlify/functions')) {
     return;
   }
 

@@ -497,11 +497,29 @@ async function findAppointments() {
 // ============================================================================
 // NETLIFY FUNCTION HANDLER
 // ============================================================================
-exports.handler = async (event, context) => {
+
+// Main handler for both scheduled and manual triggers
+async function handler(req, context) {
   const functionStart = Date.now()
   
   try {
     console.log('🚀 AUTO-CHECK: Starting execution')
+    
+    // Check if this is a scheduled invocation
+    let isScheduled = false
+    let nextRun = null
+    
+    try {
+      const body = await req.json()
+      if (body && body.next_run) {
+        isScheduled = true
+        nextRun = body.next_run
+        console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
+      }
+    } catch (e) {
+      // Not a scheduled invocation or no body
+      console.log('🔧 Manual invocation')
+    }
     
     const appointmentResults = await findAppointments()
     
@@ -511,6 +529,8 @@ exports.handler = async (event, context) => {
     const responseBody = {
       success: true,
       executionTime: totalTime,
+      isScheduled,
+      nextRun,
       data: {
         found: appointmentResults.found,
         appointmentCount: appointmentResults.appointments.length,
@@ -519,35 +539,40 @@ exports.handler = async (event, context) => {
       }
     }
     
-    return {
-      statusCode: 200,
+    return new Response(JSON.stringify(responseBody), {
+      status: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify(responseBody)
-    }
+      }
+    })
     
   } catch (error) {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
     
-    return {
-      statusCode: 500,
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      executionTime: totalTime
+    }), {
+      status: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        success: false,
-        error: error.message,
-        executionTime: totalTime
-      })
-    }
+      }
+    })
   }
 }
 
-// Schedule configuration for Netlify (commented out for now)
-// exports.config = {
-//   schedule: "@every 5m"
-// }
+// Default export for Netlify Functions
+exports.default = handler
+
+// Schedule configuration for Netlify
+// Runs every 5 minutes
+exports.config = {
+  schedule: "*/5 * * * *"
+}
+
+// Legacy handler export for backward compatibility
+exports.handler = handler

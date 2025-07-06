@@ -27,12 +27,8 @@
   # Maximum execution time in seconds (10s max for free tier)
   timeout = 10
   # Schedule for auto-check function (every 5 minutes)
-  # IMPORTANT: To enable scheduled runs:
-  # 1. Uncomment the line below
-  # 2. Deploy to Netlify
-  # 3. The function will run automatically every 5 minutes
+  # The schedule is now configured in the function file itself
   # Note: With 125K monthly invocations limit, 5-minute intervals = ~8,640 runs/month
-  # schedule = "*/5 * * * *"
 
 # Development settings
 [dev]
