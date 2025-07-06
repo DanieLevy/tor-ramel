@@ -23,12 +23,10 @@
   # Set function timeout (max 10 seconds for free tier)
   included_files = ["netlify/functions/**"]
 
-[functions.auto-check]
-  # Maximum execution time in seconds (10s max for free tier)
-  timeout = 10
-  # Schedule for auto-check function (every 5 minutes)
-  # The schedule is now configured in the function file itself
-  # Note: With 125K monthly invocations limit, 5-minute intervals = ~8,640 runs/month
+# Note: Schedule for auto-check function is defined in the function file itself
+# using export const config = { schedule: "*/5 * * * *" }
+# This runs every 5 minutes
+# With 125K monthly invocations limit, 5-minute intervals = ~8,640 runs/month
 
 # Development settings
 [dev]

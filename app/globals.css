@@ -317,6 +317,18 @@ input[type="text"] {
   margin-top: calc(-1 * var(--safe-area-inset-top));
 }
 
+/* Main content spacing for fixed header */
+.with-header {
+  /* Account for header height + safe area */
+  padding-top: calc(3.5rem + var(--safe-area-inset-top));
+}
+
+/* Combined header and bottom nav */
+.with-header.with-bottom-nav {
+  padding-top: calc(3.5rem + var(--safe-area-inset-top));
+  padding-bottom: calc(4.5rem + var(--safe-area-inset-bottom));
+}
+
 /* Touch manipulation for better mobile experience */
 .touch-manipulation {
   touch-action: manipulation;

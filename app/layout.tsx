@@ -71,7 +71,7 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1 with-bottom-nav">{children}</main>
+                  <main className="flex-1 with-header with-bottom-nav">{children}</main>
                   <BottomNav />
                 </div>
               </HeaderProvider>

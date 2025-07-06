@@ -1,8 +1,8 @@
-const axios = require('axios')
-const cheerio = require('cheerio')
-const http = require('http')
-const https = require('https')
-const { createClient } = require('@supabase/supabase-js')
+import axios from 'axios'
+import * as cheerio from 'cheerio'
+import http from 'http'
+import https from 'https'
+import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -382,6 +382,17 @@ async function saveToSupabase(results) {
 async function findAppointments() {
   console.log('🚀 Starting optimized appointment search')
   console.log(`📅 Current Israel time: ${new Date().toLocaleString('he-IL', { timeZone: ISRAEL_TIMEZONE })}`)
+  
+  // Debug: Show day calculation for next week
+  const debugDate = new Date()
+  console.log('🔍 Debug - Days of the week check:')
+  for (let i = 0; i < 7; i++) {
+    const checkDate = addDaysIsrael(debugDate, i)
+    const dayName = new Intl.DateTimeFormat('en-US', { timeZone: ISRAEL_TIMEZONE, weekday: 'long' }).format(checkDate)
+    const dateStr = formatDateIsrael(checkDate)
+    console.log(`   ${dateStr}: ${dayName} ${isClosedDay(checkDate) ? '(CLOSED)' : '(Open)'}`)
+  }
+  
   const startTime = Date.now()
   
   // Reset performance stats
@@ -495,11 +506,11 @@ async function findAppointments() {
 }
 
 // ============================================================================
-// NETLIFY FUNCTION HANDLER
+// NETLIFY FUNCTION HANDLER (2025 Format)
 // ============================================================================
 
-// Main handler for both scheduled and manual triggers
-async function handler(event, context) {
+// Main handler for scheduled function - runs every 5 minutes
+export default async (req) => {
   const functionStart = Date.now()
   
   try {
@@ -509,22 +520,17 @@ async function handler(event, context) {
     let isScheduled = false
     let nextRun = null
     
-    // Netlify scheduled functions pass next_run in the body
-    if (event.body) {
-      try {
-        const body = JSON.parse(event.body)
-        if (body && body.next_run) {
-          isScheduled = true
-          nextRun = body.next_run
-          console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
-        }
-      } catch (e) {
-        // Not a scheduled invocation or invalid body
+    // Netlify scheduled functions pass next_run in the request body
+    try {
+      const body = await req.json()
+      if (body && body.next_run) {
+        isScheduled = true
+        nextRun = body.next_run
+        console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
       }
-    }
-    
-    if (!isScheduled) {
-      console.log('🔧 Manual invocation')
+    } catch (e) {
+      // Not a scheduled invocation or invalid body
+      console.log('🔧 Manual invocation (no next_run in body)')
     }
     
     const appointmentResults = await findAppointments()
@@ -537,6 +543,7 @@ async function handler(event, context) {
       executionTime: totalTime,
       isScheduled,
       nextRun,
+      timestamp: new Date().toISOString(),
       data: {
         found: appointmentResults.found,
         appointmentCount: appointmentResults.appointments.length,
@@ -545,38 +552,35 @@ async function handler(event, context) {
       }
     }
     
-    return {
-      statusCode: 200,
+    return new Response(JSON.stringify(responseBody), {
+      status: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify(responseBody)
-    }
+      }
+    })
     
   } catch (error) {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
+    console.error(error.stack)
     
-    return {
-      statusCode: 500,
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      executionTime: totalTime,
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({
-        success: false,
-        error: error.message,
-        executionTime: totalTime
-      })
-    }
+      }
+    })
   }
 }
 
-// Export for Netlify Functions
-module.exports = {
-  handler,
-  config: {
-    schedule: "*/5 * * * *"
-  }
+// Schedule configuration - runs every 5 minutes
+export const config = {
+  schedule: "*/5 * * * *"
 }
