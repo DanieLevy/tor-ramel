@@ -317,26 +317,375 @@ function generateNotificationEmailHTML(data) {
   `
 }
 
+// Generate multi-date notification email
+function generateMultiDateNotificationEmail(data) {
+  const { appointments, subscriptionId } = data
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+  
+  // Encode all appointment data for the action URLs
+  const appointmentData = appointments.map(apt => ({
+    date: apt.date,
+    times: apt.newTimes
+  }))
+  const encodedAppointments = encodeURIComponent(JSON.stringify(appointmentData))
+  
+  // Create URL with parameters for approve/decline actions
+  const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}&appointments=${encodedAppointments}`
+  const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&appointments=${encodedAppointments}`
+  const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
+  
+  const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>תורים פנויים - תור רם-אל</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #000000;
+      background-color: #ffffff;
+      direction: rtl;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .logo {
+      display: inline-block;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .logo img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: block;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+      font-size: 16px;
+      color: #666666;
+    }
+    
+    .summary-badge {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      margin-bottom: 32px;
+      border: 1px solid #e5e5e5;
+    }
+    
+    .summary-badge strong {
+      font-size: 20px;
+      color: #000000;
+      margin-left: 8px;
+    }
+    
+    .summary-badge span {
+      font-size: 16px;
+      color: #666666;
+    }
+    
+    .appointment-card {
+      background-color: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    
+    .appointment-date {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    
+    .date-info strong {
+      display: block;
+      font-size: 18px;
+      color: #000000;
+      margin-bottom: 4px;
+    }
+    
+    .date-info span {
+      font-size: 14px;
+      color: #666666;
+    }
+    
+    .times-count {
+      background-color: #000000;
+      color: #ffffff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .times-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .time-chip {
+      display: inline-block;
+      padding: 6px 14px;
+      background-color: #ffffff;
+      border: 1px solid #000000;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #000000;
+    }
+    
+    .actions {
+      margin: 40px 0;
+      padding: 32px 0;
+      border-top: 1px solid #e5e5e5;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .button {
+      display: block;
+      width: 100%;
+      padding: 16px 32px;
+      margin-bottom: 12px;
+      text-align: center;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+    
+    .button-primary {
+      background-color: #000000;
+      color: #ffffff;
+      border: 2px solid #000000;
+    }
+    
+    .button-secondary {
+      background-color: #ffffff;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+    
+    .notice {
+      padding: 16px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #666666;
+      margin-bottom: 32px;
+    }
+    
+    .notice strong {
+      color: #000000;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #999999;
+      padding-top: 32px;
+    }
+    
+    .footer a {
+      color: #666666;
+      text-decoration: none;
+      margin: 0 8px;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .divider {
+      height: 1px;
+      background-color: #e5e5e5;
+      margin: 24px 0;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .container {
+        padding: 32px 16px;
+      }
+      
+      h1 {
+        font-size: 20px;
+      }
+      
+      .button {
+        font-size: 15px;
+        padding: 14px 24px;
+      }
+      
+      .appointment-card {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+      </div>
+      <h1>נמצאו תורים פנויים 🎉</h1>
+      <p class="subtitle">מספרת רם-אל</p>
+    </div>
+    
+    <center>
+      <div class="summary-badge">
+        <span>נמצאו תורים ב-</span>
+        <strong>${appointments.length} ${appointments.length === 1 ? 'יום' : 'ימים'}</strong>
+      </div>
+    </center>
+    
+    <div style="margin-bottom: 32px;">
+      ${appointments.map(apt => `
+        <div class="appointment-card">
+          <div class="appointment-date">
+            <div class="date-info">
+              <strong>${apt.dayName}</strong>
+              <span>${apt.date}</span>
+            </div>
+            <div class="times-count">${apt.newTimes.length} שעות</div>
+          </div>
+          <div class="times-container">
+            ${apt.newTimes.slice(0, 10).map(time => `<span class="time-chip">${time}</span>`).join('')}
+            ${apt.newTimes.length > 10 ? `<span class="time-chip">+${apt.newTimes.length - 10}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    
+    <div class="actions">
+      <a href="${approveUrl}" class="button button-primary">
+        מצאתי תור מתאים
+      </a>
+      <a href="${declineUrl}" class="button button-secondary">
+        אף תור לא מתאים
+      </a>
+    </div>
+    
+    <div class="notice">
+      <strong>לתשומת לבך:</strong> בחירת "אף תור לא מתאים" תמנע התראות עתידיות על כל השעות המוצגות למעלה. תמשיך לקבל התראות על שעות חדשות שיתפנו.
+    </div>
+    
+    <div class="footer">
+      <a href="${unsubscribeUrl}">ביטול הרשמה</a>
+      <span>•</span>
+      <a href="${baseUrl}/subscribe">ניהול התראות</a>
+      <span>•</span>
+      <a href="${baseUrl}">כניסה למערכת</a>
+      <div class="divider"></div>
+      <p>© 2025 תור רם-אל</p>
+    </div>
+  </div>
+</body>
+</html>
+  `
+  
+  // Generate text version
+  const appointmentsList = appointments.map(apt => 
+    `${apt.dayName}, ${apt.date}:\n${apt.newTimes.join(', ')}`
+  ).join('\n\n')
+  
+  const text = `
+נמצאו תורים פנויים - תור רם-אל
+
+נמצאו תורים ב-${appointments.length} ${appointments.length === 1 ? 'יום' : 'ימים'}:
+
+${appointmentsList}
+
+מה ברצונך לעשות?
+
+מצאתי תור מתאים:
+${approveUrl}
+
+אף תור לא מתאים:
+${declineUrl}
+
+לתשומת לבך: בחירת "אף תור לא מתאים" תמנע התראות עתידיות על כל השעות המוצגות למעלה.
+
+ביטול הרשמה: ${unsubscribeUrl}
+ניהול התראות: ${baseUrl}/subscribe
+
+© 2025 תור רם-אל
+  `
+  
+  return { html, text }
+}
+
 // Helper function to send notification email
 async function sendNotificationEmail(data) {
   try {
-    const { to, date, dayName, times, subscriptionId } = data
+    const { to, appointments, subscriptionId } = data
     
-    // Generate email content
-    const html = generateNotificationEmailHTML({
-      date,
-      dayName,
-      times,
-      subscriptionId
-    })
+    // Generate email content based on whether it's single or multi-date
+    let html, text, subject
     
-    const text = `
+    if (appointments && appointments.length > 0) {
+      // Multi-date notification
+      const emailData = generateMultiDateNotificationEmail({
+        appointments,
+        subscriptionId
+      })
+      html = emailData.html
+      text = emailData.text
+      subject = `🎉 תורים פנויים - ${appointments.length} ${appointments.length === 1 ? 'יום' : 'ימים'}`
+    } else if (data.date) {
+      // Single date notification (backward compatibility)
+      html = generateNotificationEmailHTML({
+        date: data.date,
+        dayName: data.dayName,
+        times: data.times,
+        subscriptionId
+      })
+      
+      text = `
 נמצאו תורים פנויים - תור רם-אל
 
-תאריך: ${dayName}, ${date}
+תאריך: ${data.dayName}, ${data.date}
 
 שעות זמינות:
-${times.join(', ')}
+${data.times.join(', ')}
 
 מה ברצונך לעשות?
 
@@ -344,18 +693,22 @@ ${times.join(', ')}
 ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscriptionId}
 
 אף תור לא מתאים:
-${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}
+${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(data.times.join(','))}&date=${data.date}
 
 לתשומת לבך: בחירת "אף תור לא מתאים" תמנע התראות עתידיות על השעות הללו בלבד.
 
 © 2025 תור רם-אל
-    `
+      `
+      subject = `🎉 תורים פנויים - ${data.dayName} ${data.date}`
+    } else {
+      throw new Error('Invalid notification data')
+    }
     
     // Send email
     const info = await transporter.sendMail({
       from: `"Tor-Ramel" <${process.env.EMAIL_SENDER}>`,
       to,
-      subject: `🎉 תורים פנויים - ${dayName} ${date}`,
+      subject,
       text,
       html
     })
@@ -413,7 +766,7 @@ export async function processNotificationQueue(limit = 10) {
     // Process each notification
     for (const item of queueItems) {
       try {
-        const { subscription, appointment_date, available_times, new_times } = item
+        const { subscription, appointments, appointment_date, available_times, new_times } = item
         const userEmail = subscription.users.email
 
         // Validate subscription is still active
@@ -439,62 +792,127 @@ export async function processNotificationQueue(limit = 10) {
           })
           .eq('id', item.id)
 
-        // Check if user has already been notified for these exact times today
-        const { data: recentNotification } = await supabase
-          .from('notified_appointments')
-          .select('id')
-          .eq('subscription_id', subscription.id)
-          .eq('appointment_date', appointment_date)
-          .eq('notified_times', new_times)
-          .gte('notification_sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .single()
+        // Check if this is a grouped notification or single
+        let emailData
+        const isGrouped = appointments && appointments.length > 0
+        
+        if (isGrouped) {
+          // Grouped notification - check for duplicate notifications
+          for (const apt of appointments) {
+            const { data: recentNotification } = await supabase
+              .from('notified_appointments')
+              .select('id')
+              .eq('subscription_id', subscription.id)
+              .eq('appointment_date', apt.date)
+              .eq('notified_times', apt.newTimes)
+              .gte('notification_sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+              .single()
 
-        if (recentNotification) {
-          console.log(`Skipping duplicate notification for subscription ${subscription.id}`)
-          await supabase
-            .from('notification_queue')
-            .update({ 
-              status: 'skipped',
-              error_message: 'Duplicate notification within 24 hours'
-            })
-            .eq('id', item.id)
-          continue
+            if (recentNotification) {
+              console.log(`Recent notification exists for ${apt.date}, filtering from group`)
+              // Remove this appointment from the group
+              appointments.splice(appointments.indexOf(apt), 1)
+            }
+          }
+          
+          // If no appointments left after filtering, skip
+          if (appointments.length === 0) {
+            console.log(`All appointments already notified for subscription ${subscription.id}`)
+            await supabase
+              .from('notification_queue')
+              .update({ 
+                status: 'skipped',
+                error_message: 'All appointments already notified within 24 hours'
+              })
+              .eq('id', item.id)
+            continue
+          }
+          
+          emailData = {
+            to: userEmail,
+            appointments,
+            subscriptionId: subscription.id
+          }
+        } else {
+          // Single notification (backward compatibility)
+          // Check if user has already been notified for these exact times today
+          const { data: recentNotification } = await supabase
+            .from('notified_appointments')
+            .select('id')
+            .eq('subscription_id', subscription.id)
+            .eq('appointment_date', appointment_date)
+            .eq('notified_times', new_times)
+            .gte('notification_sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .single()
+
+          if (recentNotification) {
+            console.log(`Skipping duplicate notification for subscription ${subscription.id}`)
+            await supabase
+              .from('notification_queue')
+              .update({ 
+                status: 'skipped',
+                error_message: 'Duplicate notification within 24 hours'
+              })
+              .eq('id', item.id)
+            continue
+          }
+
+          // Calculate day name for the appointment date
+          const dayName = new Intl.DateTimeFormat('he-IL', {
+            timeZone: 'Asia/Jerusalem',
+            weekday: 'long'
+          }).format(new Date(appointment_date + 'T00:00:00'))
+          
+          emailData = {
+            to: userEmail,
+            date: appointment_date,
+            dayName: dayName,
+            times: new_times,
+            subscriptionId: subscription.id
+          }
         }
-
-        // Calculate day name for the appointment date
-        const dayName = new Intl.DateTimeFormat('he-IL', {
-          timeZone: 'Asia/Jerusalem',
-          weekday: 'long'
-        }).format(new Date(appointment_date + 'T00:00:00'))
 
         // Send email with timeout
         const emailTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Email timeout')), 8000)
         )
         
-        const emailPromise = sendNotificationEmail({
-          to: userEmail,
-          date: appointment_date,
-          dayName: dayName,
-          times: new_times,
-          subscriptionId: subscription.id
-        })
+        const emailPromise = sendNotificationEmail(emailData)
 
         const emailSent = await Promise.race([emailPromise, emailTimeout])
 
         if (emailSent) {
-          // Record successful notification
-          const { error: notifyError } = await supabase
-            .from('notified_appointments')
-            .insert({
-              subscription_id: subscription.id,
-              appointment_date: appointment_date,
-              notified_times: new_times,
-              notification_sent_at: new Date().toISOString()
-            })
+          // Record successful notifications
+          if (isGrouped && appointments.length > 0) {
+            // Record each appointment in the group
+            for (const apt of appointments) {
+              const { error: notifyError } = await supabase
+                .from('notified_appointments')
+                .insert({
+                  subscription_id: subscription.id,
+                  appointment_date: apt.date,
+                  notified_times: apt.newTimes,
+                  notification_sent_at: new Date().toISOString()
+                })
 
-          if (notifyError) {
-            console.error('Error recording notification:', notifyError)
+              if (notifyError) {
+                console.error(`Error recording notification for ${apt.date}:`, notifyError)
+              }
+            }
+          } else {
+            // Single appointment
+            const { error: notifyError } = await supabase
+              .from('notified_appointments')
+              .insert({
+                subscription_id: subscription.id,
+                appointment_date: appointment_date,
+                notified_times: new_times,
+                notification_sent_at: new Date().toISOString()
+              })
+
+            if (notifyError) {
+              console.error('Error recording notification:', notifyError)
+            }
           }
 
           // Update queue item
@@ -507,7 +925,10 @@ export async function processNotificationQueue(limit = 10) {
             .eq('id', item.id)
 
           processed++
-          console.log(`✅ Email sent to ${userEmail} for ${appointment_date}`)
+          const message = isGrouped 
+            ? `✅ Email sent to ${userEmail} for ${appointments.length} dates`
+            : `✅ Email sent to ${userEmail} for ${appointment_date}`
+          console.log(message)
         } else {
           throw new Error('Email sending failed')
         }

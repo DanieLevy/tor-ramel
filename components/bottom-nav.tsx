@@ -21,7 +21,7 @@ export function BottomNav() {
   const pathname = usePathname()
 
   // Don't show bottom nav on auth pages
-  if (pathname === '/login' || pathname === '/verify-otp') {
+  if (pathname === '/login' || pathname === '/verify-otp' || pathname === '/register') {
     return null
   }
 

@@ -16,7 +16,7 @@ import { useHeaderContext } from './header-context'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { useAuth } from '@/components/auth-context'
+import { useAuth } from '@/components/auth-provider'
 
 export function Header() {
   const { config } = useHeaderContext()
@@ -31,7 +31,7 @@ export function Header() {
   }, [])
 
   // Don't show header on auth pages
-  if (pathname === '/login' || pathname === '/verify-otp') {
+  if (pathname === '/login' || pathname === '/verify-otp' || pathname === '/register') {
     return null
   }
 
@@ -263,7 +263,7 @@ export function Header() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            
+
             {/* Hamburger Menu */}
             {config.showMenu && (
               <DropdownMenu>

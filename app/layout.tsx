@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HeaderProvider } from "@/components/header-context";
-import { AuthProvider } from "@/components/auth-context";
+import { AuthProvider } from "@/components/auth-provider";
 import { Header } from "@/components/header";
 import { PWAHead } from "@/components/pwa-head";
 import { PWAProvider } from "@/components/pwa-provider";

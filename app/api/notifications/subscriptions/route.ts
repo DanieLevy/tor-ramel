@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth/jwt'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -9,72 +9,36 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    // Get user from cookie
-    const cookieStore = await cookies()
-    const authCookie = cookieStore.get('tor-ramel-auth')
+    // Get user from JWT token
+    const user = await getCurrentUser()
     
-    // Enhanced logging for PWA debugging
-    const userAgent = request.headers.get('user-agent') || ''
-    const isPWA = userAgent.includes('PWA') || request.headers.get('sec-fetch-dest') === 'empty'
+    if (!user) {
+      console.error('🔐 [Subscriptions API] No authenticated user')
+      return NextResponse.json({ 
+        error: 'Unauthorized'
+      }, { status: 401 })
+    }
     
-    console.log('🍪 [Subscriptions API] Auth check:', {
-      hasCookie: !!authCookie,
-      isPWA,
-      userAgent: userAgent.substring(0, 50) + '...',
-      referer: request.headers.get('referer'),
-      origin: request.headers.get('origin')
+    console.log('🔐 [Subscriptions API] Authenticated user:', {
+      userId: user.userId,
+      email: user.email
     })
-    
-    if (!authCookie) {
-      console.error('🍪 [Subscriptions API] No auth cookie found')
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        debug: { noCookie: true, isPWA }
-      }, { status: 401 })
-    }
-
-    let authData
-    try {
-      authData = JSON.parse(authCookie.value)
-      console.log('🍪 [Subscriptions API] Parsed auth data:', {
-        hasEmail: !!authData.email,
-        hasUserId: !!authData.userId,
-        userIdLength: authData.userId?.length
-      })
-    } catch (parseError) {
-      console.error('🍪 [Subscriptions API] Failed to parse auth cookie:', parseError)
-      return NextResponse.json({ 
-        error: 'Invalid auth data',
-        debug: { parseError: true, isPWA }
-      }, { status: 401 })
-    }
-    
-    const { email, userId } = authData
-    
-    if (!userId) {
-      console.error('🍪 [Subscriptions API] No userId in auth data')
-      return NextResponse.json({ 
-        error: 'Invalid auth data',
-        debug: { noUserId: true, isPWA }
-      }, { status: 401 })
-    }
 
     // Get all subscriptions for user using userId directly
     const { data: subscriptions, error: fetchError } = await supabase
       .from('notification_subscriptions')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', user.userId)
       .order('created_at', { ascending: false })
 
     if (fetchError) {
-      console.error('🍪 [Subscriptions API] Database error:', fetchError)
+      console.error('🔐 [Subscriptions API] Database error:', fetchError)
       return NextResponse.json({ 
-        error: 'Failed to fetch subscriptions',
-        debug: { dbError: fetchError.message, isPWA }
+        error: 'Failed to fetch subscriptions'
       }, { status: 500 })
     }
 
-    console.log(`🍪 [Subscriptions API] Returning ${subscriptions?.length || 0} subscriptions`)
+    console.log(`🔐 [Subscriptions API] Returning ${subscriptions?.length || 0} subscriptions for user ${user.userId}`)
     return NextResponse.json(subscriptions || [])
 
   } catch (error) {

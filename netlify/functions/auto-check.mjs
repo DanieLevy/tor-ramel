@@ -5,6 +5,7 @@ import https from 'https'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import { processNotificationQueue } from './notification-processor.mjs'
+import crypto from 'crypto'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -471,7 +472,13 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           })
         }
         
-        // Process each matching date
+        if (matchingDates.length === 0) {
+          continue
+        }
+        
+        // Group all appointments for this subscription
+        const appointmentsToNotify = []
+        
         for (const appointment of matchingDates) {
           // Get ignored times for this user and date
           const { data: ignoredData } = await supabase
@@ -505,36 +512,57 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
             continue
           }
           
-          // Check if there's already a pending notification in the queue
+          // Add to appointments to notify
+          const dayName = new Intl.DateTimeFormat('he-IL', {
+            timeZone: 'Asia/Jerusalem',
+            weekday: 'long'
+          }).format(new Date(appointment.date + 'T00:00:00'))
+          
+          appointmentsToNotify.push({
+            date: appointment.date,
+            dayName,
+            times: appointment.times,
+            newTimes
+          })
+        }
+        
+        // If we have appointments to notify about, create a single queue entry
+        if (appointmentsToNotify.length > 0) {
+          // Check if there's already a pending notification in the queue for this subscription
           const { data: existingPending } = await supabase
             .from('notification_queue')
             .select('id')
             .eq('subscription_id', subscription.id)
-            .eq('appointment_date', appointment.date)
             .eq('status', 'pending')
             .single()
           
           if (existingPending) {
-            console.log(`Pending notification already exists for subscription ${subscription.id} on ${appointment.date}`)
+            console.log(`Pending notification already exists for subscription ${subscription.id}`)
             continue
           }
           
-          // Queue the notification
+          // Generate a batch ID for this group of appointments
+          const batchId = crypto.randomUUID()
+          
+          // Queue the grouped notification
           const { error: queueError } = await supabase
             .from('notification_queue')
             .insert({
               subscription_id: subscription.id,
-              appointment_date: appointment.date,
-              available_times: appointment.times,
-              new_times: newTimes,
-              status: 'pending'
+              appointments: appointmentsToNotify, // Store all appointments in JSONB column
+              batch_id: batchId,
+              status: 'pending',
+              // Keep these for backward compatibility (use first appointment)
+              appointment_date: appointmentsToNotify[0].date,
+              available_times: appointmentsToNotify[0].times,
+              new_times: appointmentsToNotify[0].newTimes
             })
           
           if (queueError) {
             console.error('Error queueing notification:', queueError)
           } else {
             notificationsQueued++
-            console.log(`✅ Queued notification for subscription ${subscription.id} on ${appointment.date}`)
+            console.log(`✅ Queued grouped notification for subscription ${subscription.id} with ${appointmentsToNotify.length} dates`)
           }
         }
       } catch (error) {

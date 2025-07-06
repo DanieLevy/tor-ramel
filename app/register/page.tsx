@@ -8,13 +8,14 @@ import { useAuth } from '@/components/auth-provider'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [emailValid, setEmailValid] = useState<boolean | null>(null)
   const [passwordVisible, setPasswordVisible] = useState(false)
-  const { login } = useAuth()
+  const { register } = useAuth()
 
   const validateEmail = (value: string) => {
     const emailRegex = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i
@@ -35,31 +36,22 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!emailValid || !password) return
+    if (!emailValid || !password || password !== confirmPassword) return
     
     setIsLoading(true)
     
     try {
-      await login(email, password)
-      toast.success('התחברת בהצלחה!')
+      const response = await register(email, password, confirmPassword)
+      toast.success(response.message || 'נרשמת בהצלחה!')
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'שגיאה בהתחברות'
-      
-      // Check if this might be a user without password
-      if (errorMessage.includes('שגיאה') || errorMessage.includes('סיסמה')) {
-        toast.error(
-          <div>
-            <p>{errorMessage}</p>
-            <p className="text-xs mt-1">אם נרשמת בעבר ללא סיסמה, עבור להרשמה להגדרת סיסמה</p>
-          </div>
-        )
-      } else {
-        toast.error(errorMessage)
-      }
+      toast.error(error instanceof Error ? error.message : 'שגיאה בהרשמה')
     } finally {
       setIsLoading(false)
     }
   }
+
+  const passwordsMatch = password && confirmPassword && password === confirmPassword
+  const passwordError = password && confirmPassword && !passwordsMatch
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-background via-background to-muted/20">
@@ -74,9 +66,9 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
-            ברוכים הבאים
+            הרשמה למערכת
           </h1>
-          <p className="text-muted-foreground mt-2">הזן את פרטי ההתחברות שלך</p>
+          <p className="text-muted-foreground mt-2">צור חשבון חדש או הגדר סיסמה לחשבון קיים</p>
         </div>
 
         {/* Form */}
@@ -121,7 +113,7 @@ export default function LoginPage() {
                   "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
                   "transition-all duration-200"
                 )}
-                placeholder="הזן סיסמה"
+                placeholder="לפחות 6 תווים, אות וספרה"
                 required
                 minLength={6}
               />
@@ -133,32 +125,65 @@ export default function LoginPage() {
                 {passwordVisible ? "הסתר" : "הצג"}
               </button>
             </div>
+            {password && password.length < 6 && (
+              <p className="text-xs text-muted-foreground">הסיסמה חייבת להכיל לפחות 6 תווים</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="confirmPassword" className="text-sm font-medium">
+              אימות סיסמה
+            </label>
+            <input
+              id="confirmPassword"
+              type={passwordVisible ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={cn(
+                "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
+                "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+                "transition-all duration-200",
+                passwordError && "border-destructive focus:ring-destructive/50"
+              )}
+              placeholder="הזן שוב את הסיסמה"
+              required
+            />
+            {passwordError && (
+              <p className="text-xs text-destructive mt-1">הסיסמאות אינן תואמות</p>
+            )}
+            {passwordsMatch && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">הסיסמאות תואמות ✓</p>
+            )}
           </div>
 
           <Button
             type="submit"
-            disabled={!emailValid || !password || isLoading}
+            disabled={!emailValid || password.length < 6 || !passwordsMatch || isLoading}
             className="w-full py-6 rounded-xl text-base font-medium shadow-lg"
           >
             {isLoading ? (
               <>
                 <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-                מתחבר...
+                נרשם...
               </>
             ) : (
-              'התחבר'
+              'הרשם'
             )}
           </Button>
         </form>
 
         {/* Links */}
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-3">
           <Link 
-            href="/register" 
-            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            href="/login" 
+            className="text-sm text-muted-foreground hover:text-primary transition-colors block"
           >
-            אין לך חשבון? הירשם כאן
+            יש לך כבר חשבון? התחבר כאן
           </Link>
+          <div className="text-xs text-muted-foreground px-4">
+            <p className="font-medium">נרשמת בעבר ללא סיסמה?</p>
+            <p>השתמש בטופס זה כדי להגדיר סיסמה לחשבון שלך</p>
+          </div>
         </div>
       </div>
     </div>

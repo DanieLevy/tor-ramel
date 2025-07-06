@@ -1,14 +1,18 @@
 "use client"
 
 import { useState, useCallback, useEffect } from 'react'
-import { useAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Calendar, Loader2, Search, CheckCircle2, X, Zap } from 'lucide-react'
+import { Calendar, Loader2, Search, CheckCircle2, X, Zap, Clock, ExternalLink, CalendarDays, Sparkles, TrendingUp, AlertCircle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import axios from 'axios'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/components/auth-provider'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface AppointmentResult {
   date: string
@@ -28,12 +32,18 @@ interface SearchCache {
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 function SearchPage() {
-  const { user } = useAuth()
   const [isSearching, setIsSearching] = useState(false)
   const [results, setResults] = useState<AppointmentResult[]>([])
   const [searchType, setSearchType] = useState<'week' | 'two-weeks' | 'month'>('week')
   const [cache, setCache] = useState<SearchCache | null>(null)
   const [isUsingCache, setIsUsingCache] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [searchStats, setSearchStats] = useState({
+    totalDays: 0,
+    checkedDays: 0,
+    openDays: 0,
+    closedDays: 0
+  })
 
   // Load cache from localStorage on mount
   useEffect(() => {
@@ -59,67 +69,95 @@ function SearchPage() {
 
   const getDayNameHebrew = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00')
-    const shortDay = new Intl.DateTimeFormat('he-IL', {
+    const dayName = new Intl.DateTimeFormat('he-IL', {
       timeZone: 'Asia/Jerusalem',
-      weekday: 'short'
+      weekday: 'long'
     }).format(date)
     
     const dayNumber = date.getDate()
     const month = new Intl.DateTimeFormat('he-IL', {
       timeZone: 'Asia/Jerusalem',
-      month: 'short'
+      month: 'long'
     }).format(date)
     
-    return { shortDay, dayNumber, month }
+    return { dayName, dayNumber, month }
   }
 
-  const isOpenDay = (date: Date) => {
+  const isClosedDay = (date: Date) => {
     const dayOfWeek = date.getDay()
-    return dayOfWeek !== 1 && dayOfWeek !== 6 // Not Monday (1) or Saturday (6)
+    return dayOfWeek === 1 || dayOfWeek === 6 // Monday (1) or Saturday (6)
   }
 
-  const getSearchDates = (type: string): Date[] => {
+  const getOpenDays = (type: string): Date[] => {
     const dates: Date[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const daysToCheck = type === 'week' ? 7 : type === 'two-weeks' ? 14 : 30
+    const totalDays = type === 'week' ? 7 : type === 'two-weeks' ? 14 : 30
+    let closedDaysCount = 0
+    let daysChecked = 0
 
-    for (let i = 0; i < daysToCheck; i++) {
+    while (dates.length < totalDays && daysChecked < totalDays * 2) {
       const date = new Date(today)
-      date.setDate(today.getDate() + i)
-      if (isOpenDay(date)) {
-        dates.push(date)
+      date.setDate(today.getDate() + daysChecked)
+      
+      if (!isClosedDay(date)) {
+        dates.push(new Date(date))
+      } else {
+        closedDaysCount++
       }
+      daysChecked++
     }
+
+    // Update stats
+    setSearchStats({
+      totalDays,
+      checkedDays: 0,
+      openDays: dates.length,
+      closedDays: closedDaysCount
+    })
 
     return dates
   }
 
-  const checkDatesInBatch = async (dates: Date[]): Promise<AppointmentResult[]> => {
-    const dateStrings = dates.map(date => formatDateForAPI(date))
-
+  const checkSingleDate = async (dateStr: string, index: number, total: number): Promise<AppointmentResult> => {
     try {
-      const response = await axios.post('/api/check-appointment/batch', {
-        dates: dateStrings
+      const response = await axios.post('/api/check-appointment', {
+        date: dateStr
       }, {
-        timeout: 15000
+        timeout: 5000
       })
 
-      return response.data.results.map((result: any) => ({
-        ...result,
+      // Update progress
+      const checkedCount = index + 1
+      setProgress((checkedCount / total) * 100)
+      setSearchStats(prev => ({ ...prev, checkedDays: checkedCount }))
+
+      const dayInfo = getDayNameHebrew(dateStr)
+      
+      return {
+        ...response.data,
+        dayName: dayInfo.dayName,
         loading: false
-      }))
+      }
     } catch (error) {
-      console.error('Error checking dates:', error)
-      // Return error results for all dates
-      return dateStrings.map(dateStr => ({
+      console.error(`Error checking ${dateStr}:`, error)
+      
+      // Update progress even on error
+      const checkedCount = index + 1
+      setProgress((checkedCount / total) * 100)
+      setSearchStats(prev => ({ ...prev, checkedDays: checkedCount }))
+      
+      const dayInfo = getDayNameHebrew(dateStr)
+      
+      return {
         date: dateStr,
         available: false,
         times: [],
-        error: 'שגיאה',
+        dayName: dayInfo.dayName,
+        error: 'שגיאה בבדיקה',
         loading: false
-      }))
+      }
     }
   }
 
@@ -145,21 +183,72 @@ function SearchPage() {
     
     setIsSearching(true)
     setIsUsingCache(false)
-    const dates = getSearchDates(searchType)
+    setProgress(0)
+    const dates = getOpenDays(searchType)
     
     // Initialize results with loading states
-    const initialResults = dates.map(date => ({
-      date: formatDateForAPI(date),
-      available: false,
-      times: [],
-      loading: true
-    }))
+    const initialResults = dates.map(date => {
+      const dayInfo = getDayNameHebrew(formatDateForAPI(date))
+      return {
+        date: formatDateForAPI(date),
+        available: false,
+        times: [],
+        dayName: dayInfo.dayName,
+        loading: true
+      }
+    })
     setResults(initialResults)
 
     try {
-      // Check all dates in a single batch request
-      const results = await checkDatesInBatch(dates)
-      setResults(results)
+      // Process dates in smaller batches with staggered start
+      const results: AppointmentResult[] = []
+      const batchSize = 6 // Optimal based on auto-check.mjs
+      
+      for (let i = 0; i < dates.length; i += batchSize) {
+        const batch = dates.slice(i, i + batchSize)
+        const batchStartIndex = i
+        
+        // Process batch with staggered start (100ms delay between requests)
+        const batchPromises = batch.map((date, batchIndex) => {
+          const globalIndex = batchStartIndex + batchIndex
+          const delay = batchIndex * 100
+          
+          return new Promise<void>(resolve => setTimeout(resolve, delay))
+            .then(() => checkSingleDate(formatDateForAPI(date), globalIndex, dates.length))
+        })
+        
+        const batchResults = await Promise.allSettled(batchPromises)
+        
+        batchResults.forEach((result, idx) => {
+          const globalIndex = batchStartIndex + idx
+          if (result.status === 'fulfilled') {
+            results[globalIndex] = result.value
+          } else {
+            const date = dates[globalIndex]
+            const dayInfo = getDayNameHebrew(formatDateForAPI(date))
+            results[globalIndex] = {
+              date: formatDateForAPI(date),
+              available: false,
+              times: [],
+              dayName: dayInfo.dayName,
+              error: 'שגיאה בבדיקה',
+              loading: false
+            }
+          }
+          
+          // Update results in real-time
+          setResults(prev => {
+            const newResults = [...prev]
+            newResults[globalIndex] = results[globalIndex]
+            return newResults
+          })
+        })
+        
+        // Small delay between batches if not the last batch
+        if (i + batchSize < dates.length) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
       
       // Save to cache
       const newCache: SearchCache = {
@@ -172,14 +261,15 @@ function SearchPage() {
       
       const availableCount = results.filter(r => r.available).length
       if (availableCount > 0) {
-        toast.success(`נמצאו ${availableCount} תאריכים זמינים`)
+        toast.success(`נמצאו ${availableCount} תאריכים זמינים! 🎉`)
       } else {
-        toast.info('לא נמצאו תורים פנויים')
+        toast.info('לא נמצאו תורים פנויים כרגע')
       }
     } catch (error) {
       toast.error('שגיאה בחיפוש')
     } finally {
       setIsSearching(false)
+      setProgress(100)
     }
   }, [searchType, cache])
 
@@ -189,191 +279,315 @@ function SearchPage() {
 
   const availableResults = results.filter(r => r.available)
   const unavailableResults = results.filter(r => !r.available && !r.loading)
+  const loadingResults = results.filter(r => r.loading)
 
   return (
     <div className="container max-w-md mx-auto p-4 pb-20">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold mb-2">חיפוש מהיר</h1>
+      {/* Header with animation */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-6"
+      >
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
+          <Search className="h-10 w-10 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          חיפוש חכם
+        </h1>
         <p className="text-sm text-muted-foreground">
-          בדיקת {searchType === 'week' ? '7' : searchType === 'two-weeks' ? '14' : '30'} ימים בלחיצה אחת
+          סריקה מהירה של תורים פנויים
         </p>
-      </div>
+      </motion.div>
 
-      {/* Search Controls */}
-      <div className="space-y-4 mb-6">
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { value: 'week', label: 'שבוע' },
-            { value: 'two-weeks', label: 'שבועיים' },
-            { value: 'month', label: 'חודש' }
-          ].map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setSearchType(option.value as any)}
-              className={cn(
-                "py-2 px-3 rounded-lg text-sm font-medium transition-all",
-                searchType === option.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/50 hover:bg-muted"
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+      {/* Search Controls with better design */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="space-y-4 mb-6"
+      >
+        <Card className="border-2 shadow-lg">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  בחר טווח סריקה
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  {searchStats.openDays} ימים פתוחים
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'week', label: 'שבוע', icon: '7', color: 'from-blue-500 to-blue-600' },
+                  { value: 'two-weeks', label: 'שבועיים', icon: '14', color: 'from-purple-500 to-purple-600' },
+                  { value: 'month', label: 'חודש', icon: '30', color: 'from-green-500 to-green-600' }
+                ].map((option) => (
+                  <motion.button
+                    key={option.value}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSearchType(option.value as any)}
+                    className={cn(
+                      "relative py-3 px-3 rounded-xl text-sm font-medium transition-all overflow-hidden",
+                      searchType === option.value
+                        ? "text-white shadow-lg"
+                        : "bg-muted/50 hover:bg-muted"
+                    )}
+                  >
+                    {searchType === option.value && (
+                      <motion.div 
+                        layoutId="activeTab"
+                        className={`absolute inset-0 bg-gradient-to-r ${option.color}`}
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <span className="relative">
+                      {option.label}
+                      <span className="block text-xs mt-0.5 opacity-80">
+                        {option.icon} ימים
+                      </span>
+                    </span>
+                  </motion.button>
+                ))}
+              </div>
 
-        <Button
-          onClick={() => handleSearch()}
-          disabled={isSearching}
-          className="w-full"
-          size="lg"
-        >
-          {isSearching ? (
-            <>
-              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-              מחפש...
-            </>
-          ) : (
-            <>
-              <Search className="ml-2 h-4 w-4" />
-              חיפוש מהיר
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Results */}
-      {results.length > 0 && (
-        <div className="space-y-4">
-          {/* Cache indicator and refresh */}
-          {isUsingCache && !isSearching && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 rounded-lg p-2">
-              <span className="flex items-center gap-1">
-                <Zap className="h-3 w-3" />
-                תוצאות מהזיכרון המקומי
-              </span>
               <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-xs px-2"
-                onClick={() => handleSearch(true)}
+                onClick={() => handleSearch()}
+                disabled={isSearching}
+                className="w-full h-12 text-base shadow-lg"
+                size="lg"
               >
-                רענן
+                {isSearching ? (
+                  <>
+                    <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                    סורק תורים...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="ml-2 h-5 w-5" />
+                    התחל סריקה
+                  </>
+                )}
               </Button>
-            </div>
-          )}
 
-          {/* Available Appointments */}
-          {availableResults.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-green-600 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                תאריכים זמינים ({availableResults.length})
-              </h3>
-              <div className="space-y-2">
-                {availableResults.map((result) => {
-                  const dateInfo = getDayNameHebrew(result.date)
-                  return (
-                    <Card key={result.date} className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="text-center">
-                              <div className="text-2xl font-bold">{dateInfo.dayNumber}</div>
-                              <div className="text-xs text-muted-foreground">{dateInfo.month}</div>
-                            </div>
-                            <div>
-                              <div className="font-medium">{dateInfo.shortDay}</div>
-                              <div className="text-xs text-green-600">
-                                {result.times.length} תורים
+              {/* Progress indicator */}
+              {isSearching && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2"
+                >
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>נבדקו {searchStats.checkedDays} מתוך {searchStats.openDays}</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </motion.div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Results with better animations */}
+      <AnimatePresence mode="wait">
+        {results.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="space-y-4"
+          >
+            {/* Cache indicator */}
+            {isUsingCache && !isSearching && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-between text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3"
+              >
+                <span className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+                  <Zap className="h-3 w-3" />
+                  תוצאות מהירות מהזיכרון
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-xs px-2"
+                  onClick={() => handleSearch(true)}
+                >
+                  רענן
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Available Appointments with enhanced design */}
+            {availableResults.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-green-600 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    תורים זמינים
+                  </h3>
+                  <Badge variant="default" className="bg-green-600">
+                    {availableResults.length} תאריכים
+                  </Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  {availableResults.map((result, index) => {
+                    const dateInfo = getDayNameHebrew(result.date)
+                    return (
+                      <motion.div
+                        key={result.date}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card className="border-green-500/50 bg-gradient-to-r from-green-50 to-green-50/50 dark:from-green-950/20 dark:to-green-950/10 hover:shadow-md transition-all">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-4">
+                                <div className="text-center">
+                                  <div className="text-3xl font-bold text-green-700 dark:text-green-400">
+                                    {dateInfo.dayNumber}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">{dateInfo.month}</div>
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-lg">{dateInfo.dayName}</div>
+                                  <div className="flex items-center gap-2 text-sm text-green-600">
+                                    <TrendingUp className="h-3 w-3" />
+                                    {result.times.length} תורים פנויים
+                                  </div>
+                                </div>
                               </div>
+                              <Button
+                                size="sm"
+                                className="h-9 shadow-sm"
+                                asChild
+                              >
+                                <a
+                                  href={generateBookingUrl(result.date)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  הזמן
+                                  <ExternalLink className="mr-1 h-3 w-3" />
+                                </a>
+                              </Button>
                             </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            className="h-8"
-                            asChild
-                          >
-                            <a
-                              href={generateBookingUrl(result.date)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              הזמן
-                            </a>
-                          </Button>
-                        </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {result.times.slice(0, 4).map((time) => (
-                            <span
-                              key={time}
-                              className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded"
-                            >
-                              {time}
-                            </span>
-                          ))}
-                          {result.times.length > 4 && (
-                            <span className="text-xs px-2 py-0.5 text-muted-foreground">
-                              +{result.times.length - 4}
-                            </span>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+                            <div className="flex gap-1.5 flex-wrap">
+                              {result.times.slice(0, 5).map((time) => (
+                                <Badge
+                                  key={time}
+                                  variant="secondary"
+                                  className="bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                                >
+                                  {time}
+                                </Badge>
+                              ))}
+                              {result.times.length > 5 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{result.times.length - 5}
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </motion.div>
+            )}
 
-          {/* Loading States */}
-          {results.some(r => r.loading) && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground">
-                בודק תאריכים...
-              </h3>
-              {results.filter(r => r.loading).map((result, index) => (
-                <Skeleton 
-                  key={index} 
-                  className="h-16 w-full animate-pulse"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                />
-              ))}
-            </div>
-          )}
+            {/* Loading States with better animation */}
+            {loadingResults.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="space-y-2"
+              >
+                <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-3 w-3 animate-spin" />
+                  בודק תאריכים...
+                </h3>
+                {loadingResults.slice(0, 3).map((result, index) => (
+                  <Skeleton 
+                    key={result.date} 
+                    className="h-20 w-full"
+                    style={{ 
+                      animationDelay: `${index * 100}ms`,
+                      opacity: 1 - (index * 0.2)
+                    }}
+                  />
+                ))}
+              </motion.div>
+            )}
 
-          {/* Unavailable Days - Compact View */}
-          {unavailableResults.length > 0 && !results.some(r => r.loading) && (
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                <X className="h-3 w-3" />
-                לא זמין ({unavailableResults.length})
-              </h3>
-              <div className="grid grid-cols-4 gap-1.5">
-                {unavailableResults.map((result) => {
-                  const dateInfo = getDayNameHebrew(result.date)
-                  return (
-                    <div
-                      key={result.date}
-                      className={cn(
-                        "p-2 rounded-lg text-center",
-                        result.error ? "bg-red-50/50 dark:bg-red-950/20" : "bg-muted/30"
-                      )}
-                    >
-                      <div className="text-sm font-medium">{dateInfo.dayNumber}</div>
-                      <div className="text-[10px] text-muted-foreground">{dateInfo.shortDay}</div>
-                      {result.error && (
-                        <div className="text-[10px] text-red-500 mt-0.5">!</div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+            {/* Unavailable Days - Enhanced compact view */}
+            {unavailableResults.length > 0 && !loadingResults.length && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="space-y-3"
+              >
+                <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                  <X className="h-3 w-3" />
+                  ללא תורים פנויים ({unavailableResults.length})
+                </h3>
+                <div className="grid grid-cols-5 gap-2">
+                  {unavailableResults.map((result, index) => {
+                    const dateInfo = getDayNameHebrew(result.date)
+                    return (
+                      <motion.div
+                        key={result.date}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.01 }}
+                        className={cn(
+                          "p-3 rounded-lg text-center transition-all hover:scale-105",
+                          result.error 
+                            ? "bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-800" 
+                            : "bg-muted/30"
+                        )}
+                      >
+                        <div className="text-lg font-semibold">{dateInfo.dayNumber}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {dateInfo.dayName.slice(0, 3)}
+                        </div>
+                        {result.error && (
+                          <AlertCircle className="h-3 w-3 text-red-500 mx-auto mt-1" />
+                        )}
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {/* No results message */}
+            {!isSearching && !loadingResults.length && availableResults.length === 0 && unavailableResults.length > 0 && (
+              <Alert className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-700 dark:text-orange-300">
+                  לא נמצאו תורים פנויים בתאריכים שנבדקו. 
+                  נסה לחפש בטווח תאריכים אחר או הירשם להתראות.
+                </AlertDescription>
+              </Alert>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

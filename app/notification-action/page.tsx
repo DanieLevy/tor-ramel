@@ -29,6 +29,18 @@ function NotificationActionContent() {
   // Get times from URL params if available
   const times = searchParams.get('times')
   const date = searchParams.get('date')
+  const appointmentsParam = searchParams.get('appointments')
+  
+  // Parse appointments data if available
+  let appointments: Array<{ date: string; times: string[] }> = []
+  if (appointmentsParam) {
+    try {
+      appointments = JSON.parse(decodeURIComponent(appointmentsParam))
+    } catch (e) {
+      console.error('Failed to parse appointments:', e)
+    }
+  }
+  
   const timesList = times ? times.split(',') : []
 
   useEffect(() => {
@@ -77,7 +89,19 @@ function NotificationActionContent() {
         }
       } else if (action === 'decline') {
         // Handle decline action
-        if (!times || !date) {
+        let bodyData: any = {
+          action: 'decline',
+          subscriptionId
+        }
+        
+        // Check if we have multi-date appointments
+        if (appointments.length > 0) {
+          bodyData.appointments = appointments
+        } else if (times && date) {
+          // Backward compatibility for single date
+          bodyData.times = times.split(',')
+          bodyData.date = date
+        } else {
           setResult({
             success: false,
             message: 'חסרים פרטי השעות שנדחו'
@@ -91,12 +115,7 @@ function NotificationActionContent() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            action: 'decline',
-            subscriptionId,
-            times: times.split(','),
-            date
-          })
+          body: JSON.stringify(bodyData)
         })
 
         if (response.ok) {
@@ -170,7 +189,38 @@ function NotificationActionContent() {
               אנחנו שמחים שמצאת תור מתאים
             </DialogDescription>
           </DialogHeader>
-          {date && timesList.length > 0 && (
+          {/* Show appointment details if available */}
+          {appointments.length > 0 ? (
+            <div className="space-y-4 pt-4 max-h-[300px] overflow-y-auto">
+              {appointments.map((apt, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-sm px-3 py-1">
+                      {apt.date}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {apt.times.slice(0, 6).map((time, timeIndex) => (
+                      <div 
+                        key={timeIndex}
+                        className="text-center p-2 rounded-lg bg-muted/50 border border-border"
+                      >
+                        <span className="text-sm font-medium">{time}</span>
+                      </div>
+                    ))}
+                    {apt.times.length > 6 && (
+                      <div className="text-center p-2 rounded-lg bg-muted/50 border border-border">
+                        <span className="text-sm text-muted-foreground">+{apt.times.length - 6}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <p className="text-center text-sm text-muted-foreground pt-2">
+                בהצלחה בתור שלך!
+              </p>
+            </div>
+          ) : date && timesList.length > 0 ? (
             <div className="space-y-4 pt-4">
               <div className="text-center">
                 <Badge variant="outline" className="text-sm px-3 py-1">
@@ -192,7 +242,7 @@ function NotificationActionContent() {
                 בהצלחה בתור שלך!
               </p>
             </div>
-          )}
+          ) : null}
         </>
       )
     }

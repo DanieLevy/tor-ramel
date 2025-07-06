@@ -9,7 +9,7 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, subscriptionId, times, date } = body
+    const { action, subscriptionId, times, date, appointments } = body
 
     if (!action || !subscriptionId) {
       return NextResponse.json({ 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
 
-      // Update the last notified appointment record if exists
+      // Update the last notified appointment record(s) if exists
       const { error: notifiedError } = await supabase
         .from('notified_appointments')
         .update({
@@ -68,47 +68,114 @@ export async function POST(request: NextRequest) {
       })
 
     } else if (action === 'decline') {
-      if (!times || !date) {
+      // Handle multi-date appointments
+      if (appointments && Array.isArray(appointments)) {
+        // Process each appointment
+        const errors = []
+        let processedCount = 0
+        
+        for (const appointment of appointments) {
+          const { date: appointmentDate, times: appointmentTimes } = appointment
+          
+          if (!appointmentDate || !appointmentTimes || appointmentTimes.length === 0) {
+            continue
+          }
+          
+          // Save ignored times for each date
+          const { error: ignoreError } = await supabase
+            .from('ignored_appointment_times')
+            .upsert({
+              user_id: subscription.user_id,
+              appointment_date: appointmentDate,
+              ignored_times: appointmentTimes
+            }, {
+              onConflict: 'user_id,appointment_date',
+              ignoreDuplicates: false
+            })
+
+          if (ignoreError) {
+            console.error(`Error saving ignored times for ${appointmentDate}:`, ignoreError)
+            errors.push({ date: appointmentDate, error: ignoreError.message })
+          } else {
+            processedCount++
+          }
+
+          // Update the notified appointment record
+          const { error: notifiedError } = await supabase
+            .from('notified_appointments')
+            .update({
+              user_response: 'declined',
+              response_at: new Date().toISOString()
+            })
+            .eq('subscription_id', subscriptionId)
+            .eq('appointment_date', appointmentDate)
+            .is('user_response', null)
+
+          if (notifiedError) {
+            console.error(`Error updating notified appointments for ${appointmentDate}:`, notifiedError)
+          }
+        }
+        
+        if (errors.length > 0 && processedCount === 0) {
+          return NextResponse.json({ 
+            error: 'Failed to save ignored times',
+            errors
+          }, { status: 500 })
+        }
+        
         return NextResponse.json({ 
-          error: 'Missing times or date for decline action' 
-        }, { status: 400 })
-      }
-
-      // Save ignored times
-      const { error: ignoreError } = await supabase
-        .from('ignored_appointment_times')
-        .insert({
-          user_id: subscription.user_id,
-          appointment_date: date,
-          ignored_times: times
+          success: true,
+          message: `Ignored times saved for ${processedCount} dates`,
+          errors: errors.length > 0 ? errors : undefined
         })
+        
+      } else {
+        // Single date decline (backward compatibility)
+        if (!times || !date) {
+          return NextResponse.json({ 
+            error: 'Missing times or date for decline action' 
+          }, { status: 400 })
+        }
 
-      if (ignoreError) {
-        console.error('Error saving ignored times:', ignoreError)
+        // Save ignored times
+        const { error: ignoreError } = await supabase
+          .from('ignored_appointment_times')
+          .upsert({
+            user_id: subscription.user_id,
+            appointment_date: date,
+            ignored_times: times
+          }, {
+            onConflict: 'user_id,appointment_date',
+            ignoreDuplicates: false
+          })
+
+        if (ignoreError) {
+          console.error('Error saving ignored times:', ignoreError)
+          return NextResponse.json({ 
+            error: 'Failed to save ignored times' 
+          }, { status: 500 })
+        }
+
+        // Update the notified appointment record
+        const { error: notifiedError } = await supabase
+          .from('notified_appointments')
+          .update({
+            user_response: 'declined',
+            response_at: new Date().toISOString()
+          })
+          .eq('subscription_id', subscriptionId)
+          .eq('appointment_date', date)
+          .is('user_response', null)
+
+        if (notifiedError) {
+          console.error('Error updating notified appointments:', notifiedError)
+        }
+
         return NextResponse.json({ 
-          error: 'Failed to save ignored times' 
-        }, { status: 500 })
-      }
-
-      // Update the notified appointment record
-      const { error: notifiedError } = await supabase
-        .from('notified_appointments')
-        .update({
-          user_response: 'declined',
-          response_at: new Date().toISOString()
+          success: true,
+          message: 'Ignored times saved successfully'
         })
-        .eq('subscription_id', subscriptionId)
-        .eq('appointment_date', date)
-        .is('user_response', null)
-
-      if (notifiedError) {
-        console.error('Error updating notified appointments:', notifiedError)
       }
-
-      return NextResponse.json({ 
-        success: true,
-        message: 'Ignored times saved successfully'
-      })
 
     } else if (action === 'unsubscribe') {
       // Mark subscription as inactive

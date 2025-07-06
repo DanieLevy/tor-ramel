@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth/jwt'
 import { validateSubscriptionData } from '@/lib/notification-helpers'
 import { sendSubscriptionConfirmationEmail } from '@/lib/email-sender'
 
@@ -11,47 +11,21 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    // Get user from cookie
-    const cookieStore = await cookies()
-    const authCookie = cookieStore.get('tor-ramel-auth')
+    // Get user from JWT token
+    const user = await getCurrentUser()
     
-    console.log('🍪 Auth cookie check:', {
-      exists: !!authCookie,
-      value: authCookie?.value ? 'present' : 'missing',
-      headers: request.headers.get('cookie')
-    })
-    
-    if (!authCookie) {
-      console.log('Unauthorized: No auth cookie found')
+    if (!user) {
+      console.log('🔐 Unauthorized: No authenticated user')
       return NextResponse.json({ 
         error: 'לא מחובר למערכת - נא להתחבר מחדש',
         message: 'שגיאה בהרשמה'
       }, { status: 401 })
     }
-
-    let authData
-    try {
-      authData = JSON.parse(authCookie.value)
-    } catch (parseError) {
-      console.error('Failed to parse auth cookie:', parseError)
-      return NextResponse.json({ 
-        error: 'שגיאה בקריאת נתוני התחברות',
-        message: 'שגיאה בהרשמה'
-      }, { status: 401 })
-    }
     
-    const { email, userId } = authData
-    
-    if (!email || !userId) {
-      console.error('Invalid auth data:', authData)
-      return NextResponse.json({ 
-        error: 'נתוני התחברות לא תקינים',
-        message: 'שגיאה בהרשמה'
-      }, { status: 401 })
-    }
-    
-    // Use userId directly instead of looking it up by email
-    const userData = { id: userId }
+    console.log('🔐 [Subscribe API] Authenticated user:', {
+      userId: user.userId,
+      email: user.email
+    })
 
     const body = await request.json()
     
@@ -72,7 +46,7 @@ export async function POST(request: NextRequest) {
       const { data } = await supabase
         .from('notification_subscriptions')
         .select('id')
-        .eq('user_id', userData.id)
+        .eq('user_id', user.userId)
         .eq('subscription_date', subscription_date)
         .eq('is_active', true)
         .single()
@@ -82,7 +56,7 @@ export async function POST(request: NextRequest) {
       const { data } = await supabase
         .from('notification_subscriptions')
         .select('id')
-        .eq('user_id', userData.id)
+        .eq('user_id', user.userId)
         .eq('date_range_start', date_range_start)
         .eq('date_range_end', date_range_end)
         .eq('is_active', true)
@@ -92,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingSubscription) {
-      console.log('Duplicate subscription attempt for user:', userData.id)
+      console.log('Duplicate subscription attempt for user:', user.userId)
       return NextResponse.json({ 
         error: 'כבר קיים מנוי פעיל לתאריכים אלו' 
       }, { status: 400 })
@@ -102,7 +76,7 @@ export async function POST(request: NextRequest) {
     const { data: newSubscription, error: insertError } = await supabase
       .from('notification_subscriptions')
       .insert({
-        user_id: userData.id,
+        user_id: user.userId,
         subscription_date,
         date_range_start,
         date_range_end,
@@ -126,18 +100,18 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log(`✅ Created subscription ${newSubscription.id} for user ${userData.id}`)
+    console.log(`✅ Created subscription ${newSubscription.id} for user ${user.userId}`)
 
     // Send confirmation email
     try {
       await sendSubscriptionConfirmationEmail({
-        to: email,
+        to: user.email,
         subscriptionId: newSubscription.id,
         subscriptionDate: newSubscription.subscription_date,
         dateRangeStart: newSubscription.date_range_start,
         dateRangeEnd: newSubscription.date_range_end
       })
-      console.log(`📧 Sent subscription confirmation email to ${email}`)
+      console.log(`📧 Sent subscription confirmation email to ${user.email}`)
     } catch (emailError) {
       console.error('Failed to send confirmation email:', emailError)
       // Don't fail the request if email sending fails
@@ -155,26 +129,18 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth cookie
-    const cookieStore = await cookies()
-    const authCookie = cookieStore.get('tor-ramel-auth')
+    // Get user from JWT token
+    const user = await getCurrentUser()
     
-    if (!authCookie) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const authData = JSON.parse(authCookie.value)
-    const userId = authData.userId
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
     }
     
     // Get all subscriptions for user
     const { data: subscriptions, error } = await supabase
       .from('notification_subscriptions')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', user.userId)
       .order('created_at', { ascending: false })
     
     if (error) {

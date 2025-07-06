@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { getCurrentUser } from '@/lib/auth/jwt'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -15,25 +15,11 @@ export async function DELETE(
     // Await params for Next.js 15
     const { id: subscriptionId } = await params
     
-    // Get user from cookie
-    const cookieStore = await cookies()
-    const authCookie = cookieStore.get('tor-ramel-auth')
+    // Get user from JWT token
+    const user = await getCurrentUser()
     
-    if (!authCookie) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { email } = JSON.parse(authCookie.value)
-    
-    // Get user ID from database
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Verify subscription belongs to user
@@ -41,7 +27,7 @@ export async function DELETE(
       .from('notification_subscriptions')
       .select('id')
       .eq('id', subscriptionId)
-      .eq('user_id', userData.id)
+      .eq('user_id', user.userId)
       .single()
 
     if (fetchError || !subscription) {
