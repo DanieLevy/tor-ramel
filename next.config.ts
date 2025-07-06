@@ -29,6 +29,17 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Prevent Next.js from handling Netlify function URLs
+        {
+          source: '/.netlify/functions/:path*',
+          destination: '/.netlify/functions/:path*',
+        },
+      ],
+    }
+  },
 };
 
 export default nextConfig;

@@ -48,7 +48,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - fonts (font files)
      * - public folder
+     * - .netlify/functions (Netlify functions)
      */
-    '/((?!_next/static|_next/image|favicon.ico|fonts|icons|sw.js|manifest.json|browserconfig.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|otf|ttf|woff|woff2)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts|icons|sw.js|manifest.json|browserconfig.xml|\\.netlify/functions|.*\\.(?:svg|png|jpg|jpeg|gif|webp|otf|ttf|woff|woff2)$).*)',
   ],
 } 

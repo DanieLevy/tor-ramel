@@ -6,3 +6,6 @@ http://tor-ramel.netlify.app/*  https://tor-ramel.netlify.app/:splat  301!
 
 # Handle SPA routes (fallback)
 /*    /index.html   200 
+
+# Netlify Functions - these should be handled by Netlify, not Next.js
+/.netlify/functions/*  /.netlify/functions/:splat  200! 

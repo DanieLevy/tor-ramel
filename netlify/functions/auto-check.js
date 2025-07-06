@@ -155,8 +155,8 @@ const isClosedDay = (date) => {
     weekday: 'long'
   }).format(date)
   
-  // Skip checking Monday only - the barbershop is open on Saturday!
-  return dayOfWeek === 'Monday'
+  // Skip checking Monday and Saturday - barbershop is closed these days
+  return dayOfWeek === 'Monday' || dayOfWeek === 'Saturday'
 }
 
 const getOpenDays = (startDate, totalDays) => {
@@ -398,8 +398,8 @@ async function findAppointments() {
   const maxDays = 30
   const openDates = getOpenDays(currentDate, maxDays)
   
-  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday)`)
-  console.log(`🚫 Skipping ${maxDays - openDates.length} closed days (Mondays only)`)
+  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday/Saturday)`)
+  console.log(`🚫 Skipping ${maxDays - openDates.length} closed days (Mondays & Saturdays)`)
   
   const results = []
   let batchNumber = 0
@@ -499,7 +499,7 @@ async function findAppointments() {
 // ============================================================================
 
 // Main handler for both scheduled and manual triggers
-async function handler(req, context) {
+async function handler(event, context) {
   const functionStart = Date.now()
   
   try {
@@ -509,15 +509,21 @@ async function handler(req, context) {
     let isScheduled = false
     let nextRun = null
     
-    try {
-      const body = await req.json()
-      if (body && body.next_run) {
-        isScheduled = true
-        nextRun = body.next_run
-        console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
+    // Netlify scheduled functions pass next_run in the body
+    if (event.body) {
+      try {
+        const body = JSON.parse(event.body)
+        if (body && body.next_run) {
+          isScheduled = true
+          nextRun = body.next_run
+          console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
+        }
+      } catch (e) {
+        // Not a scheduled invocation or invalid body
       }
-    } catch (e) {
-      // Not a scheduled invocation or no body
+    }
+    
+    if (!isScheduled) {
       console.log('🔧 Manual invocation')
     }
     
@@ -539,40 +545,38 @@ async function handler(req, context) {
       }
     }
     
-    return new Response(JSON.stringify(responseBody), {
-      status: 200,
+    return {
+      statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      }
-    })
+      },
+      body: JSON.stringify(responseBody)
+    }
     
   } catch (error) {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
     
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      executionTime: totalTime
-    }), {
-      status: 500,
+    return {
+      statusCode: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
-      }
-    })
+      },
+      body: JSON.stringify({
+        success: false,
+        error: error.message,
+        executionTime: totalTime
+      })
+    }
   }
 }
 
-// Default export for Netlify Functions
-exports.default = handler
-
-// Schedule configuration for Netlify
-// Runs every 5 minutes
-exports.config = {
-  schedule: "*/5 * * * *"
+// Export for Netlify Functions
+module.exports = {
+  handler,
+  config: {
+    schedule: "*/5 * * * *"
+  }
 }
-
-// Legacy handler export for backward compatibility
-exports.handler = handler
