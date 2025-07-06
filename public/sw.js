@@ -1,7 +1,7 @@
 // Service Worker for תור רם-אל PWA
-const CACHE_NAME = 'tor-ramel-v4';
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v4';
-const API_CACHE = 'tor-ramel-api-v4';
+const CACHE_NAME = 'tor-ramel-v5';
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v5';
+const API_CACHE = 'tor-ramel-api-v5';
 
 // Assets to cache on install
 const STATIC_ASSETS = [

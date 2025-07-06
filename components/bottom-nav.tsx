@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Home, Search, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface NavItem {
   href: string
@@ -26,69 +27,74 @@ export function BottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe">
-      {/* Glass effect background */}
-      <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-t" />
-      
-      {/* Navigation container */}
-      <nav className="relative">
-        <ul className="flex items-center justify-around h-16">
-          {navItems.map((item, index) => {
-            const isActive = pathname === item.href
-            const isMiddle = index === 1
-            const Icon = item.icon
+    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe pointer-events-none">
+      {/* Bubble container with floating effect */}
+      <div className="flex justify-center px-4 pb-4">
+        <nav className="pointer-events-auto bg-background/95 backdrop-blur-xl rounded-full shadow-lg border border-border/50 px-2">
+          <ul className="flex items-center gap-1 p-2">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href
+              const Icon = item.icon
 
-            return (
-              <li key={item.href} className="flex-1 flex justify-center">
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "relative flex flex-col items-center justify-center transition-all duration-300",
-                    isMiddle ? "mb-4" : "p-2",
-                    isActive && !isMiddle && "text-primary"
-                  )}
-                >
-                  {isMiddle ? (
-                    // Middle circular button
-                    <div
-                      className={cn(
-                        "absolute -top-6 flex h-16 w-16 items-center justify-center rounded-full transition-all duration-300",
-                        "bg-primary text-primary-foreground shadow-lg",
-                        "hover:scale-110 hover:shadow-xl",
-                        isActive && "ring-4 ring-primary/20 scale-110"
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "relative flex items-center justify-center rounded-full transition-all duration-300",
+                      "w-14 h-14 touch-manipulation", // Ensure 56x56px for touch targets
+                      "hover:bg-accent/20",
+                      "active:scale-95"
+                    )}
+                  >
+                    {/* Active indicator background */}
+                    <AnimatePresence>
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeTab"
+                          className="absolute inset-0 bg-primary/10 rounded-full"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ duration: 0.2 }}
+                        />
                       )}
-                    >
-                      <Icon className="h-6 w-6" />
+                    </AnimatePresence>
+
+                    {/* Icon */}
+                    <div className="relative flex flex-col items-center">
+                      <Icon
+                        className={cn(
+                          "h-6 w-6 transition-all duration-300",
+                          isActive 
+                            ? "text-primary scale-110" 
+                            : "text-muted-foreground"
+                        )}
+                      />
+                      
+                      {/* Active dot indicator */}
+                      <AnimatePresence>
+                        {isActive && (
+                          <motion.div
+                            className="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.2 }}
+                          />
+                        )}
+                      </AnimatePresence>
                     </div>
-                  ) : (
-                    // Regular nav items
-                    <>
-                      <div
-                        className={cn(
-                          "flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-300",
-                          isActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        <Icon className={cn("h-5 w-5", isActive && "scale-110")} />
-                      </div>
-                      <span
-                        className={cn(
-                          "mt-1 text-xs font-medium transition-all duration-300",
-                          isActive ? "text-primary" : "text-muted-foreground"
-                        )}
-                      >
-                        {item.label}
-                      </span>
-                    </>
-                  )}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+
+                    {/* Ripple effect on tap */}
+                    <span className="absolute inset-0 rounded-full" />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      </div>
     </div>
   )
 } 

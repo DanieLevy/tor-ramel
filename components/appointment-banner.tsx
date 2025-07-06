@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, Calendar, Clock, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ExternalLink, Calendar, Clock, AlertCircle, RefreshCw } from 'lucide-react'
+import { Alert } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -11,34 +11,35 @@ interface Appointment {
   dayName: string
   times: string[]
   bookingUrl: string
-  checkedAt: string
+}
+
+interface Stats {
+  lastCheckTime: string | null
+  todayChecks: number
+  availableAppointments: number
+  nearestAppointment: Appointment | null
 }
 
 export function AppointmentBanner() {
-  const [appointment, setAppointment] = useState<Appointment | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    fetchNearestAppointment()
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchNearestAppointment, 5 * 60 * 1000)
+    fetchStats()
+    // Refresh every 2 minutes
+    const interval = setInterval(fetchStats, 2 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
-  const fetchNearestAppointment = async () => {
+  const fetchStats = async () => {
     try {
-      const response = await fetch('/api/appointments/nearest')
+      const response = await fetch('/api/appointments/stats')
       const data = await response.json()
-      
-      if (data.found && data.appointment) {
-        setAppointment(data.appointment)
-      } else {
-        setAppointment(null)
-      }
+      setStats(data)
       setError(false)
     } catch (err) {
-      console.error('Failed to fetch appointment:', err)
+      console.error('Failed to fetch stats:', err)
       setError(true)
     } finally {
       setLoading(false)
@@ -66,50 +67,88 @@ export function AppointmentBanner() {
     return `בעוד ${diffInDays} ימים`
   }
 
+  const formatLastCheckTime = (timeStr: string | null) => {
+    if (!timeStr) return 'לא זמין'
+    
+    const date = new Date(timeStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    
+    if (diffMins < 1) return 'הרגע'
+    if (diffMins < 60) return `לפני ${diffMins} דקות`
+    if (diffHours < 24) return `לפני ${diffHours} שעות`
+    return date.toLocaleDateString('he-IL')
+  }
+
   if (loading) {
     return (
-      <div className="w-full">
-        <Skeleton className="h-16 w-full rounded-xl" />
+      <div className="w-full space-y-3">
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <Skeleton className="h-12 w-full rounded-xl" />
       </div>
     )
   }
 
-  if (error || !appointment) {
+  if (error || !stats) {
     return null
   }
 
   return (
-    <Alert className="border-green-500/20 bg-green-50/50 dark:bg-green-950/20">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50">
-            <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
+    <div className="space-y-3">
+      {/* Main appointment banner */}
+      {stats.nearestAppointment ? (
+        <Alert className="border-green-500/20 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20 border-0 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 shadow-sm">
+                <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-green-900 dark:text-green-100">
+                  תור זמין {getRelativeTime(stats.nearestAppointment.date)}!
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  {stats.nearestAppointment.dayName}, {formatDate(stats.nearestAppointment.date)} • {stats.nearestAppointment.times.length} זמנים פנויים
+                </p>
+              </div>
+            </div>
+            
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+              asChild
+            >
+              <a
+                href={stats.nearestAppointment.bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                הזמן תור
+                <ExternalLink className="mr-2 h-3.5 w-3.5" />
+              </a>
+            </Button>
           </div>
-          <div>
-            <p className="font-medium text-green-900 dark:text-green-100">
-              תור זמין {getRelativeTime(appointment.date)}!
-            </p>
-            <p className="text-sm text-green-700 dark:text-green-300">
-              {appointment.dayName}, {formatDate(appointment.date)} • {appointment.times.length} זמנים פנויים
+        </Alert>
+      ) : (
+        <Alert className="border-muted bg-muted/30">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              אין תורים פנויים כרגע - המערכת ממשיכה לחפש
             </p>
           </div>
-        </div>
-        
-        <Button
-          size="sm"
-          className="bg-green-600 hover:bg-green-700 text-white"
-          asChild
-        >
-          <a
-            href={appointment.bookingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            הזמן תור
-            <ExternalLink className="mr-2 h-3.5 w-3.5" />
-          </a>
-        </Button>
+        </Alert>
+      )}
+
+      {/* Last check info */}
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <RefreshCw className="h-3.5 w-3.5" />
+        <span>בדיקה אחרונה: {formatLastCheckTime(stats.lastCheckTime)}</span>
+        <span className="mx-1">•</span>
+        <span>{stats.availableAppointments} תורים זמינים סה״כ</span>
       </div>
-    </Alert>
+    </div>
   )
 } 

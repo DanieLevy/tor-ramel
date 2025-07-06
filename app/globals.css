@@ -290,5 +290,24 @@ input[type="text"] {
 
 /* Add padding to main content when bottom nav is present */
 .with-bottom-nav {
-  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}
+
+/* Touch manipulation for better mobile experience */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure proper top padding for notch devices */
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Extend header backdrop on notch devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .header-extended {
+    padding-top: env(safe-area-inset-top);
+    margin-top: calc(-1 * env(safe-area-inset-top));
+  }
 }

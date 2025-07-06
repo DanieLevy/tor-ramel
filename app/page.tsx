@@ -5,7 +5,7 @@ import { useHeader } from '@/components/header-context'
 import { useAuth, withAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { LogOut, Clock, CheckCircle, TrendingUp, Calendar } from 'lucide-react'
+import { LogOut, Clock, CheckCircle } from 'lucide-react'
 import { AppointmentBanner } from '@/components/appointment-banner'
 
 function HomePage() {
@@ -33,44 +33,17 @@ function HomePage() {
   return (
     <div className="container py-6 px-4">
       <div className="mx-auto max-w-4xl space-y-6">
-        {/* Appointment Banner - Always at top */}
+        {/* Appointment Banner - Full width at top */}
         <AppointmentBanner />
 
         {/* Welcome Section */}
-        <div className="text-center space-y-3 py-8">
+        <div className="text-center space-y-3 py-6">
           <h1 className="text-3xl font-bold tracking-tight">
             ברוך הבא, {user?.email?.split('@')[0]}
           </h1>
           <p className="text-muted-foreground text-lg">
             המערכת שלך למציאת תורים במספרת רם-אל
           </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="border-muted">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">בדיקות היום</p>
-                  <p className="text-2xl font-bold mt-1">142</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-muted">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">תורים שנמצאו</p>
-                  <p className="text-2xl font-bold mt-1 text-green-600">18</p>
-                </div>
-                <Calendar className="h-8 w-8 text-green-600/30" />
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* How it Works */}
