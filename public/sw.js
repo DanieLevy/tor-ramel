@@ -1,7 +1,7 @@
 // Service Worker for תור רם-אל PWA
-const CACHE_NAME = 'tor-ramel-v1';
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v1';
-const API_CACHE = 'tor-ramel-api-v1';
+const CACHE_NAME = 'tor-ramel-v2';
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v2';
+const API_CACHE = 'tor-ramel-api-v2';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -53,6 +53,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip non-GET requests (POST, PUT, DELETE, etc.)
+  if (request.method !== 'GET') {
+    return;
+  }
+
   // API calls - Network first, cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
@@ -91,7 +96,8 @@ async function cacheFirst(request, cacheName) {
   
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    // Only cache GET requests with successful responses
+    if (response.ok && request.method === 'GET') {
       cache.put(request, response.clone());
     }
     return response;
@@ -104,21 +110,28 @@ async function cacheFirst(request, cacheName) {
 async function networkFirst(request, cacheName, maxAge) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    
+    // Only cache GET requests with successful responses
+    if (response.ok && request.method === 'GET') {
       const cache = await caches.open(cacheName);
       cache.put(request, response.clone());
     }
+    
     return response;
   } catch (error) {
     console.log('[SW] Network failed, trying cache:', request.url);
-    const cache = await caches.open(cacheName);
-    const cached = await cache.match(request);
     
-    if (cached) {
-      // Check if cache is still fresh
-      const cachedDate = new Date(cached.headers.get('date'));
-      if (Date.now() - cachedDate.getTime() < maxAge) {
-        return cached;
+    // Only try cache for GET requests
+    if (request.method === 'GET') {
+      const cache = await caches.open(cacheName);
+      const cached = await cache.match(request);
+      
+      if (cached) {
+        // Check if cache is still fresh
+        const cachedDate = new Date(cached.headers.get('date'));
+        if (Date.now() - cachedDate.getTime() < maxAge) {
+          return cached;
+        }
       }
     }
     

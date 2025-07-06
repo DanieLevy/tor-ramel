@@ -49,11 +49,18 @@ export function useHeaderContext() {
 export function useHeader() {
   const { updateConfig } = useHeaderContext()
   
-  // Only run cleanup on unmount, not on updateConfig changes
+  // Store updateConfig in a ref to avoid dependency issues
+  const updateConfigRef = React.useRef(updateConfig)
+  
+  React.useEffect(() => {
+    updateConfigRef.current = updateConfig
+  }, [updateConfig])
+  
+  // Only run cleanup on unmount
   React.useEffect(() => {
     return () => {
       // Reset to defaults when component unmounts
-      updateConfig({
+      updateConfigRef.current({
         title: 'תור רם-אל',
         showBackButton: false,
         showMenu: true,
