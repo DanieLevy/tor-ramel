@@ -96,10 +96,11 @@ export default function LoginPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="relative inline-block mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary/80 rounded-3xl flex items-center justify-center mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg shadow-primary/20">
-              <span className="text-primary-foreground font-bold text-3xl">תר</span>
-            </div>
-            <div className="absolute -inset-1 bg-gradient-to-br from-primary to-primary/80 rounded-3xl blur-lg opacity-30 animate-pulse"></div>
+            <img 
+              src="/icons/icon-96x96.png" 
+              alt="תור רם-אל" 
+              className="w-20 h-20 rounded-3xl mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg"
+            />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
             ברוכים הבאים

@@ -15,36 +15,15 @@ function HomePage() {
   useEffect(() => {
     updateHeader({
       title: 'תור רם-אל',
-      showMenu: true,
-      customActions: (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={logout}
-          title={user?.email}
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="mr-2 hidden sm:inline">יציאה</span>
-        </Button>
-      )
+      showMenu: true
     })
-  }, [updateHeader, logout, user])
+  }, [updateHeader])
 
   return (
-    <div className="container py-6 px-4">
+    <div className="container p-4">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Appointment Banner - Full width at top */}
         <AppointmentBanner />
-
-        {/* Welcome Section */}
-        <div className="text-center space-y-3 py-6">
-          <h1 className="text-3xl font-bold tracking-tight">
-            ברוך הבא, {user?.email?.split('@')[0]}
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            המערכת שלך למציאת תורים במספרת רם-אל
-          </p>
-        </div>
 
         {/* How it Works */}
         <Card className="bg-muted/30 border-muted">
