@@ -1,6 +1,6 @@
-// Service Worker v3.6
-const SW_VERSION = '2025-01-29-v3.6'
-const CACHE_NAME = 'tor-ramel-v3.6'
+// Service Worker v3.7
+const SW_VERSION = '2025-01-29-v3.7'
+const CACHE_NAME = 'tor-ramel-v3.7'
 const DYNAMIC_CACHE = 'tor-ramel-dynamic-v18';
 const API_CACHE = 'tor-ramel-api-v18';
 
@@ -207,10 +207,23 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Message handling for skip waiting
+// Message handling for skip waiting and cache clearing
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_ALL_CACHES') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            console.log('[SW] Deleting cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      })
+    );
   }
 });
 

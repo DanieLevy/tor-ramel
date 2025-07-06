@@ -38,26 +38,17 @@ function SubscribePage() {
 
   useEffect(() => {
     fetchSubscriptions()
-    
-    // Log PWA status for debugging
-    if (isRunningAsPWA()) {
-      console.log('🔍 Running as PWA - special handling enabled')
-    }
   }, [])
 
   const fetchSubscriptions = async () => {
     try {
-      console.log('🔍 Fetching subscriptions...')
       const response = await pwaFetch('/api/notifications/subscriptions', {
         method: 'GET',
         credentials: 'include'
       })
       
-      console.log('🔍 Subscription response status:', response.status)
-      
       if (response.ok) {
         const data = await response.json()
-        console.log('🔍 Subscriptions loaded:', data.length)
         setSubscriptions(data)
       } else {
         const error = await response.json()
@@ -91,8 +82,6 @@ function SubscribePage() {
             date_range_start: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
             date_range_end: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null
           }
-
-      console.log('🔍 Creating subscription:', payload)
 
       const response = await pwaFetch('/api/notifications/subscribe', {
         method: 'POST',
@@ -404,17 +393,7 @@ function SubscribePage() {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  console.log('🔍 Full Debug Info:', {
-                    cookies: document.cookie,
-                    localStorage: {
-                      user: localStorage.getItem('tor-ramel-user'),
-                      expiry: localStorage.getItem('tor-ramel-auth-expiry')
-                    },
-                    pwaMode: isRunningAsPWA(),
-                    displayMode: window.matchMedia('(display-mode: standalone)').matches,
-                    userAgent: navigator.userAgent
-                  })
-                  toast.info('Debug info logged to console')
+                  toast.info('Debug info removed - logs have been cleaned up')
                 }}
               >
                 Log Full Debug Info

@@ -37,44 +37,153 @@ export function Header() {
 
   const clearAllCache = async () => {
     try {
-      // Clear all caches
+      toast.info('מנקה את כל הנתונים...', { duration: 2000 })
+
+      // 1. Clear all caches (including API caches)
       if ('caches' in window) {
         const cacheNames = await caches.keys()
         await Promise.all(
-          cacheNames.map(cacheName => caches.delete(cacheName))
+          cacheNames.map(cacheName => {
+            console.log(`Deleting cache: ${cacheName}`)
+            return caches.delete(cacheName)
+          })
         )
       }
 
-      // Clear localStorage
-      localStorage.clear()
-
-      // Clear sessionStorage
-      sessionStorage.clear()
-
-      // Clear cookies (client-side accessible ones)
-      document.cookie.split(";").forEach((c) => {
-        document.cookie = c
-          .replace(/^ +/, "")
-          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      // 2. Clear localStorage with specific keys
+      const localStorageKeys = Object.keys(localStorage)
+      localStorageKeys.forEach(key => {
+        console.log(`Removing localStorage: ${key}`)
+        localStorage.removeItem(key)
       })
 
-      // Unregister service worker
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations()
-        for (const registration of registrations) {
-          await registration.unregister()
+      // 3. Clear sessionStorage
+      const sessionStorageKeys = Object.keys(sessionStorage)
+      sessionStorageKeys.forEach(key => {
+        console.log(`Removing sessionStorage: ${key}`)
+        sessionStorage.removeItem(key)
+      })
+
+      // 4. Clear all cookies more aggressively
+      document.cookie.split(";").forEach((c) => {
+        const eqPos = c.indexOf("=")
+        const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim()
+        // Clear for all possible paths
+        const paths = ['/', '/login', '/verify-otp', '/search', '/subscribe']
+        const domains = [window.location.hostname, `.${window.location.hostname}`, '']
+        
+        paths.forEach(path => {
+          domains.forEach(domain => {
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path};domain=${domain}`
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}`
+          })
+        })
+      })
+
+      // 5. Clear IndexedDB
+      if ('indexedDB' in window) {
+        const databases = await indexedDB.databases?.() || []
+        await Promise.all(
+          databases.map(db => {
+            if (db.name) {
+              console.log(`Deleting IndexedDB: ${db.name}`)
+              return indexedDB.deleteDatabase(db.name)
+            }
+          })
+        )
+      }
+
+      // 6. Clear WebSQL (for older browsers)
+      if ('openDatabase' in window) {
+        try {
+          const db = (window as any).openDatabase('', '', '', '')
+          db.transaction((tx: any) => {
+            tx.executeSql('DROP TABLE IF EXISTS cache')
+          })
+        } catch (e) {
+          // WebSQL might not be available
         }
       }
 
-      toast.success('כל המטמון נוקה בהצלחה')
+      // 7. Unregister all service workers and clear their caches
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(
+          registrations.map(async (registration) => {
+            console.log(`Unregistering SW: ${registration.scope}`)
+            // Send message to SW to clear its internal caches
+            if (registration.active) {
+              registration.active.postMessage({ type: 'CLEAR_ALL_CACHES' })
+            }
+            return registration.unregister()
+          })
+        )
+      }
+
+      // 8. Clear any custom storage (iOS specific)
+      if ('localStorage' in window && window.localStorage) {
+        // Force clear iOS WebKit data
+        try {
+          (window as any).webkit?.messageHandlers?.clearData?.postMessage('clear')
+        } catch (e) {
+          // Not in iOS WebView
+        }
+      }
+
+      // 9. Clear push subscriptions
+      if ('PushManager' in window && 'serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready
+          const subscription = await registration.pushManager.getSubscription()
+          if (subscription) {
+            await subscription.unsubscribe()
+          }
+        } catch (e) {
+          // Push not available
+        }
+      }
+
+      // 10. Clear any notification permissions
+      if ('permissions' in navigator) {
+        try {
+          const result = await navigator.permissions.query({ name: 'notifications' as PermissionName })
+          if (result.state === 'granted') {
+            // Note: Can't programmatically revoke, but we've cleared the subscription
+          }
+        } catch (e) {
+          // Permissions API not available
+        }
+      }
+
+      // 11. Force clear auth-related data
+      const authPaths = [
+        'tor-ramel-user',
+        'tor-ramel-auth',
+        'tor-ramel-auth-expiry',
+        'tor-ramel-search-cache'
+      ]
+      authPaths.forEach(key => {
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+      })
+
+      toast.success('כל הנתונים נוקו בהצלחה! האפליקציה תיטען מחדש...', { duration: 2000 })
       
-      // Reload the page after a short delay
+      // Force hard reload with cache bypass
       setTimeout(() => {
-        window.location.reload()
-      }, 1000)
+        // Try multiple reload methods for maximum compatibility
+        if ('location' in window) {
+          // Method 1: Hard reload
+          window.location.href = window.location.origin
+          // Method 2: Force reload (backup)
+          setTimeout(() => {
+            window.location.reload()
+          }, 100)
+        }
+      }, 2000)
     } catch (error) {
       console.error('Error clearing cache:', error)
-      toast.error('שגיאה בניקוי המטמון')
+      toast.error('שגיאה בניקוי הנתונים - נסה שוב')
     }
   }
 
@@ -201,7 +310,7 @@ export function Header() {
                     onClick={clearAllCache}
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="flex-1">נקה מטמון</span>
+                    <span className="flex-1">איפוס מלא</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

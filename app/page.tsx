@@ -19,9 +19,6 @@ export default function HomePage() {
     })
   }, [updateHeader])
 
-  // Debug info
-  console.log('HomePage - Auth state:', { user, isLoading })
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">

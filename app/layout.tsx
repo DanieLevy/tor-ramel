@@ -105,12 +105,15 @@ export default function RootLayout({
                 </div>
               </HeaderProvider>
               <Toaster 
-                position="top-center" 
+                position="bottom-center" 
                 dir="rtl" 
+                className="!z-[100]"
                 toastOptions={{
                   style: {
-                    marginTop: 'calc(var(--safe-area-inset-top, 0px) + 1rem)',
+                    marginBottom: 'calc(var(--safe-area-inset-bottom, 0px) + 4.5rem)',
+                    zIndex: 100,
                   },
+                  className: 'font-sans',
                 }}
               />
             </PWAProvider>
