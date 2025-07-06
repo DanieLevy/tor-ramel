@@ -3,6 +3,29 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
+  
+  // Suppress punycode deprecation warning in development
+  ...(process.env.NODE_ENV === 'development' && {
+    webpack: (config: any) => {
+      // Suppress punycode deprecation warning
+      config.ignoreWarnings = [
+        { module: /node_modules\/punycode/ },
+        { message: /punycode/ }
+      ];
+      return config;
+    },
+  }),
+  
+  // Fix cross-origin warnings in development
+  ...(process.env.NODE_ENV === 'development' && {
+    allowedDevOrigins: [
+      'localhost:3000',
+      '127.0.0.1:3000',
+      '10.100.102.18:3000', // Add your specific IP
+      // Add other local network IPs as needed
+    ],
+  }),
+  
   async headers() {
     return [
       {
@@ -29,6 +52,7 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  
   async rewrites() {
     return {
       beforeFiles: [
@@ -39,6 +63,28 @@ const nextConfig: NextConfig = {
         },
       ],
     }
+  },
+  
+  async redirects() {
+    return [
+      // Handle missing apple-touch-icon requests
+      {
+        source: '/apple-touch-icon.png',
+        destination: '/icons/touch-icon-iphone-retina.png',
+        permanent: true,
+      },
+      {
+        source: '/apple-touch-icon-precomposed.png',
+        destination: '/icons/touch-icon-iphone-retina.png',
+        permanent: true,
+      },
+      // Handle other common PWA icon requests
+      {
+        source: '/apple-touch-icon-:size.png',
+        destination: '/icons/touch-icon-iphone-retina.png',
+        permanent: true,
+      },
+    ]
   },
 };
 

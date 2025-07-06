@@ -6,12 +6,21 @@ export function PWAHead() {
       <meta name="apple-touch-fullscreen" content="yes" />
       <meta name="apple-mobile-web-app-title" content="תור רם-אל" />
       <meta name="application-name" content="תור רם-אל" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       
-      {/* iOS Icon Links */}
-      <link rel="apple-touch-icon" href="/icons/touch-icon-iphone.png" />
+      {/* Standard Apple Touch Icons */}
+      <link rel="apple-touch-icon" href="/icons/touch-icon-iphone-retina.png" />
+      <link rel="apple-touch-icon" sizes="120x120" href="/icons/touch-icon-iphone.png" />
       <link rel="apple-touch-icon" sizes="152x152" href="/icons/touch-icon-ipad.png" />
-      <link rel="apple-touch-icon" sizes="180x180" href="/icons/touch-icon-iphone-retina.png" />
       <link rel="apple-touch-icon" sizes="167x167" href="/icons/touch-icon-ipad-retina.png" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/icons/touch-icon-iphone-retina.png" />
+      
+      {/* Precomposed versions for older iOS */}
+      <link rel="apple-touch-icon-precomposed" href="/icons/touch-icon-iphone-retina.png" />
+      <link rel="apple-touch-icon-precomposed" sizes="120x120" href="/icons/touch-icon-iphone.png" />
+      <link rel="apple-touch-icon-precomposed" sizes="152x152" href="/icons/touch-icon-ipad.png" />
+      <link rel="apple-touch-icon-precomposed" sizes="167x167" href="/icons/touch-icon-ipad-retina.png" />
+      <link rel="apple-touch-icon-precomposed" sizes="180x180" href="/icons/touch-icon-iphone-retina.png" />
       
       {/* iOS Splash Screens */}
       <link
@@ -57,6 +66,13 @@ export function PWAHead() {
       <link rel="manifest" href="/manifest.json" />
       <meta name="msapplication-TileColor" content="#6366f1" />
       <meta name="msapplication-config" content="/browserconfig.xml" />
+      
+      {/* Prevent automatic telephone number detection */}
+      <meta name="format-detection" content="telephone=no" />
+      
+      {/* Additional PWA meta tags */}
+      <meta name="mobile-web-app-capable" content="yes" />
+      <meta name="mobile-web-app-status-bar-style" content="black-translucent" />
     </>
   )
 } 

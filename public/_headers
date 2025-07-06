@@ -6,6 +6,11 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Language: he
 
+# Apple touch icons
+/apple-touch-icon*.png
+  Cache-Control: public, max-age=86400
+  Content-Type: image/png
+
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
   Service-Worker-Allowed: /

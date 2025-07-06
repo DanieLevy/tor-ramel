@@ -36,13 +36,29 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' }
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico', sizes: '16x16', type: 'image/x-icon' }
     ],
     apple: [
-      { url: '/icons/touch-icon-iphone.png', sizes: '180x180', type: 'image/png' },
+      // Standard apple-touch-icon
+      { url: '/icons/touch-icon-iphone-retina.png', sizes: '180x180', type: 'image/png' },
       { url: '/icons/touch-icon-ipad.png', sizes: '152x152', type: 'image/png' },
       { url: '/icons/touch-icon-ipad-retina.png', sizes: '167x167', type: 'image/png' },
-      { url: '/icons/touch-icon-iphone-retina.png', sizes: '180x180', type: 'image/png' }
+      { url: '/icons/touch-icon-iphone.png', sizes: '120x120', type: 'image/png' },
+    ],
+    other: [
+      {
+        rel: 'apple-touch-icon',
+        url: '/icons/touch-icon-iphone-retina.png',
+        sizes: '180x180',
+        type: 'image/png'
+      },
+      {
+        rel: 'apple-touch-icon-precomposed',
+        url: '/icons/touch-icon-iphone-retina.png',
+        sizes: '180x180',
+        type: 'image/png'
+      }
     ]
   }
 };
