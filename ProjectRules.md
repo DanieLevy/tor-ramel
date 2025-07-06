@@ -13,3 +13,5 @@
 # This app used to help users to find opp in our Barbershop/מספרה
 # When running build process (only by me request), fix issues from root cause to ensure proper and valid fixes
 # remember to update sw.js ver to include properly updates in PWA cases and etc.
+# For complex issues/implementations, make full to do list
+# do not commit nothing until i asked you to. do not build nothing until i told you to.

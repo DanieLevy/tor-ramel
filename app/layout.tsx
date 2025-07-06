@@ -10,9 +10,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
 
 export const metadata: Metadata = {
-  title: "תור רם-אל",
-  description: "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
+  title: "תור רם-אל - זימון תורים",
+  description: "מערכת חכמה לזימון תורים למספרת רם-אל",
+  keywords: "תור, מספרה, רם-אל, זימון תורים",
   manifest: "/manifest.json",
+  viewport: "width=device-width, initial-scale=1, viewport-fit=cover",
+  themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -32,6 +35,18 @@ export const metadata: Metadata = {
     title: "תור רם-אל",
     description: "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
   },
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' }
+    ],
+    apple: [
+      { url: '/icons/touch-icon-iphone.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icons/touch-icon-ipad.png', sizes: '152x152', type: 'image/png' },
+      { url: '/icons/touch-icon-ipad-retina.png', sizes: '167x167', type: 'image/png' },
+      { url: '/icons/touch-icon-iphone-retina.png', sizes: '180x180', type: 'image/png' }
+    ]
+  }
 };
 
 export const viewport: Viewport = {

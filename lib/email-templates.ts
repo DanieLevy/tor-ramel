@@ -64,21 +64,14 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
       display: inline-block;
       width: 48px;
       height: 48px;
-      background-color: #000000;
-      border-radius: 12px;
       margin-bottom: 16px;
-      position: relative;
     }
     
-    .logo::after {
-      content: "ת";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-size: 24px;
-      font-weight: 700;
+    .logo img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: block;
     }
     
     h1 {
@@ -231,7 +224,9 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo"></div>
+      <div class="logo">
+        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+      </div>
       <h1>נמצאו תורים פנויים</h1>
       <p class="subtitle">מספרת רם-אל</p>
     </div>
@@ -374,20 +369,14 @@ export function generateSubscriptionConfirmationEmail(data: SubscriptionData): {
       display: inline-block;
       width: 64px;
       height: 64px;
-      background-color: #f5f5f5;
+      background-color: #10b981;
       border-radius: 50%;
       margin-bottom: 24px;
       position: relative;
-    }
-    
-    .success-icon::after {
-      content: "✓";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      line-height: 64px;
+      text-align: center;
       font-size: 32px;
-      color: #000000;
+      color: #ffffff;
     }
     
     h1 {
@@ -488,7 +477,7 @@ export function generateSubscriptionConfirmationEmail(data: SubscriptionData): {
 <body>
   <div class="container">
     <div class="header">
-      <div class="success-icon"></div>
+      <div class="success-icon">✓</div>
       <h1>נרשמת בהצלחה להתראות</h1>
     </div>
     
@@ -593,19 +582,14 @@ export function generateWelcomeEmail(email: string): { html: string; text: strin
       display: inline-block;
       width: 64px;
       height: 64px;
-      background-color: #000000;
-      border-radius: 16px;
       margin-bottom: 24px;
-      position: relative;
     }
     
-    .welcome-icon::after {
-      content: "👋";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 32px;
+    .welcome-icon img {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      display: block;
     }
     
     h1 {
@@ -690,7 +674,9 @@ export function generateWelcomeEmail(email: string): { html: string; text: strin
 <body>
   <div class="container">
     <div class="header">
-      <div class="welcome-icon"></div>
+      <div class="welcome-icon">
+        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="64" height="64" style="border-radius: 16px;">
+      </div>
       <h1>ברוכים הבאים!</h1>
       <p class="intro">החשבון שלך נוצר בהצלחה. כעת תוכל להנות מכל היתרונות של תור רם-אל.</p>
     </div>

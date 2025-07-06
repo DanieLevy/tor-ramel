@@ -82,12 +82,15 @@ export function Header() {
   const username = user?.email?.split('@')[0] || ''
 
   return (
-    <header className={cn(
-      "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 header-safe",
-      config.className
-    )}>
-      <div className="container flex h-14 items-center px-safe px-safe-landscape">
-        <div className="flex flex-1 items-center justify-between">
+    <header 
+      className={cn(
+        "sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b transition-all duration-300",
+        "supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)]",
+        config.className
+      )}
+    >
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
           {/* Right section (RTL) - App Icon & Title */}
           <div className="flex items-center gap-2 mr-2">
             <img 

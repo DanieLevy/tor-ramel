@@ -40,7 +40,7 @@ export async function sendNotificationEmail(data: NotificationEmailData): Promis
     
     // Send email
     const info = await transporter.sendMail({
-      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+      from: `"Tor-Ramel" <${process.env.EMAIL_SENDER}>`,
       to,
       subject: `תורים פנויים - ${dayName} ${date}`,
       text,
@@ -79,7 +79,7 @@ export async function sendSubscriptionConfirmationEmail(data: SubscriptionEmailD
     
     // Send email
     const info = await transporter.sendMail({
-      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+      from: `"Tor-Ramel" <${process.env.EMAIL_SENDER}>`,
       to,
       subject,
       text,
@@ -135,21 +135,14 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
       display: inline-block;
       width: 56px;
       height: 56px;
-      background-color: #000000;
-      border-radius: 12px;
       margin-bottom: 24px;
-      position: relative;
     }
     
-    .logo::after {
-      content: "ת";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-size: 28px;
-      font-weight: 700;
+    .logo img {
+      width: 56px;
+      height: 56px;
+      border-radius: 12px;
+      display: block;
     }
     
     h1 {
@@ -230,7 +223,9 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo"></div>
+      <div class="logo">
+        <img src="${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/icons/icon-128x128.png" alt="תור רם-אל" width="56" height="56" style="border-radius: 12px;">
+      </div>
       <h1>קוד אימות</h1>
       <p class="subtitle">תור רם-אל</p>
     </div>
@@ -270,9 +265,9 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
     `
     
     const info = await transporter.sendMail({
-      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+      from: `"Tor-Ramel" <${process.env.EMAIL_SENDER}>`,
       to: email,
-      subject: `${otp} - קוד האימות שלך`,
+      subject: `קוד אימות - תור רם-אל`,
       text,
       html
     })

@@ -16,17 +16,35 @@ export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isInstallable, setIsInstallable] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
+  const [isAndroid, setIsAndroid] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true)
-      return
-    }
+    if (typeof window !== 'undefined') {
+      const ua = navigator.userAgent
 
+      // Detect platform
+      const iosMatch = ua.match(/iPhone|iPad|iPod/)
+      const androidMatch = ua.match(/Android/)
+      
+      setIsIOS(!!iosMatch)
+      setIsAndroid(!!androidMatch)
+
+      // Detect if running as installed app
+      const standaloneMedia = window.matchMedia('(display-mode: standalone)').matches
+      const standaloneNavigator = 'standalone' in navigator && (navigator as any).standalone === true
+      const iosTWA = iosMatch && !ua.match(/Safari/)
+      
+      const installed = !!(standaloneMedia || standaloneNavigator || iosTWA)
+      
+      setIsInstalled(installed)
+      setIsStandalone(standaloneMedia || standaloneNavigator)
+    }
+  }, [])
+
+  useEffect(() => {
     // iOS doesn't support beforeinstallprompt, check if it's iOS
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-    
     if (isIOS) {
       // Check if it's Safari
       const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
@@ -64,7 +82,6 @@ export function usePWAInstall() {
   const promptInstall = async () => {
     if (!deferredPrompt) {
       // For iOS, show instructions
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
       if (isIOS) {
         alert('להתקנת האפליקציה:\n1. לחץ על כפתור השיתוף\n2. בחר "הוסף למסך הבית"')
         return { outcome: 'dismissed' as const }
@@ -93,6 +110,10 @@ export function usePWAInstall() {
   return {
     isInstallable,
     isInstalled,
+    isIOS,
+    isAndroid,
+    isStandalone,
+    platform: isIOS ? 'ios' : isAndroid ? 'android' : 'unknown',
     promptInstall,
   }
 } 

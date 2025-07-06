@@ -27,74 +27,40 @@ export function BottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe px-safe pointer-events-none">
-      {/* Bubble container with floating effect */}
-      <div className="flex justify-center px-4 pb-3 px-safe-landscape">
-        <nav className="pointer-events-auto bg-background/95 backdrop-blur-xl rounded-full shadow-lg border border-border/50 px-1">
-          <ul className="flex items-center gap-0.5 p-1.5">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href
-              const Icon = item.icon
+    <>
+      {/* Spacer to prevent content from being hidden behind nav */}
+      <div className="h-16 pb-[env(safe-area-inset-bottom)]" />
+      
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg">
+        {/* Add padding for safe area at bottom */}
+        <div className="pb-[constant(safe-area-inset-bottom)] pb-[env(safe-area-inset-bottom)]">
+          <div className="flex justify-around items-center h-16">
+            <Link href="/" className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+              pathname === '/' ? 'text-primary' : 'text-muted-foreground'
+            )}>
+              <Home className="h-5 w-5" />
+              <span className="text-xs mt-1">בית</span>
+            </Link>
 
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "relative flex items-center justify-center rounded-full transition-all duration-300",
-                      "w-12 h-12 touch-manipulation", // 48x48px - still good for touch
-                      "hover:bg-accent/20",
-                      "active:scale-95"
-                    )}
-                  >
-                    {/* Active indicator background */}
-                    <AnimatePresence>
-                      {isActive && (
-                        <motion.div
-                          layoutId="activeTab"
-                          className="absolute inset-0 bg-primary/10 rounded-full"
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.2 }}
-                        />
-                      )}
-                    </AnimatePresence>
+            <Link href="/search" className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+              pathname === '/search' ? 'text-primary' : 'text-muted-foreground'
+            )}>
+              <Search className="h-5 w-5" />
+              <span className="text-xs mt-1">חיפוש</span>
+            </Link>
 
-                    {/* Icon */}
-                    <div className="relative flex flex-col items-center">
-                      <Icon
-                        className={cn(
-                          "h-5 w-5 transition-all duration-300",
-                          isActive 
-                            ? "text-primary scale-110" 
-                            : "text-muted-foreground"
-                        )}
-                      />
-                      
-                      {/* Active dot indicator */}
-                      <AnimatePresence>
-                        {isActive && (
-                          <motion.div
-                            className="absolute -bottom-1 w-1 h-1 bg-primary rounded-full"
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.2 }}
-                          />
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {/* Ripple effect on tap */}
-                    <span className="absolute inset-0 rounded-full" />
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
-      </div>
-    </div>
+            <Link href="/subscribe" className={cn(
+              "flex flex-col items-center justify-center flex-1 h-full transition-colors",
+              pathname === '/subscribe' ? 'text-primary' : 'text-muted-foreground'
+            )}>
+              <Bell className="h-5 w-5" />
+              <span className="text-xs mt-1">התראות</span>
+            </Link>
+          </div>
+        </div>
+      </nav>
+    </>
   )
 } 

@@ -56,13 +56,6 @@ export default function HomePage() {
         {/* Appointment Banner - Full width at top */}
         <AppointmentBanner />
 
-        {/* User Info Debug */}
-        <Card className="bg-muted/10 border-muted">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">מחובר כ: {user.email}</p>
-          </CardContent>
-        </Card>
-
         {/* How it Works */}
         <Card className="bg-muted/30 border-muted">
           <CardHeader className="pb-4">

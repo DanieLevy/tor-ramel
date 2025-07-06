@@ -67,21 +67,14 @@ function generateNotificationEmailHTML(data) {
       display: inline-block;
       width: 48px;
       height: 48px;
-      background-color: #000000;
-      border-radius: 12px;
       margin-bottom: 16px;
-      position: relative;
     }
     
-    .logo::after {
-      content: "ת";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-size: 24px;
-      font-weight: 700;
+    .logo img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: block;
     }
     
     h1 {
@@ -129,22 +122,44 @@ function generateNotificationEmailHTML(data) {
       margin-bottom: 16px;
     }
     
+    /* Updated times container for better mobile handling */
     .times-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      max-height: 200px;
+      overflow-y: auto;
       margin-bottom: 24px;
+      padding: 4px;
+      background-color: #fafafa;
+      border-radius: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    .times-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 8px;
+      padding: 8px;
     }
     
     .time-chip {
-      display: inline-block;
-      padding: 8px 16px;
+      display: block;
+      padding: 8px 12px;
       background-color: #ffffff;
       border: 2px solid #000000;
       border-radius: 24px;
       font-size: 16px;
       font-weight: 500;
       color: #000000;
+      text-align: center;
+      white-space: nowrap;
+    }
+    
+    /* Show all times message for very long lists */
+    .times-count {
+      font-size: 14px;
+      color: #666666;
+      text-align: center;
+      margin-top: 8px;
+      font-style: italic;
     }
     
     .actions {
@@ -228,14 +243,32 @@ function generateNotificationEmailHTML(data) {
         font-size: 15px;
         padding: 14px 24px;
       }
+      
+      /* Ensure times container works well on mobile */
+      .times-container {
+        max-height: 240px;
+      }
+      
+      .times-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 6px;
+        padding: 6px;
+      }
+      
+      .time-chip {
+        font-size: 15px;
+        padding: 7px 10px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo"></div>
-      <h1>נמצאו תורים פנויים</h1>
+      <div class="logo">
+        <img src="${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+      </div>
+      <h1>נמצאו תורים פנויים 🎉</h1>
       <p class="subtitle">מספרת רם-אל</p>
     </div>
     
@@ -249,8 +282,11 @@ function generateNotificationEmailHTML(data) {
     <div class="section">
       <h2 class="section-title">שעות זמינות</h2>
       <div class="times-container">
-        ${times.map(time => `<span class="time-chip">${time}</span>`).join('')}
+        <div class="times-grid">
+          ${times.slice(0, 20).map(time => `<span class="time-chip">${time}</span>`).join('')}
+        </div>
       </div>
+      ${times.length > 20 ? `<p class="times-count">ועוד ${times.length - 20} שעות נוספות...</p>` : ''}
     </div>
     
     <div class="actions">
@@ -317,9 +353,9 @@ ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notificat
     
     // Send email
     const info = await transporter.sendMail({
-      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+      from: `"Tor-Ramel" <${process.env.EMAIL_SENDER}>`,
       to,
-      subject: `תורים פנויים - ${dayName} ${date}`,
+      subject: `🎉 תורים פנויים - ${dayName} ${date}`,
       text,
       html
     })

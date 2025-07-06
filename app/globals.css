@@ -347,3 +347,44 @@ input[type="text"] {
   /* Push toasts below the safe area/notch */
   top: calc(1rem + var(--safe-area-inset-top)) !important;
 }
+
+/* iOS Safe Area Support */
+@supports (padding-top: constant(safe-area-inset-top)) {
+  :root {
+    --safe-area-inset-top: constant(safe-area-inset-top);
+    --safe-area-inset-right: constant(safe-area-inset-right);
+    --safe-area-inset-bottom: constant(safe-area-inset-bottom);
+    --safe-area-inset-left: constant(safe-area-inset-left);
+  }
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-right: env(safe-area-inset-right);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+  }
+}
+
+/* Apply safe area padding to html for PWA */
+@media (display-mode: standalone) {
+  html {
+    /* Add safe area padding to avoid content being hidden under notch */
+    padding-top: var(--safe-area-inset-top, 0);
+    padding-left: var(--safe-area-inset-left, 0);
+    padding-right: var(--safe-area-inset-right, 0);
+    /* Don't add bottom padding to html to avoid white bar at bottom */
+    min-height: calc(100vh + var(--safe-area-inset-top, 0));
+  }
+  
+  /* Ensure body fills the viewport */
+  body {
+    min-height: 100vh;
+  }
+}
+
+/* Print styles */
+@media print {
+
+}

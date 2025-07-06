@@ -1,6 +1,6 @@
 // Service Worker for תור רם-אל PWA
 const SW_VERSION = '2025-01-28-v2.8'
-const CACHE_NAME = 'tor-ramel-v2.8'
+const CACHE_NAME = 'tor-ramel-v2.9'
 const DYNAMIC_CACHE = 'tor-ramel-dynamic-v12';
 const API_CACHE = 'tor-ramel-api-v12';
 
@@ -18,13 +18,13 @@ const STATIC_ASSETS = [
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[SW] Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       })
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -198,5 +198,74 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  
+  const urlToOpen = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(windowClients => {
+      // Check if there's already a window/tab open with the target URL
+      const hadWindowToFocus = windowClients.some(windowClient => {
+        if (windowClient.url === urlToOpen && 'focus' in windowClient) {
+          windowClient.focus();
+          return true;
+        }
+      });
+      
+      // Otherwise, open a new window/tab with the target URL
+      if (!hadWindowToFocus) {
+        clients.openWindow(urlToOpen).then(windowClient => {
+          if (windowClient) {
+            windowClient.focus();
+          }
+        });
+      }
+    })
+  );
+});
+
+// Handle app badge
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SET_BADGE') {
+    if ('setAppBadge' in navigator) {
+      navigator.setAppBadge(event.data.count);
+    }
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_BADGE') {
+    if ('clearAppBadge' in navigator) {
+      navigator.clearAppBadge();
+    }
+  }
+});
+
+// Handle external URL interception for installed PWA
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  
+  // Check if this is an external navigation that should stay in the PWA
+  if (event.request.mode === 'navigate' && url.origin === self.location.origin) {
+    // Handle notification action URLs
+    if (url.pathname === '/notification-action') {
+      event.respondWith(
+        clients.openWindow(url.href).then(windowClient => {
+          if (windowClient) {
+            windowClient.focus();
+          }
+          return new Response('Redirecting...', {
+            status: 302,
+            headers: { 'Location': url.href }
+          });
+        })
+      );
+    }
   }
 }); 
