@@ -1,8 +1,8 @@
 [build]
-  command = "npm run build"
+  command = "npm ci && npm run build"
   functions = "netlify/functions"
   publish = ".next"
-  environment = { NEXT_TELEMETRY_DISABLED = "1" }
+  environment = { NEXT_TELEMETRY_DISABLED = "1", CI = "true" }
 
 [build.processing]
   skip_processing = false
