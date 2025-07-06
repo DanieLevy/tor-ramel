@@ -21,7 +21,7 @@ function generateNotificationEmailHTML(data) {
   const { date, dayName, times, subscriptionId } = data
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
   
-  const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}`
+  const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}`
   const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}`
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   

@@ -160,29 +160,17 @@
   
   /* PWA Specific Styles */
   
-  /* Define CSS custom properties for safe areas */
-  :root {
-    --safe-area-inset-top: env(safe-area-inset-top, 0px);
-    --safe-area-inset-right: env(safe-area-inset-right, 0px);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-area-inset-left: env(safe-area-inset-left, 0px);
-  }
-  
   /* iOS Safe Areas - Modern 2025 approach */
   html {
-    /* Ensure proper height calculation with safe areas */
-    min-height: calc(100% + var(--safe-area-inset-top));
-    /* Only add horizontal padding to html */
-    padding-left: var(--safe-area-inset-left);
-    padding-right: var(--safe-area-inset-right);
+    /* Ensure full viewport height */
+    min-height: 100vh;
   }
   
   /* Body should fill available space */
   body {
     min-height: 100vh;
-    /* Use CSS Grid for proper layout with safe areas */
-    display: grid;
-    grid-template-rows: 1fr;
+    /* Remove grid layout - causes issues with safe areas */
+    display: block;
   }
   
   /* Prevent iOS bounce effect */
@@ -348,7 +336,16 @@ input[type="text"] {
   top: calc(1rem + var(--safe-area-inset-top)) !important;
 }
 
-/* iOS Safe Area Support */
+/* iOS Safe Area Support - Consolidated */
+:root {
+  /* Default values */
+  --safe-area-inset-top: 0px;
+  --safe-area-inset-right: 0px;
+  --safe-area-inset-bottom: 0px;
+  --safe-area-inset-left: 0px;
+}
+
+/* iOS 11.0 - 11.2 */
 @supports (padding-top: constant(safe-area-inset-top)) {
   :root {
     --safe-area-inset-top: constant(safe-area-inset-top);
@@ -358,6 +355,7 @@ input[type="text"] {
   }
 }
 
+/* iOS 11.2+ */
 @supports (padding-top: env(safe-area-inset-top)) {
   :root {
     --safe-area-inset-top: env(safe-area-inset-top);
@@ -370,17 +368,24 @@ input[type="text"] {
 /* Apply safe area padding to html for PWA */
 @media (display-mode: standalone) {
   html {
-    /* Add safe area padding to avoid content being hidden under notch */
-    padding-top: var(--safe-area-inset-top, 0);
+    /* Remove top padding - it causes empty space above header */
     padding-left: var(--safe-area-inset-left, 0);
     padding-right: var(--safe-area-inset-right, 0);
-    /* Don't add bottom padding to html to avoid white bar at bottom */
-    min-height: calc(100vh + var(--safe-area-inset-top, 0));
+    /* Don't add any vertical padding to html */
+    min-height: 100vh;
   }
   
   /* Ensure body fills the viewport */
   body {
     min-height: 100vh;
+    /* Remove the grid layout that was causing issues */
+    display: block;
+  }
+  
+  /* Main content area should have proper bottom spacing */
+  main {
+    /* Add padding at bottom for nav bar + safe area */
+    padding-bottom: calc(5rem + var(--safe-area-inset-bottom, 0));
   }
 }
 

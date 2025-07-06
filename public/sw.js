@@ -1,8 +1,8 @@
-// Service Worker v3.1
-const SW_VERSION = '2025-01-28-v3.1'
-const CACHE_NAME = 'tor-ramel-v3.1'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v13';
-const API_CACHE = 'tor-ramel-api-v13';
+// Service Worker v3.4
+const SW_VERSION = '2025-01-28-v3.4'
+const CACHE_NAME = 'tor-ramel-v3.4'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v16';
+const API_CACHE = 'tor-ramel-api-v16';
 
 // Assets to cache on install
 const STATIC_ASSETS = [

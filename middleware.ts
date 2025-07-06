@@ -18,11 +18,21 @@ const publicRoutes = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
+  // Allow all API routes to handle their own auth
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+  
   // Check if route is public
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
   
-  // Check for auth in cookies (we'll set this after login)
+  // Check for auth in cookies
   const hasAuth = request.cookies.has('tor-ramel-auth')
+  
+  // Log for debugging mobile issues
+  if (!hasAuth && !isPublicRoute) {
+    console.log('Middleware: No auth cookie for protected route:', pathname)
+  }
   
   // Redirect to login if accessing protected route without auth
   if (!isPublicRoute && !hasAuth) {

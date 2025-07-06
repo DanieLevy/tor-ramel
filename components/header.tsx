@@ -83,11 +83,10 @@ export function Header() {
 
   return (
     <header 
-      className={cn(
-        "sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b transition-all duration-300",
-        "supports-[padding:env(safe-area-inset-top)]:pt-[env(safe-area-inset-top)]",
-        config.className
-      )}
+      className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b transition-all duration-300"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)'
+      }}
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">

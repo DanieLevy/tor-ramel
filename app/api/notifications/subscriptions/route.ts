@@ -13,28 +13,35 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     const authCookie = cookieStore.get('tor-ramel-auth')
     
+    console.log('🍪 Auth cookie check (subscriptions):', {
+      exists: !!authCookie,
+      headers: request.headers.get('cookie')
+    })
+    
     if (!authCookie) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { email } = JSON.parse(authCookie.value)
+    let authData
+    try {
+      authData = JSON.parse(authCookie.value)
+    } catch (parseError) {
+      console.error('Failed to parse auth cookie:', parseError)
+      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
+    }
     
-    // Get user ID from database
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
-
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const { email, userId } = authData
+    
+    if (!userId) {
+      console.error('No userId in auth data:', authData)
+      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
     }
 
-    // Get all subscriptions for user
+    // Get all subscriptions for user using userId directly
     const { data: subscriptions, error: fetchError } = await supabase
       .from('notification_subscriptions')
       .select('*')
-      .eq('user_id', userData.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
     if (fetchError) {

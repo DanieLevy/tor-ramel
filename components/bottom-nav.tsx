@@ -28,11 +28,11 @@ export function BottomNav() {
   return (
     <>
       {/* Spacer to prevent content from being hidden behind nav */}
-      <div className="h-16 pb-[env(safe-area-inset-bottom)]" />
+      <div className="h-20" />
       
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg">
-        {/* Add padding for safe area at bottom */}
-        <div className="pb-[constant(safe-area-inset-bottom)] pb-[env(safe-area-inset-bottom)]">
+        {/* Container with safe area padding */}
+        <div className="pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around items-center h-16">
             <Link href="/" className={cn(
               "flex flex-col items-center justify-center flex-1 h-full transition-colors",

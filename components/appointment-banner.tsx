@@ -34,7 +34,14 @@ export function AppointmentBanner() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/appointments/stats')
+      const response = await fetch('/api/appointments/stats', {
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats')
+      }
+      
       const data = await response.json()
       setStats(data)
       setError(false)

@@ -42,7 +42,9 @@ function SubscribePage() {
 
   const fetchSubscriptions = async () => {
     try {
-      const response = await fetch('/api/notifications/subscriptions')
+      const response = await fetch('/api/notifications/subscriptions', {
+        credentials: 'include'
+      })
       if (response.ok) {
         const data = await response.json()
         setSubscriptions(data)
@@ -78,6 +80,7 @@ function SubscribePage() {
       const response = await fetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload)
       })
 
@@ -112,7 +115,8 @@ function SubscribePage() {
   const handleDelete = async (id: string) => {
     try {
       const response = await fetch(`/api/notifications/subscriptions/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       })
 
       if (response.ok) {
@@ -350,7 +354,8 @@ function SubscribePage() {
                 onClick={async () => {
                   try {
                     const response = await fetch('/api/notifications/test', {
-                      method: 'POST'
+                      method: 'POST',
+                      credentials: 'include'
                     })
                     if (response.ok) {
                       toast.success('מייל בדיקה נשלח בהצלחה!')

@@ -84,7 +84,7 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1 ">{children}</main>
+                  <main className="flex-1">{children}</main>
                   <BottomNav />
                 </div>
               </HeaderProvider>
@@ -93,7 +93,7 @@ export default function RootLayout({
                 dir="rtl" 
                 toastOptions={{
                   style: {
-                    marginTop: 'var(--safe-area-inset-top)',
+                    marginTop: 'calc(var(--safe-area-inset-top, 0px) + 1rem)',
                   },
                 }}
               />

@@ -15,24 +15,43 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
     const authCookie = cookieStore.get('tor-ramel-auth')
     
+    console.log('🍪 Auth cookie check:', {
+      exists: !!authCookie,
+      value: authCookie?.value ? 'present' : 'missing',
+      headers: request.headers.get('cookie')
+    })
+    
     if (!authCookie) {
       console.log('Unauthorized: No auth cookie found')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ 
+        error: 'לא מחובר למערכת - נא להתחבר מחדש',
+        message: 'שגיאה בהרשמה'
+      }, { status: 401 })
     }
 
-    const { email } = JSON.parse(authCookie.value)
+    let authData
+    try {
+      authData = JSON.parse(authCookie.value)
+    } catch (parseError) {
+      console.error('Failed to parse auth cookie:', parseError)
+      return NextResponse.json({ 
+        error: 'שגיאה בקריאת נתוני התחברות',
+        message: 'שגיאה בהרשמה'
+      }, { status: 401 })
+    }
     
-    // Get user ID from database
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single()
-
-    if (userError || !userData) {
-      console.error('User not found:', userError)
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const { email, userId } = authData
+    
+    if (!email || !userId) {
+      console.error('Invalid auth data:', authData)
+      return NextResponse.json({ 
+        error: 'נתוני התחברות לא תקינים',
+        message: 'שגיאה בהרשמה'
+      }, { status: 401 })
     }
+    
+    // Use userId directly instead of looking it up by email
+    const userData = { id: userId }
 
     const body = await request.json()
     
