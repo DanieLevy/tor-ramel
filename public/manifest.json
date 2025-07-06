@@ -78,29 +78,6 @@
       "purpose": "any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/home-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "מסך הבית"
-    },
-    {
-      "src": "/screenshots/login-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "מסך כניסה"
-    },
-    {
-      "src": "/screenshots/home-tablet.png",
-      "sizes": "1024x1366",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "מסך הבית - טאבלט"
-    }
-  ],
   "shortcuts": [
     {
       "name": "חיפוש תורים",

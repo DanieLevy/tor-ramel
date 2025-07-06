@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react'
-import { Menu, Sun, Moon, Search, Bell, Info } from 'lucide-react'
+import { Menu, Sun, Moon, Search, Bell, Info, Home } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useHeaderContext } from './header-context'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 export function Header() {
   const { config } = useHeaderContext()
@@ -56,13 +57,23 @@ export function Header() {
                   align="start" 
                   className="w-48 rounded-xl border-border/50 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
                 >
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5">
-                    <Search className="h-4 w-4 opacity-60" />
-                    <span className="flex-1">בדיקת תורים</span>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                    <Link href="/">
+                      <Home className="h-4 w-4 opacity-60" />
+                      <span className="flex-1">דף הבית</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5">
-                    <Bell className="h-4 w-4 opacity-60" />
-                    <span className="flex-1">ההתראות שלי</span>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                    <Link href="/search">
+                      <Search className="h-4 w-4 opacity-60" />
+                      <span className="flex-1">חיפוש תורים</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                    <Link href="/subscribe">
+                      <Bell className="h-4 w-4 opacity-60" />
+                      <span className="flex-1">התראות</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5">

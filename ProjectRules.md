@@ -12,3 +12,4 @@
 # Full PWA application with full sw support. 
 # This app used to help users to find opp in our Barbershop/מספרה
 # When running build process (only by me request), fix issues from root cause to ensure proper and valid fixes
+# remember to update sw.js ver to include properly updates in PWA cases and etc.

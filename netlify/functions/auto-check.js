@@ -2,6 +2,13 @@ const axios = require('axios')
 const cheerio = require('cheerio')
 const http = require('http')
 const https = require('https')
+const { createClient } = require('@supabase/supabase-js')
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 // ============================================================================
 // OPTIMIZED AUTO-CHECK FUNCTION
@@ -323,6 +330,54 @@ async function checkSingleDate(dateStr, retryCount = 0) {
   }
 }
 
+// Save results to Supabase
+async function saveToSupabase(results) {
+  try {
+    console.log('💾 Saving results to Supabase...')
+    
+    // Prepare data for upsert
+    const dataToSave = results.map(result => {
+      const dayName = result.date ? getDayNameHebrew(result.date) : null
+      const bookingUrl = result.date ? generateBookingUrl(result.date) : null
+      
+      return {
+        check_date: result.date,
+        available: result.available || false,
+        times: result.times || [],
+        day_name: dayName,
+        booking_url: bookingUrl,
+        checked_at: new Date().toISOString()
+      }
+    })
+    
+    // Upsert all results (insert or update based on check_date)
+    const { data, error } = await supabase
+      .from('appointment_checks')
+      .upsert(dataToSave, { 
+        onConflict: 'check_date',
+        returning: 'minimal'
+      })
+    
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      return false
+    }
+    
+    console.log(`✅ Saved ${dataToSave.length} results to Supabase`)
+    
+    // Log summary of available appointments
+    const availableCount = results.filter(r => r.available === true).length
+    if (availableCount > 0) {
+      console.log(`🎯 Found ${availableCount} dates with available appointments`)
+    }
+    
+    return true
+  } catch (error) {
+    console.error('❌ Failed to save to Supabase:', error)
+    return false
+  }
+}
+
 // Main appointment finding function with optimizations
 async function findAppointments() {
   console.log('🚀 Starting optimized appointment search')
@@ -416,6 +471,12 @@ async function findAppointments() {
   
   if (errorResults.length > 0) {
     console.log(`⚠️ Failed dates: ${errorResults.map(r => r.date).join(', ')}`)
+  }
+  
+  // Save all successful results to Supabase (available and not available)
+  const successfulResults = results.filter(r => r.available !== null)
+  if (successfulResults.length > 0) {
+    await saveToSupabase(successfulResults)
   }
   
   return {
