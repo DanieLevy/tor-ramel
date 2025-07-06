@@ -1,6 +1,6 @@
 // Service Worker for תור רם-אל PWA
-const SW_VERSION = '2025-01-28-v2.7'
-const CACHE_NAME = 'tor-ramel-v2.7'
+const SW_VERSION = '2025-01-28-v2.8'
+const CACHE_NAME = 'tor-ramel-v2.8'
 const DYNAMIC_CACHE = 'tor-ramel-dynamic-v12';
 const API_CACHE = 'tor-ramel-api-v12';
 

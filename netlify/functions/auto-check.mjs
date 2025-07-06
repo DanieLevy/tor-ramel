@@ -28,23 +28,23 @@ const performanceStats = {
 
 // Response cache for the current run (avoids duplicate requests)
 const responseCache = new Map()
-const CACHE_TTL = 60 * 1000 // 1 minute cache
+const CACHE_TTL = 5 * 60 * 1000 // 5 minute cache for better performance
 
 // Create optimized HTTP agents with better connection pooling
 const httpAgent = new http.Agent({ 
   keepAlive: true, 
-  maxSockets: 10, // Increased for better parallelism
-  maxFreeSockets: 5,
-  timeout: 3000, // Reduced timeout
+  maxSockets: 15, // Increased for better parallelism
+  maxFreeSockets: 8,
+  timeout: 2500, // Faster timeout for quicker retries
   keepAliveMsecs: 3000,
   scheduling: 'lifo' // Last-in-first-out for better connection reuse
 })
 const httpsAgent = new https.Agent({ 
   keepAlive: true, 
-  maxSockets: 10,
-  maxFreeSockets: 5,
+  maxSockets: 15,
+  maxFreeSockets: 8,
   rejectUnauthorized: false,
-  timeout: 3000,
+  timeout: 2500,
   keepAliveMsecs: 3000,
   scheduling: 'lifo'
 })
@@ -61,7 +61,7 @@ const axiosInstance = axios.create({
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache'
   },
-  timeout: 3000, // Reduced from 4000ms
+  timeout: 2500, // Further reduced for faster failures
   responseType: 'arraybuffer',
   maxRedirects: 2, // Reduced from 3
   decompress: true,
@@ -185,32 +185,34 @@ function getAdaptiveBatchSize(elapsed, totalRemaining) {
     ? performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length
     : 300 // Default estimate
   
-  const timeRemaining = 8000 - elapsed // Target 8 seconds max to leave time for notifications
+  const timeRemaining = 9500 - elapsed // Target 9.5 seconds max
   
-  // Account for staggered delays (150ms per request in batch)
-  // Last request in batch starts at (batchSize-1) * 150ms
-  const staggerDelay = 150
+  // Account for staggered delays (100ms per request in batch)
+  // Last request in batch starts at (batchSize-1) * 100ms
+  const staggerDelay = 100
   
   // Calculate optimal batch size considering stagger delays
-  let batchSize = 5 // Start with reasonable default
+  let batchSize = 6 // Start with higher default for speed
   
   // Estimate time for a batch: stagger delay + avg response time
-  const estimatedBatchTime = (batchSize - 1) * staggerDelay + avgResponseTime + 200 // Buffer
+  const estimatedBatchTime = (batchSize - 1) * staggerDelay + avgResponseTime + 100 // Reduced buffer
   
-  // Adjust batch size based on remaining time
-  if (timeRemaining < 2000) {
-    batchSize = 3 // Minimum
-  } else if (timeRemaining > 4000 && avgResponseTime < 350) {
-    batchSize = 6 // Can handle more
+  // Adjust batch size based on remaining time and performance
+  if (timeRemaining < 1500) {
+    batchSize = 3 // Minimum for last batch
+  } else if (timeRemaining < 3000) {
+    batchSize = 4 // Medium for mid-run
+  } else if (timeRemaining > 5000 && avgResponseTime < 400) {
+    batchSize = 8 // Can handle more at start
   }
   
-  // Reduce batch size if we're getting errors
-  if (performanceStats.errors > 1 || performanceStats.retries > 3) {
-    batchSize = Math.max(3, batchSize - 1)
+  // Reduce batch size only if we're getting many errors
+  if (performanceStats.errors > 2 || performanceStats.retries > 5) {
+    batchSize = Math.max(3, batchSize - 2)
   }
   
-  // Never exceed 6 to avoid overwhelming the server
-  return Math.min(6, Math.max(3, batchSize))
+  // Allow up to 8 for better throughput
+  return Math.min(8, Math.max(3, batchSize))
 }
 
 // Single date check function with caching
@@ -227,17 +229,15 @@ async function checkSingleDate(dateStr, retryCount = 0) {
   }
   performanceStats.cacheMisses++
   
-  console.log(`🔍 Checking ${dateStr}${retryCount > 0 ? ` (retry ${retryCount})` : ''}...`)
+  if (retryCount > 0 || performanceStats.requestTimes.length < 5) {
+    console.log(`🔍 Checking ${dateStr}${retryCount > 0 ? ` (retry ${retryCount})` : ''}...`)
+  }
   
   try {
     const startTime = Date.now()
     
     const userId = process.env.USER_ID || '4481'
     const codeAuth = process.env.CODE_AUTH || 'Sa1W2GjL'
-    
-    if (retryCount === 0) {
-      console.log(`🔐 Using credentials: userId=${userId}`)
-    }
     
     const params = {
       i: 'cmFtZWwzMw==', // ramel33
@@ -259,7 +259,10 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     
     const responseTime = Date.now() - startTime
     performanceStats.requestTimes.push(responseTime)
-    console.log(`📡 Response received for ${dateStr}: status=${response.status}, size=${response.data.length} bytes, time=${responseTime}ms`)
+    // Only log first few responses or slow ones
+    if (performanceStats.requestTimes.length <= 3 || responseTime > 1000) {
+      console.log(`📡 Response received for ${dateStr}: status=${response.status}, size=${response.data.length} bytes, time=${responseTime}ms`)
+    }
 
     // Parse HTML with minimal processing
     let $
@@ -275,23 +278,23 @@ async function checkSingleDate(dateStr, retryCount = 0) {
       throw new Error('Failed to parse HTML response')
     }
     
-    // Quick check for no appointments (optimized selectors)
-    const dangerText = $('h4.tx-danger').first().text()
-    const hasNoAppointments = dangerText.includes('לא נשארו תורים פנויים') || 
-                             dangerText.includes('אין תורים זמינים')
-    
-    if (hasNoAppointments) {
-      console.log(`❌ No appointments message found for ${dateStr}`)
-      const result = { date: dateStr, available: false, times: [] }
-      responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
-      return result
+    // Quick check for no appointments (optimized - check first, parse once)
+    const dangerElem = $('h4.tx-danger').first()
+    if (dangerElem.length > 0) {
+      const dangerText = dangerElem.text()
+      if (dangerText.includes('לא נשארו תורים פנויים') || dangerText.includes('אין תורים זמינים')) {
+        if (performanceStats.requestTimes.length <= 3) {
+          console.log(`❌ No appointments message found for ${dateStr}`)
+        }
+        const result = { date: dateStr, available: false, times: [] }
+        responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
+        return result
+      }
     }
 
-    // Extract available times efficiently
+    // Extract available times efficiently - single pass
     const availableTimes = []
-    const timeButtons = $('button.btn.btn-outline-dark.btn-block')
-    
-    timeButtons.each((i, elem) => {
+    $('button.btn.btn-outline-dark.btn-block').each((i, elem) => {
       const timeText = $(elem).text().trim()
       if (/^\d{1,2}:\d{2}$/.test(timeText)) {
         availableTimes.push(timeText)
@@ -319,11 +322,11 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     
     console.error(`❌ Error checking ${dateStr}: ${error.message} (Status: ${error.response?.status || 'N/A'})`)
     
-    // Retry logic with exponential backoff
+    // Retry logic with faster backoff
     if (isRetryable && retryCount < maxRetries) {
       performanceStats.retries++
-      // Exponential backoff: 300ms, 600ms, 1200ms
-      const backoffTime = Math.min(300 * Math.pow(2, retryCount), 1200)
+      // Faster backoff: 200ms, 400ms, 800ms
+      const backoffTime = Math.min(200 * Math.pow(2, retryCount), 800)
       console.log(`🔄 Retrying ${dateStr} after ${backoffTime}ms (attempt ${retryCount + 1}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, backoffTime))
       return checkSingleDate(dateStr, retryCount + 1)
@@ -514,14 +517,17 @@ async function findAppointments() {
   console.log('🚀 Starting optimized appointment search')
   console.log(`📅 Current Israel time: ${new Date().toLocaleString('he-IL', { timeZone: ISRAEL_TIMEZONE })}`)
   
-  // Debug: Show day calculation for next week
-  const debugDate = new Date()
-  console.log('🔍 Debug - Days of the week check:')
-  for (let i = 0; i < 7; i++) {
-    const checkDate = addDaysIsrael(debugDate, i)
-    const dayName = new Intl.DateTimeFormat('en-US', { timeZone: ISRAEL_TIMEZONE, weekday: 'long' }).format(checkDate)
-    const dateStr = formatDateIsrael(checkDate)
-    console.log(`   ${dateStr}: ${dayName} ${isClosedDay(checkDate) ? '(CLOSED)' : '(Open)'}`)
+  // Debug: Show day calculation only on first run
+  if (!performanceStats._debugShown) {
+    performanceStats._debugShown = true
+    const debugDate = new Date()
+    console.log('🔍 Debug - Days of the week check:')
+    for (let i = 0; i < 7; i++) {
+      const checkDate = addDaysIsrael(debugDate, i)
+      const dayName = new Intl.DateTimeFormat('en-US', { timeZone: ISRAEL_TIMEZONE, weekday: 'long' }).format(checkDate)
+      const dateStr = formatDateIsrael(checkDate)
+      console.log(`   ${dateStr}: ${dayName} ${isClosedDay(checkDate) ? '(CLOSED)' : '(Open)'}`)
+    }
   }
   
   const startTime = Date.now()
@@ -563,8 +569,8 @@ async function findAppointments() {
     // Process batch with staggered start to avoid 500 errors
     // Based on test results, small delays between requests prevent server errors
     const batchPromises = batch.map((date, index) => {
-      // Stagger requests by 150ms to avoid overwhelming the server
-      const delay = index * 150
+      // Stagger requests by 100ms to avoid overwhelming the server
+      const delay = index * 100
       return new Promise(resolve => setTimeout(resolve, delay))
         .then(() => checkSingleDate(formatDateIsrael(date)))
     })
@@ -592,20 +598,16 @@ async function findAppointments() {
     // Update index
     i += batchSize
     
-    // Stop if approaching time limit (leaving 2 seconds for notifications)
-    if (totalElapsed > 8000) {
-      console.log(`⏰ TIME LIMIT: Stopping at ${totalElapsed}ms to leave time for notifications`)
+    // Stop if approaching time limit (leaving 0.5 seconds for cleanup)
+    if (totalElapsed > 9500) {
+      console.log(`⏰ TIME LIMIT: Stopping at ${totalElapsed}ms`)
       break
     }
     
-    // Dynamic delay between batches based on performance
-    if (i < openDates.length) {
-      const avgResponseTime = performanceStats.requestTimes.length > 0
-        ? performanceStats.requestTimes.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, performanceStats.requestTimes.length)
-        : 300
-      
-      // Adjust delay based on server response time
-      const delay = avgResponseTime > 350 ? 200 : 100 // Reduced delays
+    // Minimal delay between batches (only if having errors)
+    if (i < openDates.length && performanceStats.errors > 0) {
+      // Only delay if we're seeing errors
+      const delay = performanceStats.errors > 2 ? 150 : 50
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
