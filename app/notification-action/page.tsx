@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle, XCircle, Loader2, Home, Calendar } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-export default function NotificationActionPage() {
+function NotificationActionContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [processing, setProcessing] = useState(true)
@@ -190,5 +191,26 @@ export default function NotificationActionPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function NotificationActionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white py-12 px-4">
+        <div className="container max-w-2xl mx-auto">
+          <Card className="shadow-lg">
+            <CardContent className="py-12">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-muted-foreground">טוען...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    }>
+      <NotificationActionContent />
+    </Suspense>
   )
 } 

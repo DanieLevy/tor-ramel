@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer'
 import { generateNotificationEmail } from './email-templates'
 
 // Create transporter
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_SENDER,

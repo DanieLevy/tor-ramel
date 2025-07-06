@@ -9,11 +9,14 @@ const supabase = createClient(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params for Next.js 15
+    const { id: subscriptionId } = await params
+    
     // Get user from cookie
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const authCookie = cookieStore.get('tor-ramel-auth')
     
     if (!authCookie) {
@@ -32,8 +35,6 @@ export async function DELETE(
     if (userError || !userData) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
-    const subscriptionId = params.id
 
     // Verify subscription belongs to user
     const { data: subscription, error: fetchError } = await supabase

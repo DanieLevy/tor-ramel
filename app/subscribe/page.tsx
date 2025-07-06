@@ -98,6 +98,17 @@ function SubscribePage() {
     }
   }
 
+  const handleDateRangeSelect = (range: any) => {
+    if (range?.from || range?.to) {
+      setDateRange({
+        from: range.from || undefined,
+        to: range.to || undefined
+      })
+    } else {
+      setDateRange({ from: undefined, to: undefined })
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       const response = await fetch(`/api/notifications/subscriptions/${id}`, {
@@ -219,7 +230,7 @@ function SubscribePage() {
                       <CalendarComponent
                         mode="range"
                         selected={dateRange}
-                        onSelect={setDateRange}
+                        onSelect={handleDateRangeSelect}
                         disabled={isDateDisabled}
                         locale={he}
                         initialFocus
