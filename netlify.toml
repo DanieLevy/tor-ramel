@@ -44,7 +44,6 @@
 # Environment variables (these override .env files in production)
 [context.production.environment]
   NEXT_PUBLIC_BASE_URL = "https://tor-ramel.netlify.app"
-  NODE_ENV = "production"
   # Function environment variables (will use from Netlify UI or .env)
   # USER_ID = "set in Netlify UI"
   # CODE_AUTH = "set in Netlify UI"
