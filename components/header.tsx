@@ -127,10 +127,12 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center gap-2 hover:bg-accent/50 transition-colors px-3"
+                    className="flex items-center gap-2 hover:bg-accent/50 transition-colors px-2 h-8"
                   >
-                    <User className="h-4 w-4" />
-                    <span className="text-sm font-medium">{username}</span>
+                    <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50 border border-border/50">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-sm font-medium">{username}</span>
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 

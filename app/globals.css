@@ -317,27 +317,14 @@ input[type="text"] {
   margin-top: calc(-1 * var(--safe-area-inset-top));
 }
 
-/* Main content spacing for fixed header */
-.with-header {
-  /* Only account for header height, safe area is handled by header itself */
-  padding-top: 3.5rem;
-}
-
-/* Combined header and bottom nav */
-.with-header.with-bottom-nav {
-  padding-top: 3.5rem;
-  padding-bottom: calc(4.5rem + var(--safe-area-inset-bottom));
-}
-
 /* iOS specific adjustments for PWA */
 @supports (padding: max(0px)) {
-  .with-header {
-    /* Use max() to ensure minimum padding on all devices */
-    padding-top: max(3.5rem, calc(3.5rem + var(--safe-area-inset-top) - 20px));
-  }
-  
-  .with-header.with-bottom-nav {
-    padding-top: max(3.5rem, calc(3.5rem + var(--safe-area-inset-top) - 20px));
+  /* Only add safe area handling for standalone PWA mode */
+  @media all and (display-mode: standalone) {
+    .header-safe {
+      /* Ensure header extends into safe area properly */
+      padding-top: max(var(--safe-area-inset-top), 20px);
+    }
   }
 }
 
@@ -353,4 +340,10 @@ input[type="text"] {
     padding-left: max(1rem, var(--safe-area-inset-left));
     padding-right: max(1rem, var(--safe-area-inset-right));
   }
+}
+
+/* Sonner toast safe area handling */
+[data-sonner-toaster] {
+  /* Push toasts below the safe area/notch */
+  top: calc(1rem + var(--safe-area-inset-top)) !important;
 }

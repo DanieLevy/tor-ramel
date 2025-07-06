@@ -378,6 +378,155 @@ async function saveToSupabase(results) {
   }
 }
 
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
+  try {
+    console.log('🔔 Checking notification subscriptions...')
+    
+    // Get all active subscriptions
+    const { data: subscriptions, error: subError } = await supabase
+      .from('notification_subscriptions')
+      .select('*')
+      .eq('is_active', true)
+    
+    if (subError) {
+      console.error('Error fetching subscriptions:', subError)
+      return
+    }
+    
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('No active subscriptions found')
+      return
+    }
+    
+    console.log(`Found ${subscriptions.length} active subscriptions`)
+    
+    // Filter appointments that have available slots
+    const availableAppointments = appointmentResults.filter(r => r.available && r.times.length > 0)
+    
+    if (availableAppointments.length === 0) {
+      console.log('No available appointments to notify about')
+      return
+    }
+    
+    let notificationsQueued = 0
+    
+    // Check each subscription
+    for (const subscription of subscriptions) {
+      try {
+        let matchingDates = []
+        
+        if (subscription.subscription_date) {
+          // Single date subscription
+          const match = availableAppointments.find(a => a.date === subscription.subscription_date)
+          if (match) {
+            matchingDates.push(match)
+          }
+        } else if (subscription.date_range_start && subscription.date_range_end) {
+          // Date range subscription
+          matchingDates = availableAppointments.filter(a => {
+            return a.date >= subscription.date_range_start && 
+                   a.date <= subscription.date_range_end
+          })
+        }
+        
+        // Process each matching date
+        for (const appointment of matchingDates) {
+          // Get ignored times for this user and date
+          const { data: ignoredData } = await supabase
+            .from('ignored_appointment_times')
+            .select('ignored_times_array')
+            .eq('user_id', subscription.user_id)
+            .eq('appointment_date', appointment.date)
+          
+          const ignoredTimes = ignoredData ? 
+            ignoredData.flatMap(d => d.ignored_times_array || []) : []
+          
+          // Filter out ignored times
+          const newTimes = appointment.times.filter(time => !ignoredTimes.includes(time))
+          
+          if (newTimes.length === 0) {
+            console.log(`All times ignored for subscription ${subscription.id} on ${appointment.date}`)
+            continue
+          }
+          
+          // Check if notification was already sent for these exact times
+          const { data: existingNotification } = await supabase
+            .from('notified_appointments')
+            .select('id')
+            .eq('subscription_id', subscription.id)
+            .eq('appointment_date', appointment.date)
+            .eq('times_array', newTimes)
+            .single()
+          
+          if (existingNotification) {
+            console.log(`Notification already sent for subscription ${subscription.id} on ${appointment.date}`)
+            continue
+          }
+          
+          // Queue the notification
+          const { error: queueError } = await supabase
+            .from('notification_queue')
+            .insert({
+              subscription_id: subscription.id,
+              appointment_data: {
+                date: appointment.date,
+                dayName: getDayNameHebrew(appointment.date),
+                times: newTimes
+              },
+              status: 'pending'
+            })
+          
+          if (queueError) {
+            console.error('Error queueing notification:', queueError)
+          } else {
+            notificationsQueued++
+            console.log(`✅ Queued notification for subscription ${subscription.id} on ${appointment.date}`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing subscription ${subscription.id}:`, error)
+      }
+    }
+    
+    console.log(`📧 Queued ${notificationsQueued} notifications`)
+    
+    // Trigger notification processor if we queued any notifications
+    if (notificationsQueued > 0) {
+      await triggerNotificationProcessor()
+    }
+    
+  } catch (error) {
+    console.error('Error in notification system:', error)
+  }
+}
+
+async function triggerNotificationProcessor() {
+  try {
+    console.log('🚀 Triggering notification processor...')
+    
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+    const response = await axios.post(
+      `${baseUrl}/api/notifications/process`,
+      {},
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000
+      }
+    )
+    
+    console.log('✅ Notification processor response:', response.data)
+  } catch (error) {
+    console.error('❌ Failed to trigger notification processor:', error.message)
+  }
+}
+
 // Main appointment finding function with optimizations
 async function findAppointments() {
   console.log('🚀 Starting optimized appointment search')
@@ -488,6 +637,9 @@ async function findAppointments() {
   const successfulResults = results.filter(r => r.available !== null)
   if (successfulResults.length > 0) {
     await saveToSupabase(successfulResults)
+    
+    // Check subscriptions and queue notifications
+    await checkSubscriptionsAndQueueNotifications(successfulResults)
   }
   
   return {

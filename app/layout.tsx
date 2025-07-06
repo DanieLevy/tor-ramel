@@ -71,11 +71,19 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1 with-header with-bottom-nav">{children}</main>
+                  <main className="flex-1 ">{children}</main>
                   <BottomNav />
                 </div>
               </HeaderProvider>
-              <Toaster position="top-center" dir="rtl" />
+              <Toaster 
+                position="top-center" 
+                dir="rtl" 
+                toastOptions={{
+                  style: {
+                    marginTop: 'var(--safe-area-inset-top)',
+                  },
+                }}
+              />
             </PWAProvider>
           </AuthProvider>
         </ThemeProvider>

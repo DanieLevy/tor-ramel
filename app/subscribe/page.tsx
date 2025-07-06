@@ -1,93 +1,361 @@
 "use client"
 
+import { useState, useEffect } from 'react'
 import { useAuth, withAuth } from '@/components/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bell, Mail, MessageSquare } from 'lucide-react'
+import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { format, addDays } from 'date-fns'
+import { he } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+
+interface Subscription {
+  id: string
+  subscription_date: string | null
+  date_range_start: string | null
+  date_range_end: string | null
+  is_active: boolean
+  created_at: string
+  completed_at: string | null
+}
 
 function SubscribePage() {
   const { user } = useAuth()
+  const [selectedDate, setSelectedDate] = useState<Date>()
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  })
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [loading, setLoading] = useState(false)
+  const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
+  const [tab, setTab] = useState<'single' | 'range'>('single')
+
+  useEffect(() => {
+    fetchSubscriptions()
+  }, [])
+
+  const fetchSubscriptions = async () => {
+    try {
+      const response = await fetch('/api/notifications/subscriptions')
+      if (response.ok) {
+        const data = await response.json()
+        setSubscriptions(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch subscriptions:', error)
+      toast.error('שגיאה בטעינת המנויים')
+    } finally {
+      setFetchingSubscriptions(false)
+    }
+  }
+
+  const isDateDisabled = (date: Date) => {
+    const day = date.getDay()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    // Disable past dates, Mondays (1) and Saturdays (6)
+    return date < today || day === 1 || day === 6
+  }
+
+  const handleSubscribe = async () => {
+    setLoading(true)
+    
+    try {
+      const payload = tab === 'single' 
+        ? { subscription_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null }
+        : { 
+            date_range_start: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
+            date_range_end: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null
+          }
+
+      const response = await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (response.ok) {
+        toast.success('נרשמת בהצלחה להתראות')
+        // Reset form
+        setSelectedDate(undefined)
+        setDateRange({ from: undefined, to: undefined })
+        fetchSubscriptions()
+      } else {
+        const error = await response.json()
+        toast.error(error.message || 'שגיאה בהרשמה')
+      }
+    } catch (error) {
+      toast.error('שגיאה בהרשמה להתראות')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/notifications/subscriptions/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        toast.success('המנוי בוטל בהצלחה')
+        fetchSubscriptions()
+      } else {
+        toast.error('שגיאה בביטול המנוי')
+      }
+    } catch (error) {
+      toast.error('שגיאה בביטול המנוי')
+    }
+  }
+
+  const formatSubscriptionDate = (sub: Subscription) => {
+    if (sub.subscription_date) {
+      return format(new Date(sub.subscription_date + 'T00:00:00'), 'dd/MM/yyyy')
+    }
+    if (sub.date_range_start && sub.date_range_end) {
+      return `${format(new Date(sub.date_range_start + 'T00:00:00'), 'dd/MM')} - ${format(new Date(sub.date_range_end + 'T00:00:00'), 'dd/MM/yyyy')}`
+    }
+    return ''
+  }
 
   return (
     <div className="container py-8 px-4">
       <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold">התראות והרשמה</h1>
+          <h1 className="text-3xl font-bold">התראות על תורים פנויים</h1>
           <p className="text-muted-foreground">
-            קבל התראות כשיש תורים פנויים
+            הירשם לקבלת התראות במייל כשיש תורים פנויים בתאריכים שבחרת
           </p>
         </div>
 
-        {/* Coming Soon */}
+        {/* Subscription Form */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              בקרוב...
+              הרשמה להתראות
             </CardTitle>
             <CardDescription>
-              מערכת ההתראות תהיה זמינה בקרוב
+              בחר תאריך בודד או טווח תאריכים לקבלת התראות
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="text-center py-12">
-              <div className="flex justify-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Mail className="h-6 w-6 text-primary" />
-                </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Bell className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              
-              <h3 className="text-lg font-semibold mb-2">מערכת התראות חכמה</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                בקרוב תוכל להירשם לקבלת התראות אוטומטיות במייל, SMS או התראות דחיפה כשיש תורים פנויים בתאריכים שמעניינים אותך.
-              </p>
-            </div>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as 'single' | 'range')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">תאריך בודד</TabsTrigger>
+                <TabsTrigger value="range">טווח תאריכים</TabsTrigger>
+              </TabsList>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="border-dashed">
-                <CardHeader className="text-center">
-                  <Mail className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <CardTitle className="text-base">מייל</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center">
-                    קבל התראות ישירות למייל שלך
-                  </p>
-                </CardContent>
-              </Card>
+              <TabsContent value="single" className="space-y-4 mt-6">
+                <div className="flex flex-col gap-4">
+                  <label className="text-sm font-medium">בחר תאריך</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-right",
+                          !selectedDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="ml-2 h-4 w-4" />
+                        {selectedDate ? (
+                          format(selectedDate, "dd/MM/yyyy")
+                        ) : (
+                          "בחר תאריך"
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        disabled={isDateDisabled}
+                        locale={he}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </TabsContent>
 
-              <Card className="border-dashed">
-                <CardHeader className="text-center">
-                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <CardTitle className="text-base">SMS</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center">
-                    קבל הודעות SMS לנייד
-                  </p>
-                </CardContent>
-              </Card>
+              <TabsContent value="range" className="space-y-4 mt-6">
+                <div className="flex flex-col gap-4">
+                  <label className="text-sm font-medium">בחר טווח תאריכים</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-right",
+                          !dateRange.from && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarDays className="ml-2 h-4 w-4" />
+                        {dateRange.from ? (
+                          dateRange.to ? (
+                            <>
+                              {format(dateRange.from, "dd/MM/yyyy")} -{" "}
+                              {format(dateRange.to, "dd/MM/yyyy")}
+                            </>
+                          ) : (
+                            format(dateRange.from, "dd/MM/yyyy")
+                          )
+                        ) : (
+                          "בחר טווח תאריכים"
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        disabled={isDateDisabled}
+                        locale={he}
+                        initialFocus
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </TabsContent>
+            </Tabs>
 
-              <Card className="border-dashed">
-                <CardHeader className="text-center">
-                  <Bell className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <CardTitle className="text-base">Push</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground text-center">
-                    התראות דחיפה לאפליקציה
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            <Button 
+              onClick={handleSubscribe}
+              disabled={loading || (tab === 'single' ? !selectedDate : !dateRange.from || !dateRange.to)}
+              className="w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  נרשם...
+                </>
+              ) : (
+                <>
+                  <Bell className="ml-2 h-4 w-4" />
+                  הרשם להתראות
+                </>
+              )}
+            </Button>
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                תקבל התראה במייל כשיימצאו תורים פנויים בתאריכים שבחרת.
+                תוכל לבטל את ההרשמה בכל עת.
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
+
+        {/* Active Subscriptions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              המנויים הפעילים שלי
+            </CardTitle>
+            <CardDescription>
+              כאן תוכל לראות ולנהל את ההתראות שהגדרת
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {fetchingSubscriptions ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : subscriptions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>אין לך מנויים פעילים כרגע</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {subscriptions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className={cn(
+                      "flex items-center justify-between p-4 rounded-lg border",
+                      sub.is_active ? "bg-background" : "bg-muted/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      {sub.is_active ? (
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="font-medium">
+                          {formatSubscriptionDate(sub)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {sub.is_active ? 'פעיל' : 'הושלם'}
+                          {' • '}
+                          נוצר ב-{format(new Date(sub.created_at), 'dd/MM/yyyy HH:mm')}
+                        </p>
+                      </div>
+                    </div>
+                    {sub.is_active && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(sub.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Test Email Button - Development Only */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-dashed border-orange-500">
+            <CardHeader>
+              <CardTitle className="text-orange-600">🧪 בדיקת מערכת</CardTitle>
+              <CardDescription>
+                כלי פיתוח - שלח מייל בדיקה
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/notifications/test', {
+                      method: 'POST'
+                    })
+                    if (response.ok) {
+                      toast.success('מייל בדיקה נשלח בהצלחה!')
+                    } else {
+                      toast.error('שגיאה בשליחת מייל בדיקה')
+                    }
+                  } catch (error) {
+                    toast.error('שגיאה בשליחת מייל בדיקה')
+                  }
+                }}
+              >
+                📧 שלח מייל בדיקה
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )
