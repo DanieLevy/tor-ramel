@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { HeaderProvider } from "@/components/header-context";
@@ -31,13 +31,14 @@ export const metadata: Metadata = {
     title: "תור רם-אל",
     description: "מערכת חיפוש תורים אוטומטית למרפאת רם-אל",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: "cover",
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#6366f1" },
     { media: "(prefers-color-scheme: dark)", color: "#6366f1" },
