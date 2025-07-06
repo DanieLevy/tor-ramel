@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio'
 import http from 'http'
 import https from 'https'
 import { createClient } from '@supabase/supabase-js'
+import nodemailer from 'nodemailer'
+import { processNotificationQueue } from './notification-processor.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -31,18 +33,18 @@ const CACHE_TTL = 60 * 1000 // 1 minute cache
 // Create optimized HTTP agents with better connection pooling
 const httpAgent = new http.Agent({ 
   keepAlive: true, 
-  maxSockets: 5, // Reduced to avoid overwhelming server
-  maxFreeSockets: 2,
-  timeout: 5000,
+  maxSockets: 10, // Increased for better parallelism
+  maxFreeSockets: 5,
+  timeout: 3000, // Reduced timeout
   keepAliveMsecs: 3000,
   scheduling: 'lifo' // Last-in-first-out for better connection reuse
 })
 const httpsAgent = new https.Agent({ 
   keepAlive: true, 
-  maxSockets: 5,
-  maxFreeSockets: 2,
+  maxSockets: 10,
+  maxFreeSockets: 5,
   rejectUnauthorized: false,
-  timeout: 5000,
+  timeout: 3000,
   keepAliveMsecs: 3000,
   scheduling: 'lifo'
 })
@@ -59,7 +61,7 @@ const axiosInstance = axios.create({
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache'
   },
-  timeout: 4000,
+  timeout: 3000, // Reduced from 4000ms
   responseType: 'arraybuffer',
   maxRedirects: 2, // Reduced from 3
   decompress: true,
@@ -181,25 +183,25 @@ const getOpenDays = (startDate, totalDays) => {
 function getAdaptiveBatchSize(elapsed, totalRemaining) {
   const avgResponseTime = performanceStats.requestTimes.length > 0
     ? performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length
-    : 400 // Default estimate
+    : 300 // Default estimate (reduced from 400)
   
-  const timeRemaining = 9000 - elapsed // Target 9 seconds max
-  const estimatedTimePerBatch = avgResponseTime + 200 // Add buffer for processing
+  const timeRemaining = 8000 - elapsed // Target 8 seconds max to leave time for notifications
+  const estimatedTimePerBatch = avgResponseTime + 100 // Reduced buffer
   
   // Calculate optimal batch size
   let batchSize = Math.floor(timeRemaining / estimatedTimePerBatch)
   
-  // Apply constraints
-  batchSize = Math.max(2, Math.min(5, batchSize)) // Between 2 and 5
+  // Apply constraints - increased max batch size
+  batchSize = Math.max(3, Math.min(8, batchSize)) // Between 3 and 8
   
   // If we're running well, increase batch size
   if (elapsed < 3000 && avgResponseTime < 300) {
-    batchSize = Math.min(5, batchSize + 1)
+    batchSize = Math.min(8, batchSize + 2)
   }
   
   // If we're running slow, decrease batch size
-  if (avgResponseTime > 500 || performanceStats.errors > 2) {
-    batchSize = Math.max(2, batchSize - 1)
+  if (avgResponseTime > 400 || performanceStats.errors > 2) {
+    batchSize = Math.max(3, batchSize - 1)
   }
   
   return batchSize
@@ -207,7 +209,7 @@ function getAdaptiveBatchSize(elapsed, totalRemaining) {
 
 // Single date check function with caching
 async function checkSingleDate(dateStr, retryCount = 0) {
-  const maxRetries = 2
+  const maxRetries = 1 // Reduced from 2
   
   // Check cache first
   const cacheKey = `date_${dateStr}`
@@ -314,7 +316,7 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     // Retry logic with exponential backoff
     if (isRetryable && retryCount < maxRetries) {
       performanceStats.retries++
-      const backoffTime = Math.min((retryCount + 1) * 300, 1000)
+      const backoffTime = Math.min((retryCount + 1) * 200, 500) // Reduced backoff
       console.log(`🔄 Retrying ${dateStr} after ${backoffTime}ms...`)
       await new Promise(resolve => setTimeout(resolve, backoffTime))
       return checkSingleDate(dateStr, retryCount + 1)
@@ -492,36 +494,11 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
     
     console.log(`📧 Queued ${notificationsQueued} notifications`)
     
-    // Trigger notification processor if we queued any notifications
-    if (notificationsQueued > 0) {
-      await triggerNotificationProcessor()
-    }
+    return notificationsQueued
     
   } catch (error) {
     console.error('Error in notification system:', error)
-  }
-}
-
-async function triggerNotificationProcessor() {
-  try {
-    console.log('🚀 Triggering notification processor...')
-    
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
-    const response = await axios.post(
-      `${baseUrl}/api/notifications/process`,
-      {},
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.CRON_SECRET}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 5000
-      }
-    )
-    
-    console.log('✅ Notification processor response:', response.data)
-  } catch (error) {
-    console.error('❌ Failed to trigger notification processor:', error.message)
+    return 0
   }
 }
 
@@ -602,9 +579,9 @@ async function findAppointments() {
     // Update index
     i += batchSize
     
-    // Stop if approaching time limit
-    if (totalElapsed > 8500) {
-      console.log(`⏰ TIME LIMIT: Stopping at ${totalElapsed}ms to stay under 10 seconds`)
+    // Stop if approaching time limit (leaving 2 seconds for notifications)
+    if (totalElapsed > 8000) {
+      console.log(`⏰ TIME LIMIT: Stopping at ${totalElapsed}ms to leave time for notifications`)
       break
     }
     
@@ -612,10 +589,10 @@ async function findAppointments() {
     if (i < openDates.length) {
       const avgResponseTime = performanceStats.requestTimes.length > 0
         ? performanceStats.requestTimes.slice(-5).reduce((a, b) => a + b, 0) / Math.min(5, performanceStats.requestTimes.length)
-        : 400
+        : 300
       
       // Adjust delay based on server response time
-      const delay = avgResponseTime > 400 ? 300 : 150
+      const delay = avgResponseTime > 350 ? 200 : 100 // Reduced delays
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
@@ -637,7 +614,19 @@ async function findAppointments() {
     await saveToSupabase(successfulResults)
     
     // Check subscriptions and queue notifications
-    await checkSubscriptionsAndQueueNotifications(successfulResults)
+    const notificationsQueued = await checkSubscriptionsAndQueueNotifications(successfulResults)
+    
+    // Process notifications immediately if any were queued
+    if (notificationsQueued > 0) {
+      const notificationStart = Date.now()
+      try {
+        const result = await processNotificationQueue(5) // Process max 5 to save time
+        const notificationTime = Date.now() - notificationStart
+        console.log(`📧 Notification processing completed in ${notificationTime}ms: ${result.processed} sent, ${result.failed} failed`)
+      } catch (error) {
+        console.error('❌ Error processing notifications:', error)
+      }
+    }
   }
   
   return {
