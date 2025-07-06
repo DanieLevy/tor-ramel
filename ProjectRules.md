@@ -1,4 +1,4 @@
-# Do not create .md files / Do not even update already .md files.
+# Do not create .md files / Do not even update already .md files or any .txt and etc files for summary of actions and etc. 
 # Use shadcnUI elements (installed already)
 # This project designed for mobile devices
 # Using Turbopack in here

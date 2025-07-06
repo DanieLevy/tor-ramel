@@ -155,8 +155,8 @@ const isClosedDay = (date) => {
     weekday: 'long'
   }).format(date)
   
-  // Skip checking Monday and Saturday entirely
-  return dayOfWeek === 'Monday' || dayOfWeek === 'Saturday'
+  // Skip checking Monday only - the barbershop is open on Saturday!
+  return dayOfWeek === 'Monday'
 }
 
 const getOpenDays = (startDate, totalDays) => {
@@ -398,8 +398,8 @@ async function findAppointments() {
   const maxDays = 30
   const openDates = getOpenDays(currentDate, maxDays)
   
-  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday/Saturday)`)
-  console.log(`🚫 Skipping ${maxDays - openDates.length} closed days (Mondays & Saturdays)`)
+  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday)`)
+  console.log(`🚫 Skipping ${maxDays - openDates.length} closed days (Mondays only)`)
   
   const results = []
   let batchNumber = 0

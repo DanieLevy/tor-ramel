@@ -39,7 +39,7 @@ function SearchPage() {
 
   const isOpenDay = (date: Date) => {
     const dayOfWeek = date.getDay()
-    return dayOfWeek !== 1 && dayOfWeek !== 6 // Not Monday (1) or Saturday (6)
+    return dayOfWeek !== 1 // Not Monday (1) - Saturday is open!
   }
 
   const getSearchDates = (type: string): Date[] => {

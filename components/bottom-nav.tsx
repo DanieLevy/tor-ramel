@@ -27,11 +27,11 @@ export function BottomNav() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe pointer-events-none">
+    <div className="fixed bottom-0 left-0 right-0 z-50 pb-safe px-safe pointer-events-none">
       {/* Bubble container with floating effect */}
-      <div className="flex justify-center px-4 pb-4">
-        <nav className="pointer-events-auto bg-background/95 backdrop-blur-xl rounded-full shadow-lg border border-border/50 px-2">
-          <ul className="flex items-center gap-1 p-2">
+      <div className="flex justify-center px-4 pb-3 px-safe-landscape">
+        <nav className="pointer-events-auto bg-background/95 backdrop-blur-xl rounded-full shadow-lg border border-border/50 px-1">
+          <ul className="flex items-center gap-0.5 p-1.5">
             {navItems.map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
@@ -42,7 +42,7 @@ export function BottomNav() {
                     href={item.href}
                     className={cn(
                       "relative flex items-center justify-center rounded-full transition-all duration-300",
-                      "w-14 h-14 touch-manipulation", // Ensure 56x56px for touch targets
+                      "w-12 h-12 touch-manipulation", // 48x48px - still good for touch
                       "hover:bg-accent/20",
                       "active:scale-95"
                     )}
@@ -65,7 +65,7 @@ export function BottomNav() {
                     <div className="relative flex flex-col items-center">
                       <Icon
                         className={cn(
-                          "h-6 w-6 transition-all duration-300",
+                          "h-5 w-5 transition-all duration-300",
                           isActive 
                             ? "text-primary scale-110" 
                             : "text-muted-foreground"

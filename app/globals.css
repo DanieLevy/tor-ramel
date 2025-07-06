@@ -160,40 +160,38 @@
   
   /* PWA Specific Styles */
   
-  /* iOS Safe Areas */
-  @supports (padding: max(0px)) {
-    body {
-      padding-top: env(safe-area-inset-top);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
-    }
+  /* Define CSS custom properties for safe areas */
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
   
-  /* Prevent iOS bounce effect only in standalone mode */
+  /* iOS Safe Areas - Modern 2025 approach */
+  html {
+    /* Ensure proper height calculation with safe areas */
+    min-height: calc(100% + var(--safe-area-inset-top));
+    /* Only add horizontal padding to html */
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+  
+  /* Body should fill available space */
+  body {
+    min-height: 100vh;
+    /* Use CSS Grid for proper layout with safe areas */
+    display: grid;
+    grid-template-rows: 1fr;
+  }
+  
+  /* Prevent iOS bounce effect */
   @media screen and (display-mode: standalone) {
-    html {
-      position: fixed;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-    }
-    
     body {
-      position: fixed;
-      height: 100%;
-      width: 100%;
-      overflow: auto;
+      /* Prevent overscroll bounce on iOS */
+      overscroll-behavior: none;
+      /* Smooth scrolling */
       -webkit-overflow-scrolling: touch;
-    }
-  }
-  
-  /* iOS Status Bar */
-  @media screen and (display-mode: standalone) {
-    /* When running as PWA */
-    body {
-      padding-top: constant(safe-area-inset-top);
-      padding-top: env(safe-area-inset-top);
     }
   }
   
@@ -283,14 +281,40 @@ input[type="text"] {
   font-variant-numeric: tabular-nums;
 }
 
-/* Safe area padding for iOS bottom nav */
+/* Safe area utilities - Modern 2025 approach */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-area-inset-bottom);
 }
 
-/* Add padding to main content when bottom nav is present */
+.pt-safe {
+  padding-top: var(--safe-area-inset-top);
+}
+
+.px-safe {
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
+
+/* Bottom navigation safe area handling */
+.bottom-nav-container {
+  /* Fixed height + safe area */
+  height: calc(4.5rem + var(--safe-area-inset-bottom));
+  /* Padding inside for content */
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Main content spacing for bottom nav */
 .with-bottom-nav {
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  /* Use the container height */
+  padding-bottom: calc(4.5rem + var(--safe-area-inset-bottom));
+}
+
+/* Header safe area handling */
+.header-safe {
+  /* Extend header background into safe area */
+  padding-top: var(--safe-area-inset-top);
+  /* Position adjustment */
+  margin-top: calc(-1 * var(--safe-area-inset-top));
 }
 
 /* Touch manipulation for better mobile experience */
@@ -299,15 +323,10 @@ input[type="text"] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Ensure proper top padding for notch devices */
-.pt-safe {
-  padding-top: env(safe-area-inset-top);
-}
-
-/* Extend header backdrop on notch devices */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .header-extended {
-    padding-top: env(safe-area-inset-top);
-    margin-top: calc(-1 * env(safe-area-inset-top));
+/* Landscape orientation safe areas */
+@media (orientation: landscape) {
+  .px-safe-landscape {
+    padding-left: max(1rem, var(--safe-area-inset-left));
+    padding-right: max(1rem, var(--safe-area-inset-right));
   }
 }
