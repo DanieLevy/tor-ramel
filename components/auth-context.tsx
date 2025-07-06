@@ -32,13 +32,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const authExpiry = localStorage.getItem('tor-ramel-auth-expiry')
         
         if (storedUser && authExpiry) {
+          // Validate stored user is valid JSON
+          if (storedUser === 'undefined' || storedUser === 'null') {
+            console.warn('Invalid stored user data, clearing auth')
+            localStorage.removeItem('tor-ramel-user')
+            localStorage.removeItem('tor-ramel-auth-expiry')
+            document.cookie = 'tor-ramel-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC'
+            return
+          }
+          
           const expiryDate = new Date(authExpiry)
           const now = new Date()
           
           if (expiryDate > now) {
-            setUser(JSON.parse(storedUser))
-            // Ensure cookie is set
-            document.cookie = `tor-ramel-auth=true; path=/; expires=${expiryDate.toUTCString()}`
+            try {
+              const userData = JSON.parse(storedUser)
+              setUser(userData)
+              // Ensure cookie is set
+              document.cookie = `tor-ramel-auth=true; path=/; expires=${expiryDate.toUTCString()}`
+            } catch (parseError) {
+              console.error('Error parsing stored user:', parseError)
+              // Clear invalid data
+              localStorage.removeItem('tor-ramel-user')
+              localStorage.removeItem('tor-ramel-auth-expiry')
+              document.cookie = 'tor-ramel-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC'
+            }
           } else {
             // Session expired, clear storage
             localStorage.removeItem('tor-ramel-user')
@@ -48,6 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Error checking auth:', error)
+        // Clear potentially corrupted data
+        localStorage.removeItem('tor-ramel-user')
+        localStorage.removeItem('tor-ramel-auth-expiry')
+        document.cookie = 'tor-ramel-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC'
       } finally {
         setIsLoading(false)
       }

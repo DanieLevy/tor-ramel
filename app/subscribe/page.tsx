@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useAuth, withAuth } from '@/components/auth-context'
+import { useAuth } from '@/components/auth-context'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -372,4 +372,4 @@ function SubscribePage() {
   )
 }
 
-export default withAuth(SubscribePage) 
+export default SubscribePage 

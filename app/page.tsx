@@ -2,15 +2,15 @@
 
 import { useEffect } from 'react'
 import { useHeader } from '@/components/header-context'
-import { useAuth, withAuth } from '@/components/auth-context'
+import { useAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LogOut, Clock, CheckCircle } from 'lucide-react'
 import { AppointmentBanner } from '@/components/appointment-banner'
 
-function HomePage() {
+export default function HomePage() {
   const updateHeader = useHeader()
-  const { user, logout } = useAuth()
+  const { user, logout, isLoading } = useAuth()
 
   useEffect(() => {
     updateHeader({
@@ -19,11 +19,49 @@ function HomePage() {
     })
   }, [updateHeader])
 
+  // Debug info
+  console.log('HomePage - Auth state:', { user, isLoading })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">טוען...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="container p-4">
+        <div className="mx-auto max-w-4xl">
+          <Card className="bg-muted/30">
+            <CardContent className="p-6 text-center">
+              <p className="text-lg font-medium mb-4">אינך מחובר למערכת</p>
+              <Button onClick={() => window.location.href = '/login'}>
+                עבור להתחברות
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="container p-4">
       <div className="mx-auto max-w-4xl space-y-6">
         {/* Appointment Banner - Full width at top */}
         <AppointmentBanner />
+
+        {/* User Info Debug */}
+        <Card className="bg-muted/10 border-muted">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">מחובר כ: {user.email}</p>
+          </CardContent>
+        </Card>
 
         {/* How it Works */}
         <Card className="bg-muted/30 border-muted">
@@ -73,5 +111,3 @@ function HomePage() {
     </div>
   )
 }
-
-export default withAuth(HomePage)

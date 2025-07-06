@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from 'react'
-import { useAuth, withAuth } from '@/components/auth-context'
+import { useAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Calendar, Loader2, Search, AlertCircle, CheckCircle2 } from 'lucide-react'
@@ -294,4 +294,4 @@ function SearchPage() {
   )
 }
 
-export default withAuth(SearchPage) 
+export default SearchPage 

@@ -71,9 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login
+    const now = new Date().toISOString()
     await supabase
       .from('users')
-      .update({ last_login: new Date().toISOString() })
+      .update({ last_login: now })
       .eq('id', user.id)
 
     // Create JWT token
@@ -87,7 +88,12 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'התחברת בהצלחה',
       token,
-      email
+      email,
+      user: {
+        id: user.id,
+        email: email,
+        lastLogin: now
+      }
     })
 
     // Set secure cookie
