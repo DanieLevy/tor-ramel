@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         .insert({
           user_id: subscription.user_id,
           appointment_date: date,
-          ignored_times_array: times
+          ignored_times: times
         })
 
       if (ignoreError) {

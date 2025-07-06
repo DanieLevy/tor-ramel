@@ -438,12 +438,12 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           // Get ignored times for this user and date
           const { data: ignoredData } = await supabase
             .from('ignored_appointment_times')
-            .select('ignored_times_array')
+            .select('ignored_times')
             .eq('user_id', subscription.user_id)
             .eq('appointment_date', appointment.date)
           
           const ignoredTimes = ignoredData ? 
-            ignoredData.flatMap(d => d.ignored_times_array || []) : []
+            ignoredData.flatMap(d => d.ignored_times || []) : []
           
           // Filter out ignored times
           const newTimes = appointment.times.filter(time => !ignoredTimes.includes(time))
@@ -459,7 +459,7 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
             .select('id')
             .eq('subscription_id', subscription.id)
             .eq('appointment_date', appointment.date)
-            .eq('times_array', newTimes)
+            .eq('notified_times', newTimes)
             .single()
           
           if (existingNotification) {
@@ -472,11 +472,9 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
             .from('notification_queue')
             .insert({
               subscription_id: subscription.id,
-              appointment_data: {
-                date: appointment.date,
-                dayName: getDayNameHebrew(appointment.date),
-                times: newTimes
-              },
+              appointment_date: appointment.date,
+              available_times: appointment.times,
+              new_times: newTimes,
               status: 'pending'
             })
           

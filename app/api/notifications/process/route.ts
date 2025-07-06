@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     // Process each notification
     for (const item of queueItems) {
       try {
-        const { subscription, appointment_data } = item
+        const { subscription, appointment_date, available_times, new_times } = item
         const userEmail = subscription.users.email
 
         // Validate subscription is still active
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
           .from('notified_appointments')
           .select('id')
           .eq('subscription_id', subscription.id)
-          .eq('appointment_date', appointment_data.date)
-          .eq('times_array', appointment_data.times)
+          .eq('appointment_date', appointment_date)
+          .eq('notified_times', new_times)
           .gte('notification_sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
           .single()
 
@@ -126,6 +126,12 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Calculate day name for the appointment date
+        const dayName = new Intl.DateTimeFormat('he-IL', {
+          timeZone: 'Asia/Jerusalem',
+          weekday: 'long'
+        }).format(new Date(appointment_date + 'T00:00:00'))
+
         // Send email with timeout
         const emailTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Email timeout')), 10000)
@@ -133,9 +139,9 @@ export async function POST(request: NextRequest) {
         
         const emailPromise = sendNotificationEmail({
           to: userEmail,
-          date: appointment_data.date,
-          dayName: appointment_data.dayName,
-          times: appointment_data.times,
+          date: appointment_date,
+          dayName: dayName,
+          times: new_times,
           subscriptionId: subscription.id
         })
 
@@ -147,8 +153,8 @@ export async function POST(request: NextRequest) {
             .from('notified_appointments')
             .insert({
               subscription_id: subscription.id,
-              appointment_date: appointment_data.date,
-              times_array: appointment_data.times,
+              appointment_date: appointment_date,
+              notified_times: new_times,
               notification_sent_at: new Date().toISOString()
             })
 
@@ -166,7 +172,7 @@ export async function POST(request: NextRequest) {
             .eq('id', item.id)
 
           processed++
-          console.log(`✅ Email sent to ${userEmail} for ${appointment_data.date}`)
+          console.log(`✅ Email sent to ${userEmail} for ${appointment_date}`)
         } else {
           throw new Error('Email sending failed')
         }

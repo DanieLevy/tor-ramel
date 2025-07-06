@@ -175,7 +175,7 @@ export async function getUserSubscriptionSummary(userId: string) {
         *,
         notified_appointments(
           appointment_date,
-          times_array,
+          notified_times,
           notification_sent_at,
           user_response
         )
