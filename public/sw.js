@@ -1,8 +1,8 @@
-// Service Worker v3.5
-const SW_VERSION = '2025-01-28-v3.5'
-const CACHE_NAME = 'tor-ramel-v3.5'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v17';
-const API_CACHE = 'tor-ramel-api-v17';
+// Service Worker v3.6
+const SW_VERSION = '2025-01-29-v3.6'
+const CACHE_NAME = 'tor-ramel-v3.6'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v18';
+const API_CACHE = 'tor-ramel-api-v18';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -64,10 +64,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API calls - Network first, cache fallback
+  // API calls - Special handling for subscriptions and auth-related endpoints
   if (url.pathname.startsWith('/api/')) {
+    // Never cache auth or subscription endpoints
+    if (url.pathname.includes('/auth/') || 
+        url.pathname.includes('/notifications/subscriptions') ||
+        url.pathname.includes('/notifications/subscribe')) {
+      console.log('[SW] Skipping cache for auth/subscription endpoint:', url.pathname);
+      return;
+    }
+    
+    // For other API calls, use network first with shorter cache
     event.respondWith(
-      networkFirst(request, API_CACHE, 5 * 60 * 1000) // 5 minutes cache
+      networkFirst(request, API_CACHE, 1 * 60 * 1000) // 1 minute cache only
     );
     return;
   }
@@ -90,7 +99,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Cache strategies
+// Cache strategies with better error handling
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
@@ -101,7 +110,9 @@ async function cacheFirst(request, cacheName) {
   }
   
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, {
+      credentials: 'include' // Ensure cookies are sent
+    });
     // Only cache GET requests with successful responses
     if (response.ok && request.method === 'GET') {
       cache.put(request, response.clone());
@@ -115,7 +126,9 @@ async function cacheFirst(request, cacheName) {
 
 async function networkFirst(request, cacheName, maxAge) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, {
+      credentials: 'include' // Ensure cookies are sent
+    });
     
     // Only cache GET requests with successful responses
     if (response.ok && request.method === 'GET') {

@@ -84,6 +84,24 @@ export async function POST(request: NextRequest) {
       { expiresIn: '7d' }
     )
 
+    // Create auth data
+    const authData = {
+      email,
+      userId: user.id
+    }
+
+    // Set auth cookie with proper PWA-compatible settings
+    const cookieOptions = [
+      `tor-ramel-auth=${encodeURIComponent(JSON.stringify(authData))}`,
+      'Path=/',
+      'HttpOnly',
+      'SameSite=Lax',  // Changed from Strict to Lax for better PWA compatibility
+      `Max-Age=${7 * 24 * 60 * 60}`,  // 7 days
+      process.env.NODE_ENV === 'production' ? 'Secure' : ''
+    ].filter(Boolean).join('; ')
+
+    console.log('✅ Setting auth cookie with options:', cookieOptions.replace(authData.userId, '[HIDDEN]'))
+
     const response = NextResponse.json({ 
       success: true,
       message: 'התחברת בהצלחה',
@@ -94,15 +112,10 @@ export async function POST(request: NextRequest) {
         email: email,
         lastLogin: now
       }
-    })
-
-    // Set secure cookie
-    response.cookies.set('tor-ramel-auth', JSON.stringify({ email, userId: user.id }), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-      path: '/'
+    }, {
+      headers: {
+        'Set-Cookie': cookieOptions
+      }
     })
 
     console.log('✅ Login successful for:', email)

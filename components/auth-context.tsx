@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (user: User) => void
+  login: (email: string, userId: string) => Promise<void>
   logout: () => void
   checkAuth: () => boolean
 }
@@ -78,29 +78,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkStoredAuth()
   }, [])
 
-  const login = (userData: User) => {
-    // Store user data in localStorage with 7 days expiry
+  const login = async (email: string, userId: string) => {
+    const userData: User = { 
+      email, 
+      id: userId,
+      lastLogin: new Date().toISOString()
+    }
+    setUser(userData)
+    
+    // Set expiry for 7 days
     const expiryDate = new Date()
     expiryDate.setDate(expiryDate.getDate() + 7)
     
+    // Store in localStorage for PWA persistence
     localStorage.setItem('tor-ramel-user', JSON.stringify(userData))
     localStorage.setItem('tor-ramel-auth-expiry', expiryDate.toISOString())
     
-    // Set cookie for middleware
-    document.cookie = `tor-ramel-auth=true; path=/; expires=${expiryDate.toUTCString()}`
+    // Set cookie manually for better PWA compatibility
+    // Using Lax instead of Strict for better cross-context compatibility
+    const cookieValue = JSON.stringify({ email, userId })
+    const cookieString = `tor-ramel-auth=${encodeURIComponent(cookieValue)}; path=/; expires=${expiryDate.toUTCString()}; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`
+    document.cookie = cookieString
     
-    setUser(userData)
-    router.push('/')
+    console.log('✅ Auth set in localStorage and cookie')
   }
 
   const logout = () => {
+    setUser(null)
     localStorage.removeItem('tor-ramel-user')
     localStorage.removeItem('tor-ramel-auth-expiry')
     
-    // Clear cookie
-    document.cookie = 'tor-ramel-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC'
+    // Clear cookie with proper attributes
+    document.cookie = 'tor-ramel-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax'
     
-    setUser(null)
     router.push('/login')
   }
 

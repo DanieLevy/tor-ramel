@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { format, addDays } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
+import { cn, pwaFetch, isRunningAsPWA } from '@/lib/utils'
 import { toast } from 'sonner'
 
 interface Subscription {
@@ -38,19 +38,34 @@ function SubscribePage() {
 
   useEffect(() => {
     fetchSubscriptions()
+    
+    // Log PWA status for debugging
+    if (isRunningAsPWA()) {
+      console.log('🔍 Running as PWA - special handling enabled')
+    }
   }, [])
 
   const fetchSubscriptions = async () => {
     try {
-      const response = await fetch('/api/notifications/subscriptions', {
+      console.log('🔍 Fetching subscriptions...')
+      const response = await pwaFetch('/api/notifications/subscriptions', {
+        method: 'GET',
         credentials: 'include'
       })
+      
+      console.log('🔍 Subscription response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('🔍 Subscriptions loaded:', data.length)
         setSubscriptions(data)
+      } else {
+        const error = await response.json()
+        console.error('🔍 Failed to fetch subscriptions:', error)
+        toast.error('שגיאה בטעינת המנויים')
       }
     } catch (error) {
-      console.error('Failed to fetch subscriptions:', error)
+      console.error('🔍 Failed to fetch subscriptions:', error)
       toast.error('שגיאה בטעינת המנויים')
     } finally {
       setFetchingSubscriptions(false)
@@ -77,10 +92,10 @@ function SubscribePage() {
             date_range_end: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null
           }
 
-      const response = await fetch('/api/notifications/subscribe', {
+      console.log('🔍 Creating subscription:', payload)
+
+      const response = await pwaFetch('/api/notifications/subscribe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload)
       })
 
@@ -95,6 +110,7 @@ function SubscribePage() {
         toast.error(error.message || 'שגיאה בהרשמה')
       }
     } catch (error) {
+      console.error('🔍 Subscribe error:', error)
       toast.error('שגיאה בהרשמה להתראות')
     } finally {
       setLoading(false)
@@ -114,9 +130,8 @@ function SubscribePage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/notifications/subscriptions/${id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const response = await pwaFetch(`/api/notifications/subscriptions/${id}`, {
+        method: 'DELETE'
       })
 
       if (response.ok) {
@@ -126,6 +141,7 @@ function SubscribePage() {
         toast.error('שגיאה בביטול המנוי')
       }
     } catch (error) {
+      console.error('🔍 Delete error:', error)
       toast.error('שגיאה בביטול המנוי')
     }
   }
@@ -353,9 +369,8 @@ function SubscribePage() {
                 className="w-full"
                 onClick={async () => {
                   try {
-                    const response = await fetch('/api/notifications/test', {
-                      method: 'POST',
-                      credentials: 'include'
+                    const response = await pwaFetch('/api/notifications/test', {
+                      method: 'POST'
                     })
                     if (response.ok) {
                       toast.success('מייל בדיקה נשלח בהצלחה!')
@@ -368,6 +383,41 @@ function SubscribePage() {
                 }}
               >
                 📧 שלח מייל בדיקה
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PWA Debug Info - Development Only */}
+        {process.env.NODE_ENV === 'development' && isRunningAsPWA() && (
+          <Card className="border-dashed border-purple-500">
+            <CardHeader>
+              <CardTitle className="text-purple-600">🔍 PWA Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs font-mono">
+              <div>PWA Mode: {isRunningAsPWA() ? '✅ Yes' : '❌ No'}</div>
+              <div>User: {user?.email || 'Not logged in'}</div>
+              <div>Auth Cookie: {document.cookie.includes('tor-ramel-auth') ? '✅ Present' : '❌ Missing'}</div>
+              <div>LocalStorage User: {localStorage.getItem('tor-ramel-user') ? '✅ Present' : '❌ Missing'}</div>
+              <div>Display Mode: {window.matchMedia('(display-mode: standalone)').matches ? 'Standalone' : 'Browser'}</div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  console.log('🔍 Full Debug Info:', {
+                    cookies: document.cookie,
+                    localStorage: {
+                      user: localStorage.getItem('tor-ramel-user'),
+                      expiry: localStorage.getItem('tor-ramel-auth-expiry')
+                    },
+                    pwaMode: isRunningAsPWA(),
+                    displayMode: window.matchMedia('(display-mode: standalone)').matches,
+                    userAgent: navigator.userAgent
+                  })
+                  toast.info('Debug info logged to console')
+                }}
+              >
+                Log Full Debug Info
               </Button>
             </CardContent>
           </Card>

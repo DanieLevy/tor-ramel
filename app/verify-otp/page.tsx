@@ -14,6 +14,7 @@ export default function VerifyOTPPage() {
   const [email, setEmail] = useState('')
   const [canResend, setCanResend] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
+  const [error, setError] = useState('')
   
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
   const router = useRouter()
@@ -124,11 +125,19 @@ export default function VerifyOTPPage() {
         throw new Error(data.error || 'שגיאה באימות קוד')
       }
 
-      // Clear session storage
-      sessionStorage.removeItem('tor-ramel-pending-email')
-      
-      // Login user
-      login(data.user)
+      if (data.success && data.user) {
+        // Store auth in context and redirect
+        await login(data.user.email, data.user.id)
+        
+        toast.success('התחברת בהצלחה!')
+        
+        // Small delay to ensure auth is properly set
+        setTimeout(() => {
+          router.push('/')
+        }, 100)
+      } else {
+        setError(data.error || 'קוד שגוי או פג תוקף')
+      }
 
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'שגיאה לא צפויה')

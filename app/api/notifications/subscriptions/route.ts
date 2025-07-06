@@ -13,28 +13,50 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     const authCookie = cookieStore.get('tor-ramel-auth')
     
-    console.log('🍪 Auth cookie check (subscriptions):', {
-      exists: !!authCookie,
-      headers: request.headers.get('cookie')
+    // Enhanced logging for PWA debugging
+    const userAgent = request.headers.get('user-agent') || ''
+    const isPWA = userAgent.includes('PWA') || request.headers.get('sec-fetch-dest') === 'empty'
+    
+    console.log('🍪 [Subscriptions API] Auth check:', {
+      hasCookie: !!authCookie,
+      isPWA,
+      userAgent: userAgent.substring(0, 50) + '...',
+      referer: request.headers.get('referer'),
+      origin: request.headers.get('origin')
     })
     
     if (!authCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      console.error('🍪 [Subscriptions API] No auth cookie found')
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        debug: { noCookie: true, isPWA }
+      }, { status: 401 })
     }
 
     let authData
     try {
       authData = JSON.parse(authCookie.value)
+      console.log('🍪 [Subscriptions API] Parsed auth data:', {
+        hasEmail: !!authData.email,
+        hasUserId: !!authData.userId,
+        userIdLength: authData.userId?.length
+      })
     } catch (parseError) {
-      console.error('Failed to parse auth cookie:', parseError)
-      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
+      console.error('🍪 [Subscriptions API] Failed to parse auth cookie:', parseError)
+      return NextResponse.json({ 
+        error: 'Invalid auth data',
+        debug: { parseError: true, isPWA }
+      }, { status: 401 })
     }
     
     const { email, userId } = authData
     
     if (!userId) {
-      console.error('No userId in auth data:', authData)
-      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
+      console.error('🍪 [Subscriptions API] No userId in auth data')
+      return NextResponse.json({ 
+        error: 'Invalid auth data',
+        debug: { noUserId: true, isPWA }
+      }, { status: 401 })
     }
 
     // Get all subscriptions for user using userId directly
@@ -45,18 +67,21 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (fetchError) {
-      console.error('Error fetching subscriptions:', fetchError)
+      console.error('🍪 [Subscriptions API] Database error:', fetchError)
       return NextResponse.json({ 
-        error: 'Failed to fetch subscriptions' 
+        error: 'Failed to fetch subscriptions',
+        debug: { dbError: fetchError.message, isPWA }
       }, { status: 500 })
     }
 
+    console.log(`🍪 [Subscriptions API] Returning ${subscriptions?.length || 0} subscriptions`)
     return NextResponse.json(subscriptions || [])
 
   } catch (error) {
-    console.error('Error in subscriptions API:', error)
+    console.error('🍪 [Subscriptions API] Unexpected error:', error)
     return NextResponse.json({ 
-      error: 'Internal server error' 
+      error: 'Internal server error',
+      debug: { unexpectedError: true }
     }, { status: 500 })
   }
 } 
