@@ -110,6 +110,28 @@ export async function POST(request: NextRequest) {
         message: 'Ignored times saved successfully'
       })
 
+    } else if (action === 'unsubscribe') {
+      // Mark subscription as inactive
+      const { error: updateError } = await supabase
+        .from('notification_subscriptions')
+        .update({
+          is_active: false,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', subscriptionId)
+
+      if (updateError) {
+        console.error('Error unsubscribing:', updateError)
+        return NextResponse.json({ 
+          error: 'Failed to unsubscribe' 
+        }, { status: 500 })
+      }
+
+      return NextResponse.json({ 
+        success: true,
+        message: 'Successfully unsubscribed from notifications'
+      })
+
     } else {
       return NextResponse.json({ 
         error: 'Invalid action' 

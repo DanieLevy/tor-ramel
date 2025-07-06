@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { validateSubscriptionData } from '@/lib/notification-helpers'
+import { sendSubscriptionConfirmationEmail } from '@/lib/email-sender'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -108,10 +109,66 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Created subscription ${newSubscription.id} for user ${userData.id}`)
 
+    // Send confirmation email
+    try {
+      await sendSubscriptionConfirmationEmail({
+        to: email,
+        subscriptionId: newSubscription.id,
+        subscriptionDate: newSubscription.subscription_date,
+        dateRangeStart: newSubscription.date_range_start,
+        dateRangeEnd: newSubscription.date_range_end
+      })
+      console.log(`📧 Sent subscription confirmation email to ${email}`)
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError)
+      // Don't fail the request if email sending fails
+    }
+
     return NextResponse.json(newSubscription)
 
   } catch (error) {
     console.error('Error in subscribe API:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error' 
+    }, { status: 500 })
+  }
+} 
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get auth cookie
+    const cookieStore = await cookies()
+    const authCookie = cookieStore.get('tor-ramel-auth')
+    
+    if (!authCookie) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const authData = JSON.parse(authCookie.value)
+    const userId = authData.userId
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid auth data' }, { status: 401 })
+    }
+    
+    // Get all subscriptions for user
+    const { data: subscriptions, error } = await supabase
+      .from('notification_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching subscriptions:', error)
+      return NextResponse.json({ 
+        error: 'Failed to fetch subscriptions' 
+      }, { status: 500 })
+    }
+    
+    return NextResponse.json(subscriptions || [])
+    
+  } catch (error) {
+    console.error('Error in GET subscriptions:', error)
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 })

@@ -97,6 +97,30 @@ function NotificationActionContent() {
             message: error.message || 'אירעה שגיאה בשמירת השעות שנדחו'
           })
         }
+      } else if (action === 'unsubscribe') {
+        // Handle unsubscribe action
+        const response = await fetch('/api/notifications/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'unsubscribe',
+            subscriptionId
+          })
+        })
+
+        if (response.ok) {
+          setResult({
+            success: true,
+            message: 'ההרשמה בוטלה בהצלחה. לא תקבל יותר התראות עבור מנוי זה.',
+            action: 'unsubscribe'
+          })
+        } else {
+          const error = await response.json()
+          setResult({
+            success: false,
+            message: error.message || 'אירעה שגיאה בביטול ההרשמה'
+          })
+        }
       } else {
         setResult({
           success: false,
@@ -158,6 +182,16 @@ function NotificationActionContent() {
                     <h3 className="text-lg font-semibold mb-2">הבנו 👍</h3>
                     <p className="text-muted-foreground">
                       נמשיך לחפש עבורך ונודיע לך כשיתפנו שעות חדשות
+                    </p>
+                  </div>
+                )}
+
+                {result.success && result.action === 'unsubscribe' && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                    <XCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">ההרשמה בוטלה</h3>
+                    <p className="text-muted-foreground">
+                      לא תקבל יותר התראות עבור מנוי זה. תוכל תמיד להירשם מחדש בעתיד.
                     </p>
                   </div>
                 )}

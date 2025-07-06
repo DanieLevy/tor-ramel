@@ -5,6 +5,14 @@ interface AppointmentData {
   subscriptionId: string
 }
 
+interface SubscriptionData {
+  email: string
+  subscriptionId: string
+  subscriptionDate?: string
+  dateRangeStart?: string
+  dateRangeEnd?: string
+}
+
 export function generateNotificationEmail(data: AppointmentData): { html: string; text: string } {
   const { date, dayName, times, subscriptionId } = data
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
@@ -12,6 +20,7 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   // Create URL with parameters for approve/decline actions
   const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}`
   const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}`
+  const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   
   const html = `
 <!DOCTYPE html>
@@ -19,13 +28,9 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>התראה על תורים פנויים - תור רם-אל</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>תורים פנויים - תור רם-אל</title>
   <style>
-    @font-face {
-      font-family: 'Heebo';
-      src: url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700&display=swap');
-    }
-    
     * {
       margin: 0;
       padding: 0;
@@ -33,230 +38,239 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
     }
     
     body {
-      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
       line-height: 1.6;
-      color: #333;
-      background-color: #f5f5f5;
+      color: #000000;
+      background-color: #ffffff;
       direction: rtl;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
     
-    .email-wrapper {
-      max-width: 600px;
+    .container {
+      max-width: 560px;
       margin: 0 auto;
-      background-color: #ffffff;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 40px 20px;
     }
     
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px 30px;
       text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #e5e5e5;
     }
     
-    .header h1 {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    
-    .header p {
-      font-size: 16px;
-      opacity: 0.9;
-    }
-    
-    .content {
-      padding: 40px 30px;
-    }
-    
-    .date-section {
-      background-color: #f8f9fa;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 30px;
-      text-align: center;
-    }
-    
-    .date-section h2 {
-      color: #667eea;
-      font-size: 24px;
-      margin-bottom: 5px;
-    }
-    
-    .date-section p {
-      color: #666;
-      font-size: 18px;
-    }
-    
-    .times-section {
-      margin-bottom: 30px;
-    }
-    
-    .times-section h3 {
-      font-size: 20px;
-      margin-bottom: 15px;
-      color: #333;
-    }
-    
-    .times-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    
-    .time-slot {
-      background-color: #e3f2fd;
-      border: 2px solid #2196f3;
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-      font-size: 18px;
-      font-weight: 600;
-      color: #1976d2;
-    }
-    
-    .action-buttons {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-      margin-top: 30px;
-    }
-    
-    .btn {
+    .logo {
       display: inline-block;
-      padding: 14px 30px;
-      text-decoration: none;
+      width: 48px;
+      height: 48px;
+      background-color: #000000;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    
+    .logo::after {
+      content: "ת";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+      font-size: 16px;
+      color: #666666;
+    }
+    
+    .date-badge {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #f5f5f5;
       border-radius: 8px;
+      margin-bottom: 32px;
+      border: 1px solid #e5e5e5;
+    }
+    
+    .date-badge strong {
+      display: block;
+      font-size: 18px;
+      color: #000000;
+      margin-bottom: 4px;
+    }
+    
+    .date-badge span {
+      font-size: 14px;
+      color: #666666;
+    }
+    
+    .section {
+      margin-bottom: 32px;
+    }
+    
+    .section-title {
       font-size: 16px;
       font-weight: 600;
+      color: #000000;
+      margin-bottom: 16px;
+    }
+    
+    .times-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    
+    .time-chip {
+      display: inline-block;
+      padding: 8px 16px;
+      background-color: #ffffff;
+      border: 2px solid #000000;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 500;
+      color: #000000;
+    }
+    
+    .actions {
+      margin: 40px 0;
+      padding: 32px 0;
+      border-top: 1px solid #e5e5e5;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .button {
+      display: block;
+      width: 100%;
+      padding: 16px 32px;
+      margin-bottom: 12px;
       text-align: center;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-    
-    .btn-approve {
-      background-color: #4caf50;
-      color: white;
-    }
-    
-    .btn-approve:hover {
-      background-color: #45a049;
-    }
-    
-    .btn-decline {
-      background-color: #ff9800;
-      color: white;
-    }
-    
-    .btn-decline:hover {
-      background-color: #f57c00;
-    }
-    
-    .info-section {
-      background-color: #fff3cd;
-      border: 1px solid #ffeeba;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 500;
       border-radius: 8px;
-      padding: 15px;
-      margin-top: 30px;
+      transition: all 0.2s ease;
     }
     
-    .info-section p {
-      color: #856404;
+    .button-primary {
+      background-color: #000000;
+      color: #ffffff;
+      border: 2px solid #000000;
+    }
+    
+    .button-secondary {
+      background-color: #ffffff;
+      color: #000000;
+      border: 2px solid #000000;
+    }
+    
+    .notice {
+      padding: 16px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
       font-size: 14px;
+      color: #666666;
+      margin-bottom: 32px;
+    }
+    
+    .notice strong {
+      color: #000000;
     }
     
     .footer {
-      background-color: #f8f9fa;
-      padding: 30px;
       text-align: center;
-      border-top: 1px solid #e9ecef;
-    }
-    
-    .footer p {
-      color: #666;
       font-size: 14px;
-      margin-bottom: 10px;
+      color: #999999;
+      padding-top: 32px;
     }
     
     .footer a {
-      color: #667eea;
+      color: #666666;
       text-decoration: none;
+      margin: 0 8px;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .divider {
+      height: 1px;
+      background-color: #e5e5e5;
+      margin: 24px 0;
     }
     
     @media only screen and (max-width: 600px) {
-      .header {
-        padding: 30px 20px;
+      .container {
+        padding: 32px 16px;
       }
       
-      .header h1 {
-        font-size: 24px;
+      h1 {
+        font-size: 20px;
       }
       
-      .content {
-        padding: 30px 20px;
-      }
-      
-      .action-buttons {
-        flex-direction: column;
-      }
-      
-      .btn {
-        width: 100%;
-      }
-      
-      .times-grid {
-        grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+      .button {
+        font-size: 15px;
+        padding: 14px 24px;
       }
     }
   </style>
 </head>
 <body>
-  <div class="email-wrapper">
+  <div class="container">
     <div class="header">
-      <h1>🎉 נמצאו תורים פנויים!</h1>
-      <p>במספרת רם-אל</p>
+      <div class="logo"></div>
+      <h1>נמצאו תורים פנויים</h1>
+      <p class="subtitle">מספרת רם-אל</p>
     </div>
     
-    <div class="content">
-      <div class="date-section">
-        <h2>${dayName}</h2>
-        <p>${date}</p>
+    <center>
+      <div class="date-badge">
+        <strong>${dayName}</strong>
+        <span>${date}</span>
       </div>
-      
-      <div class="times-section">
-        <h3>השעות הפנויות:</h3>
-        <div class="times-grid">
-          ${times.map(time => `<div class="time-slot">${time}</div>`).join('')}
-        </div>
+    </center>
+    
+    <div class="section">
+      <h2 class="section-title">שעות זמינות</h2>
+      <div class="times-container">
+        ${times.map(time => `<span class="time-chip">${time}</span>`).join('')}
       </div>
-      
-      <div class="action-buttons">
-        <a href="${approveUrl}" class="btn btn-approve">
-          ✅ מצאתי תור מתאים
-        </a>
-        <a href="${declineUrl}" class="btn btn-decline">
-          ❌ אף תור לא מתאים
-        </a>
-      </div>
-      
-      <div class="info-section">
-        <p>
-          <strong>שים לב:</strong> אם תבחר "אף תור לא מתאים", לא תקבל התראות נוספות על השעות הללו,
-          אך תמשיך לקבל התראות אם יתפנו שעות חדשות.
-        </p>
-      </div>
+    </div>
+    
+    <div class="actions">
+      <a href="${approveUrl}" class="button button-primary">
+        מצאתי תור מתאים
+      </a>
+      <a href="${declineUrl}" class="button button-secondary">
+        אף תור לא מתאים
+      </a>
+    </div>
+    
+    <div class="notice">
+      <strong>לתשומת לבך:</strong> בחירת "אף תור לא מתאים" תמנע התראות עתידיות על השעות הללו בלבד. תמשיך לקבל התראות על שעות חדשות שיתפנו.
     </div>
     
     <div class="footer">
-      <p>הודעה זו נשלחה אליך כי נרשמת לקבלת התראות על תורים פנויים.</p>
-      <p>
-        <a href="${baseUrl}/subscribe">ניהול הרשמות</a> | 
-        <a href="${baseUrl}">כניסה לאתר</a>
-      </p>
-      <p style="margin-top: 20px; font-size: 12px; color: #999;">
-        © 2025 תור רם-אל. כל הזכויות שמורות.
-      </p>
+      <a href="${unsubscribeUrl}">ביטול הרשמה</a>
+      <span>•</span>
+      <a href="${baseUrl}/subscribe">ניהול התראות</a>
+      <span>•</span>
+      <a href="${baseUrl}">כניסה למערכת</a>
+      <div class="divider"></div>
+      <p>© 2025 תור רם-אל</p>
     </div>
   </div>
 </body>
@@ -264,28 +278,274 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   `
   
   const text = `
-התראה על תורים פנויים - תור רם-אל
-
-נמצאו תורים פנויים!
+נמצאו תורים פנויים - תור רם-אל
 
 תאריך: ${dayName}, ${date}
 
-השעות הפנויות:
+שעות זמינות:
 ${times.join(', ')}
 
 מה ברצונך לעשות?
 
-1. מצאתי תור מתאים - לחץ כאן: ${approveUrl}
+מצאתי תור מתאים:
+${approveUrl}
 
-2. אף תור לא מתאים - לחץ כאן: ${declineUrl}
+אף תור לא מתאים:
+${declineUrl}
 
-שים לב: אם תבחר "אף תור לא מתאים", לא תקבל התראות נוספות על השעות הללו,
-אך תמשיך לקבל התראות אם יתפנו שעות חדשות.
+לתשומת לבך: בחירת "אף תור לא מתאים" תמנע התראות עתידיות על השעות הללו בלבד.
 
-ניהול הרשמות: ${baseUrl}/subscribe
-כניסה לאתר: ${baseUrl}
+ביטול הרשמה: ${unsubscribeUrl}
+ניהול התראות: ${baseUrl}/subscribe
 
-© 2025 תור רם-אל. כל הזכויות שמורות.
+© 2025 תור רם-אל
+  `
+  
+  return { html, text }
+}
+
+export function generateSubscriptionConfirmationEmail(data: SubscriptionData): { html: string; text: string } {
+  const { email, subscriptionId, subscriptionDate, dateRangeStart, dateRangeEnd } = data
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+  const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
+  
+  let dateDisplay = ''
+  if (subscriptionDate) {
+    const date = new Date(subscriptionDate + 'T00:00:00')
+    dateDisplay = date.toLocaleDateString('he-IL', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  } else if (dateRangeStart && dateRangeEnd) {
+    const startDate = new Date(dateRangeStart + 'T00:00:00')
+    const endDate = new Date(dateRangeEnd + 'T00:00:00')
+    const startDisplay = startDate.toLocaleDateString('he-IL', { 
+      day: 'numeric',
+      month: 'numeric'
+    })
+    const endDisplay = endDate.toLocaleDateString('he-IL', { 
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric'
+    })
+    dateDisplay = `${startDisplay} - ${endDisplay}`
+  }
+  
+  const html = `
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>אישור הרשמה - תור רם-אל</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #000000;
+      background-color: #ffffff;
+      direction: rtl;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .success-icon {
+      display: inline-block;
+      width: 64px;
+      height: 64px;
+      background-color: #f5f5f5;
+      border-radius: 50%;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    
+    .success-icon::after {
+      content: "✓";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      color: #000000;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .content {
+      margin-bottom: 40px;
+    }
+    
+    .info-card {
+      background-color: #f5f5f5;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .info-label {
+      font-size: 14px;
+      color: #666666;
+      margin-bottom: 8px;
+    }
+    
+    .info-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #000000;
+    }
+    
+    .features {
+      margin: 32px 0;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    
+    .feature-icon {
+      display: inline-block;
+      min-width: 24px;
+      height: 24px;
+      margin-left: 12px;
+      text-align: center;
+      font-size: 16px;
+    }
+    
+    .feature-text {
+      font-size: 16px;
+      color: #333333;
+    }
+    
+    .button {
+      display: inline-block;
+      padding: 16px 32px;
+      background-color: #000000;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      text-align: center;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #999999;
+      padding-top: 32px;
+      border-top: 1px solid #e5e5e5;
+    }
+    
+    .footer a {
+      color: #666666;
+      text-decoration: none;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .container {
+        padding: 32px 16px;
+      }
+      
+      h1 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="success-icon"></div>
+      <h1>נרשמת בהצלחה להתראות</h1>
+    </div>
+    
+    <div class="content">
+      <div class="info-card">
+        <div class="info-label">תאריכים במעקב</div>
+        <div class="info-value">${dateDisplay}</div>
+      </div>
+      
+      <div class="features">
+        <div class="feature">
+          <span class="feature-icon">⏰</span>
+          <span class="feature-text">המערכת סורקת תורים פנויים כל 5 דקות</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">📧</span>
+          <span class="feature-text">תקבל הודעה למייל ברגע שיימצאו תורים</span>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">🎯</span>
+          <span class="feature-text">תוכל לבחור תור מתאים או להמשיך לחפש</span>
+        </div>
+      </div>
+      
+      <center style="margin-top: 32px;">
+        <a href="${baseUrl}/subscribe" class="button">
+          ניהול ההרשמות שלי
+        </a>
+      </center>
+    </div>
+    
+    <div class="footer">
+      <p style="margin-bottom: 16px;">
+        לביטול הרשמה זו: <a href="${unsubscribeUrl}">לחץ כאן</a>
+      </p>
+      <p>© 2025 תור רם-אל</p>
+    </div>
+  </div>
+</body>
+</html>
+  `
+  
+  const text = `
+נרשמת בהצלחה להתראות - תור רם-אל
+
+תאריכים במעקב: ${dateDisplay}
+
+מה קורה עכשיו?
+⏰ המערכת סורקת תורים פנויים כל 5 דקות
+📧 תקבל הודעה למייל ברגע שיימצאו תורים
+🎯 תוכל לבחור תור מתאים או להמשיך לחפש
+
+ניהול ההרשמות שלי: ${baseUrl}/subscribe
+
+לביטול הרשמה זו: ${unsubscribeUrl}
+
+© 2025 תור רם-אל
   `
   
   return { html, text }
@@ -300,94 +560,175 @@ export function generateWelcomeEmail(email: string): { html: string; text: strin
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ברוכים הבאים לתור רם-אל</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>ברוכים הבאים - תור רם-אל</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      background-color: #f5f5f5;
-      direction: rtl;
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
     
-    .email-wrapper {
-      max-width: 600px;
-      margin: 20px auto;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #000000;
       background-color: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      direction: rtl;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 40px 20px;
     }
     
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px 30px;
       text-align: center;
+      margin-bottom: 48px;
     }
     
-    .content {
-      padding: 40px 30px;
-    }
-    
-    .button {
+    .welcome-icon {
       display: inline-block;
-      background-color: #667eea;
-      color: white;
-      padding: 14px 30px;
-      text-decoration: none;
-      border-radius: 8px;
+      width: 64px;
+      height: 64px;
+      background-color: #000000;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    
+    .welcome-icon::after {
+      content: "👋";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+    }
+    
+    h1 {
+      font-size: 28px;
       font-weight: 600;
-      margin-top: 20px;
+      color: #000000;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+    
+    .intro {
+      font-size: 18px;
+      color: #666666;
+      margin-bottom: 40px;
     }
     
     .features {
-      margin: 30px 0;
+      margin-bottom: 40px;
     }
     
-    .feature {
+    .feature-card {
+      background-color: #f5f5f5;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
-      margin-bottom: 20px;
     }
     
     .feature-icon {
       font-size: 24px;
-      margin-left: 15px;
+      margin-left: 16px;
+    }
+    
+    .feature-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 4px;
+    }
+    
+    .feature-content p {
+      font-size: 14px;
+      color: #666666;
+    }
+    
+    .cta {
+      text-align: center;
+      margin: 40px 0;
+    }
+    
+    .button {
+      display: inline-block;
+      padding: 16px 40px;
+      background-color: #000000;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #999999;
+      padding-top: 32px;
+      border-top: 1px solid #e5e5e5;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .container {
+        padding: 32px 16px;
+      }
+      
+      h1 {
+        font-size: 24px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="email-wrapper">
+  <div class="container">
     <div class="header">
-      <h1>ברוכים הבאים לתור רם-אל! 🎉</h1>
+      <div class="welcome-icon"></div>
+      <h1>ברוכים הבאים!</h1>
+      <p class="intro">החשבון שלך נוצר בהצלחה. כעת תוכל להנות מכל היתרונות של תור רם-אל.</p>
     </div>
     
-    <div class="content">
-      <p>שלום ${email},</p>
-      
-      <p>תודה שהצטרפת אלינו! כעת תוכל להנות מכל היתרונות של המערכת שלנו:</p>
-      
-      <div class="features">
-        <div class="feature">
-          <span class="feature-icon">📅</span>
-          <span>צפייה בתורים פנויים בזמן אמת</span>
-        </div>
-        <div class="feature">
-          <span class="feature-icon">🔔</span>
-          <span>קבלת התראות על תורים חדשים</span>
-        </div>
-        <div class="feature">
-          <span class="feature-icon">📱</span>
-          <span>גישה נוחה מכל מכשיר</span>
+    <div class="features">
+      <div class="feature-card">
+        <span class="feature-icon">🔍</span>
+        <div class="feature-content">
+          <h3>חיפוש תורים חכם</h3>
+          <p>מצא תורים פנויים בקלות ובמהירות</p>
         </div>
       </div>
       
-      <p>מוכן להתחיל?</p>
+      <div class="feature-card">
+        <span class="feature-icon">🔔</span>
+        <div class="feature-content">
+          <h3>התראות מיידיות</h3>
+          <p>קבל הודעה ברגע שמתפנה תור</p>
+        </div>
+      </div>
       
-      <a href="${baseUrl}" class="button">כניסה לאתר</a>
+      <div class="feature-card">
+        <span class="feature-icon">📱</span>
+        <div class="feature-content">
+          <h3>נגישות מכל מקום</h3>
+          <p>השתמש במערכת מכל מכשיר</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="cta">
+      <a href="${baseUrl}" class="button">
+        כניסה למערכת
+      </a>
+    </div>
+    
+    <div class="footer">
+      <p>© 2025 תור רם-אל</p>
     </div>
   </div>
 </body>
@@ -397,15 +738,16 @@ export function generateWelcomeEmail(email: string): { html: string; text: strin
   const text = `
 ברוכים הבאים לתור רם-אל!
 
-שלום ${email},
+החשבון שלך (${email}) נוצר בהצלחה.
 
-תודה שהצטרפת אלינו! כעת תוכל להנות מכל היתרונות של המערכת שלנו:
+כעת תוכל להנות מ:
+🔍 חיפוש תורים חכם - מצא תורים פנויים בקלות
+🔔 התראות מיידיות - קבל הודעה ברגע שמתפנה תור  
+📱 נגישות מכל מקום - השתמש במערכת מכל מכשיר
 
-- צפייה בתורים פנויים בזמן אמת
-- קבלת התראות על תורים חדשים
-- גישה נוחה מכל מכשיר
+כניסה למערכת: ${baseUrl}
 
-מוכן להתחיל? כנס לאתר: ${baseUrl}
+© 2025 תור רם-אל
   `
   
   return { html, text }

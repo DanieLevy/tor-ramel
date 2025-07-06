@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer'
-import { generateNotificationEmail } from './email-templates'
+import { generateNotificationEmail, generateSubscriptionConfirmationEmail } from './email-templates'
 
 // Create transporter
 const transporter = nodemailer.createTransport({
@@ -18,6 +18,14 @@ interface NotificationEmailData {
   subscriptionId: string
 }
 
+interface SubscriptionEmailData {
+  to: string
+  subscriptionId: string
+  subscriptionDate?: string
+  dateRangeStart?: string
+  dateRangeEnd?: string
+}
+
 export async function sendNotificationEmail(data: NotificationEmailData): Promise<boolean> {
   try {
     const { to, date, dayName, times, subscriptionId } = data
@@ -34,7 +42,7 @@ export async function sendNotificationEmail(data: NotificationEmailData): Promis
     const info = await transporter.sendMail({
       from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
       to,
-      subject: `🎉 נמצאו תורים פנויים - ${dayName} ${date}`,
+      subject: `תורים פנויים - ${dayName} ${date}`,
       text,
       html
     })
@@ -47,6 +55,45 @@ export async function sendNotificationEmail(data: NotificationEmailData): Promis
   }
 }
 
+export async function sendSubscriptionConfirmationEmail(data: SubscriptionEmailData): Promise<boolean> {
+  try {
+    const { to, subscriptionId, subscriptionDate, dateRangeStart, dateRangeEnd } = data
+    
+    // Generate email content
+    const { html, text } = generateSubscriptionConfirmationEmail({
+      email: to,
+      subscriptionId,
+      subscriptionDate,
+      dateRangeStart,
+      dateRangeEnd
+    })
+    
+    // Format subject based on date type
+    let subject = 'אישור הרשמה להתראות - תור רם-אל'
+    if (subscriptionDate) {
+      const date = new Date(subscriptionDate + 'T00:00:00')
+      subject = `אישור הרשמה - ${date.toLocaleDateString('he-IL')}`
+    } else if (dateRangeStart && dateRangeEnd) {
+      subject = `אישור הרשמה - ${dateRangeStart} עד ${dateRangeEnd}`
+    }
+    
+    // Send email
+    const info = await transporter.sendMail({
+      from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
+      to,
+      subject,
+      text,
+      html
+    })
+    
+    console.log('Subscription confirmation email sent:', info.messageId)
+    return true
+  } catch (error) {
+    console.error('Error sending subscription confirmation email:', error)
+    return false
+  }
+}
+
 export async function sendOTPEmail(email: string, otp: string): Promise<boolean> {
   try {
     const html = `
@@ -55,77 +102,155 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>קוד אימות - תור רם-אל</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      background-color: #f5f5f5;
-      direction: rtl;
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
     
-    .email-wrapper {
-      max-width: 600px;
-      margin: 20px auto;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #000000;
       background-color: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      direction: rtl;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 40px 20px;
     }
     
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px 30px;
       text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .logo {
+      display: inline-block;
+      width: 56px;
+      height: 56px;
+      background-color: #000000;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    
+    .logo::after {
+      content: "ת";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+      font-size: 16px;
+      color: #666666;
     }
     
     .content {
-      padding: 40px 30px;
       text-align: center;
+      margin-bottom: 40px;
     }
     
-    .otp-box {
-      background-color: #f8f9fa;
-      border: 2px dashed #667eea;
+    .message {
+      font-size: 16px;
+      color: #333333;
+      margin-bottom: 32px;
+    }
+    
+    .otp-container {
+      background-color: #f5f5f5;
+      border: 2px dashed #000000;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 0 auto 32px;
+      max-width: 280px;
+    }
+    
+    .otp-code {
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: 12px;
+      color: #000000;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    }
+    
+    .validity {
+      font-size: 14px;
+      color: #666666;
+      margin-bottom: 24px;
+    }
+    
+    .security-note {
+      font-size: 14px;
+      color: #999999;
+      padding: 16px;
+      background-color: #f5f5f5;
       border-radius: 8px;
-      padding: 20px;
-      margin: 30px 0;
-      font-size: 32px;
-      font-weight: bold;
-      letter-spacing: 10px;
-      color: #667eea;
     }
     
     .footer {
-      padding: 20px;
       text-align: center;
-      color: #666;
       font-size: 14px;
+      color: #999999;
+      padding-top: 32px;
+      border-top: 1px solid #e5e5e5;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .container {
+        padding: 32px 16px;
+      }
+      
+      .otp-code {
+        font-size: 32px;
+        letter-spacing: 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="email-wrapper">
+  <div class="container">
     <div class="header">
+      <div class="logo"></div>
       <h1>קוד אימות</h1>
+      <p class="subtitle">תור רם-אל</p>
     </div>
     
     <div class="content">
-      <p>שלום,</p>
-      <p>להלן קוד האימות שלך לכניסה לתור רם-אל:</p>
+      <p class="message">הזן את הקוד הבא כדי להתחבר:</p>
       
-      <div class="otp-box">${otp}</div>
+      <div class="otp-container">
+        <div class="otp-code">${otp}</div>
+      </div>
       
-      <p>הקוד תקף ל-10 דקות בלבד.</p>
-      <p>אם לא ביקשת קוד זה, אנא התעלם מהודעה זו.</p>
+      <p class="validity">הקוד תקף ל-10 דקות</p>
+      
+      <div class="security-note">
+        אם לא ביקשת קוד זה, אנא התעלם מהודעה זו
+      </div>
     </div>
     
     <div class="footer">
-      <p>© 2025 תור רם-אל. כל הזכויות שמורות.</p>
+      <p>© 2025 תור רם-אל</p>
     </div>
   </div>
 </body>
@@ -135,20 +260,19 @@ export async function sendOTPEmail(email: string, otp: string): Promise<boolean>
     const text = `
 קוד אימות - תור רם-אל
 
-שלום,
-
-להלן קוד האימות שלך: ${otp}
+הקוד שלך: ${otp}
 
 הקוד תקף ל-10 דקות בלבד.
+
 אם לא ביקשת קוד זה, אנא התעלם מהודעה זו.
 
-© 2025 תור רם-אל. כל הזכויות שמורות.
+© 2025 תור רם-אל
     `
     
     const info = await transporter.sendMail({
       from: `"תור רם-אל" <${process.env.EMAIL_SENDER}>`,
       to: email,
-      subject: 'קוד אימות - תור רם-אל',
+      subject: `${otp} - קוד האימות שלך`,
       text,
       html
     })
