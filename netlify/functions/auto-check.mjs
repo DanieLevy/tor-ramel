@@ -165,18 +165,21 @@ const getOpenDays = (startDate, totalDays) => {
   const openDays = []
   let currentDate = new Date(startDate)
   let daysChecked = 0
+  let closedDaysCount = 0
   
   const maxDaysToCheck = Math.min(totalDays * 2, 500)
   
   while (openDays.length < totalDays && daysChecked < maxDaysToCheck) {
     if (!isClosedDay(currentDate)) {
       openDays.push(new Date(currentDate))
+    } else {
+      closedDaysCount++
     }
     currentDate = addDaysIsrael(currentDate, 1)
     daysChecked++
   }
   
-  return openDays
+  return { openDays, closedDaysCount }
 }
 
 // Calculate adaptive batch size based on performance
@@ -394,6 +397,29 @@ async function saveToSupabase(results) {
 // NOTIFICATION SYSTEM
 // ============================================================================
 
+// Helper function to check for pending notifications
+async function checkPendingNotifications() {
+  try {
+    const { count, error } = await supabase
+      .from('notification_queue')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    
+    if (error) {
+      console.error('Error checking pending notifications:', error)
+      return 0
+    }
+    
+    if (count > 0) {
+      console.log(`📬 Found ${count} pending notifications to process`)
+    }
+    return count || 0
+  } catch (error) {
+    console.error('Error checking pending notifications:', error)
+    return 0
+  }
+}
+
 async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
   try {
     console.log('🔔 Checking notification subscriptions...')
@@ -558,22 +584,22 @@ async function findAppointments() {
   
   // Check next 30 days
   const maxDays = 30
-  const openDates = getOpenDays(currentDate, maxDays)
+  const { openDays, closedDaysCount } = getOpenDays(currentDate, maxDays)
   
-  console.log(`📊 Will check ${openDates.length} open dates (30 days, excluding Monday/Saturday)`)
-  console.log(`🚫 Skipping ${maxDays - openDates.length} closed days (Mondays & Saturdays)`)
+  console.log(`📊 Will check ${openDays.length} open dates (30 days, excluding Monday/Saturday)`)
+  console.log(`🚫 Skipping ${closedDaysCount} closed days (Mondays & Saturdays)`)
   
   const results = []
   let batchNumber = 0
   
   // Process in adaptive batches
-  for (let i = 0; i < openDates.length;) {
+  for (let i = 0; i < openDays.length;) {
     const elapsed = Date.now() - startTime
-    const remaining = openDates.length - i
+    const remaining = openDays.length - i
     
     // Get adaptive batch size based on performance
     const batchSize = getAdaptiveBatchSize(elapsed, remaining)
-    const batch = openDates.slice(i, i + batchSize)
+    const batch = openDays.slice(i, i + batchSize)
     batchNumber++
     
     const batchStartTime = Date.now()
@@ -619,7 +645,7 @@ async function findAppointments() {
     }
     
     // Minimal delay between batches (only if having errors)
-    if (i < openDates.length && performanceStats.errors > 0) {
+    if (i < openDays.length && performanceStats.errors > 0) {
       // Only delay if we're seeing errors
       const delay = performanceStats.errors > 2 ? 150 : 50
       await new Promise(resolve => setTimeout(resolve, delay))
@@ -631,7 +657,13 @@ async function findAppointments() {
   const errorResults = results.filter(r => r.available === null)
   
   console.log(`✅ Check completed: ${results.length} checked, ${availableResults.length} available, ${errorResults.length} errors in ${elapsed}s`)
-  console.log(`📊 Performance: ${performanceStats.cacheHits} cache hits, ${performanceStats.retries} retries, avg response: ${Math.round(performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length)}ms`)
+  
+  // Fix for NaN when all cache hits
+  const avgResponseTime = performanceStats.requestTimes.length > 0 
+    ? Math.round(performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length)
+    : 0
+  
+  console.log(`📊 Performance: ${performanceStats.cacheHits} cache hits, ${performanceStats.retries} retries, avg response: ${avgResponseTime}ms`)
   
   if (errorResults.length > 0) {
     console.log(`⚠️ Failed dates: ${errorResults.map(r => r.date).join(', ')}`)
@@ -645,8 +677,11 @@ async function findAppointments() {
     // Check subscriptions and queue notifications
     const notificationsQueued = await checkSubscriptionsAndQueueNotifications(successfulResults)
     
-    // Process notifications immediately if any were queued
-    if (notificationsQueued > 0) {
+    // Always check for pending notifications to process
+    const pendingNotifications = await checkPendingNotifications()
+    
+    // Process notifications if any were queued or pending exist
+    if (notificationsQueued > 0 || pendingNotifications > 0) {
       const notificationStart = Date.now()
       try {
         const result = await processNotificationQueue(5) // Process max 5 to save time
@@ -654,10 +689,10 @@ async function findAppointments() {
         console.log(`📧 Notification processing completed in ${notificationTime}ms: ${result.processed} sent, ${result.failed} failed`)
       } catch (error) {
         console.error('❌ Error processing notifications:', error)
-      }
+            }
     }
   }
-  
+
   return {
     success: true,
     found: availableResults.length > 0,
@@ -666,7 +701,7 @@ async function findAppointments() {
     errors: errorResults.length,
     elapsed: elapsed,
     performance: {
-      avgResponseTime: Math.round(performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length),
+      avgResponseTime: avgResponseTime,
       cacheHits: performanceStats.cacheHits,
       retries: performanceStats.retries
     }
