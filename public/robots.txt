@@ -1,0 +1,8 @@
+# תור רם-אל Robots
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap
+Sitemap: https://tor-ramel.netlify.app/sitemap.xml 

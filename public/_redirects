@@ -1,0 +1,8 @@
+# API Routes
+/api/*  /.netlify/functions/:splat  200
+
+# Force HTTPS
+http://tor-ramel.netlify.app/*  https://tor-ramel.netlify.app/:splat  301!
+
+# Handle SPA routes (fallback)
+/*    /index.html   200 
