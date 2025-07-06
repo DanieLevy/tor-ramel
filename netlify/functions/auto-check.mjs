@@ -183,33 +183,39 @@ const getOpenDays = (startDate, totalDays) => {
 function getAdaptiveBatchSize(elapsed, totalRemaining) {
   const avgResponseTime = performanceStats.requestTimes.length > 0
     ? performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length
-    : 300 // Default estimate (reduced from 400)
+    : 300 // Default estimate
   
   const timeRemaining = 8000 - elapsed // Target 8 seconds max to leave time for notifications
-  const estimatedTimePerBatch = avgResponseTime + 100 // Reduced buffer
   
-  // Calculate optimal batch size
-  let batchSize = Math.floor(timeRemaining / estimatedTimePerBatch)
+  // Account for staggered delays (150ms per request in batch)
+  // Last request in batch starts at (batchSize-1) * 150ms
+  const staggerDelay = 150
   
-  // Apply constraints - increased max batch size
-  batchSize = Math.max(3, Math.min(8, batchSize)) // Between 3 and 8
+  // Calculate optimal batch size considering stagger delays
+  let batchSize = 5 // Start with reasonable default
   
-  // If we're running well, increase batch size
-  if (elapsed < 3000 && avgResponseTime < 300) {
-    batchSize = Math.min(8, batchSize + 2)
+  // Estimate time for a batch: stagger delay + avg response time
+  const estimatedBatchTime = (batchSize - 1) * staggerDelay + avgResponseTime + 200 // Buffer
+  
+  // Adjust batch size based on remaining time
+  if (timeRemaining < 2000) {
+    batchSize = 3 // Minimum
+  } else if (timeRemaining > 4000 && avgResponseTime < 350) {
+    batchSize = 6 // Can handle more
   }
   
-  // If we're running slow, decrease batch size
-  if (avgResponseTime > 400 || performanceStats.errors > 2) {
+  // Reduce batch size if we're getting errors
+  if (performanceStats.errors > 1 || performanceStats.retries > 3) {
     batchSize = Math.max(3, batchSize - 1)
   }
   
-  return batchSize
+  // Never exceed 6 to avoid overwhelming the server
+  return Math.min(6, Math.max(3, batchSize))
 }
 
 // Single date check function with caching
 async function checkSingleDate(dateStr, retryCount = 0) {
-  const maxRetries = 1 // Reduced from 2
+  const maxRetries = 2 // Increased to handle more 500 errors
   
   // Check cache first
   const cacheKey = `date_${dateStr}`
@@ -316,8 +322,9 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     // Retry logic with exponential backoff
     if (isRetryable && retryCount < maxRetries) {
       performanceStats.retries++
-      const backoffTime = Math.min((retryCount + 1) * 200, 500) // Reduced backoff
-      console.log(`🔄 Retrying ${dateStr} after ${backoffTime}ms...`)
+      // Exponential backoff: 300ms, 600ms, 1200ms
+      const backoffTime = Math.min(300 * Math.pow(2, retryCount), 1200)
+      console.log(`🔄 Retrying ${dateStr} after ${backoffTime}ms (attempt ${retryCount + 1}/${maxRetries})...`)
       await new Promise(resolve => setTimeout(resolve, backoffTime))
       return checkSingleDate(dateStr, retryCount + 1)
     }
@@ -553,8 +560,14 @@ async function findAppointments() {
     
     console.log(`📦 Processing batch ${batchNumber} (${batchSize} dates): ${batch.map(d => formatDateIsrael(d)).join(', ')}`)
     
-    // Process batch with Promise.allSettled for resilience
-    const batchPromises = batch.map(date => checkSingleDate(formatDateIsrael(date)))
+    // Process batch with staggered start to avoid 500 errors
+    // Based on test results, small delays between requests prevent server errors
+    const batchPromises = batch.map((date, index) => {
+      // Stagger requests by 150ms to avoid overwhelming the server
+      const delay = index * 150
+      return new Promise(resolve => setTimeout(resolve, delay))
+        .then(() => checkSingleDate(formatDateIsrael(date)))
+    })
     const batchResults = await Promise.allSettled(batchPromises)
     
     batchResults.forEach((result, idx) => {
