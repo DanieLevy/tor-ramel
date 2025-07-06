@@ -6,13 +6,20 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 function NotificationActionContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [processing, setProcessing] = useState(true)
+  const [showDialog, setShowDialog] = useState(false)
   const [result, setResult] = useState<{
     success: boolean
     message: string
@@ -38,6 +45,7 @@ function NotificationActionContent() {
         message: 'פרמטרים חסרים בקישור'
       })
       setProcessing(false)
+      setShowDialog(true)
       return
     }
 
@@ -75,6 +83,7 @@ function NotificationActionContent() {
             message: 'חסרים פרטי השעות שנדחו'
           })
           setProcessing(false)
+          setShowDialog(true)
           return
         }
 
@@ -142,22 +151,105 @@ function NotificationActionContent() {
       })
     } finally {
       setProcessing(false)
+      setShowDialog(true)
     }
+  }
+
+  const getDialogContent = () => {
+    if (!result) return null
+
+    if (result.success && result.action === 'approve') {
+      return (
+        <>
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <DialogTitle className="text-center text-xl">מעולה! 🎉</DialogTitle>
+            <DialogDescription className="text-center">
+              אנחנו שמחים שמצאת תור מתאים
+            </DialogDescription>
+          </DialogHeader>
+          {date && timesList.length > 0 && (
+            <div className="space-y-4 pt-4">
+              <div className="text-center">
+                <Badge variant="outline" className="text-sm px-3 py-1">
+                  {date}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {timesList.map((time, index) => (
+                  <div 
+                    key={index}
+                    className="text-center p-2 rounded-lg bg-muted/50 border border-border"
+                  >
+                    <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                    <span className="font-medium">{time}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-center text-sm text-muted-foreground pt-2">
+                בהצלחה בתור שלך!
+              </p>
+            </div>
+          )}
+        </>
+      )
+    }
+
+    if (result.success && result.action === 'decline') {
+      return (
+        <>
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+              <Bell className="h-8 w-8 text-blue-600" />
+            </div>
+            <DialogTitle className="text-center text-xl">הבנו 👍</DialogTitle>
+            <DialogDescription className="text-center">
+              נמשיך לחפש עבורך ונודיע לך כשיתפנו שעות חדשות
+            </DialogDescription>
+          </DialogHeader>
+        </>
+      )
+    }
+
+    if (result.success && result.action === 'unsubscribe') {
+      return (
+        <>
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <DialogTitle className="text-center text-xl">ההרשמה בוטלה</DialogTitle>
+            <DialogDescription className="text-center">
+              לא תקבל יותר התראות. תוכל להירשם מחדש בכל עת.
+            </DialogDescription>
+          </DialogHeader>
+        </>
+      )
+    }
+
+    // Error state
+    return (
+      <>
+        <DialogHeader className="text-center">
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <DialogTitle className="text-center text-xl">שגיאה</DialogTitle>
+          <DialogDescription className="text-center">
+            {result.message}
+          </DialogDescription>
+        </DialogHeader>
+      </>
+    )
   }
 
   return (
     <div className="container py-8 px-4 max-w-xl mx-auto">
       <div className="space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">עדכון התראות</h1>
-          <p className="text-muted-foreground">
-            {processing ? 'מעבד את הבקשה שלך...' : 'הפעולה הושלמה'}
-          </p>
-        </div>
-
-        {/* Main Content */}
-        {processing ? (
+        {/* Loading State */}
+        {processing && (
           <Card>
             <CardContent className="py-12">
               <div className="flex flex-col items-center justify-center space-y-4">
@@ -166,98 +258,13 @@ function NotificationActionContent() {
               </div>
             </CardContent>
           </Card>
-        ) : result ? (
-          <div className="space-y-4">
-            {/* Result Alert */}
-            <Alert className={result.success ? "border-green-600" : "border-destructive"}>
-              <div className="flex items-start gap-3">
-                {result.success ? (
-                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-destructive mt-0.5" />
-                )}
-                <AlertDescription className="text-base">
-                  {result.message}
-                </AlertDescription>
-              </div>
-            </Alert>
+        )}
 
-            {/* Action Specific Content */}
-            {result.success && result.action === 'approve' && timesList.length > 0 && (
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <div className="mx-auto mb-3 w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                  <CardTitle>מעולה! 🎉</CardTitle>
-                  <CardDescription>
-                    אנחנו שמחים שמצאת תור מתאים
-                  </CardDescription>
-                </CardHeader>
-                {date && (
-                  <CardContent className="space-y-4">
-                    <div className="text-center">
-                      <Badge variant="outline" className="text-sm px-3 py-1">
-                        {date}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {timesList.map((time, index) => (
-                        <div 
-                          key={index}
-                          className="text-center p-2 rounded-lg bg-muted/50 border border-border"
-                        >
-                          <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                          <span className="font-medium">{time}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-center text-sm text-muted-foreground">
-                      בהצלחה בתור שלך!
-                    </p>
-                  </CardContent>
-                )}
-              </Card>
-            )}
-
-            {result.success && result.action === 'decline' && (
-              <Card>
-                <CardContent className="py-8">
-                  <div className="text-center space-y-4">
-                    <div className="mx-auto w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                      <Bell className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">הבנו 👍</h3>
-                      <p className="text-muted-foreground">
-                        נמשיך לחפש עבורך ונודיע לך כשיתפנו שעות חדשות
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {result.success && result.action === 'unsubscribe' && (
-              <Card>
-                <CardContent className="py-8">
-                  <div className="text-center space-y-4">
-                    <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                      <AlertCircle className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold">ההרשמה בוטלה</h3>
-                      <p className="text-muted-foreground">
-                        לא תקבל יותר התראות. תוכל להירשם מחדש בכל עת.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-3 pt-4">
+        {/* Result Dialog */}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent className="sm:max-w-md">
+            {getDialogContent()}
+            <div className="flex flex-col gap-3 pt-6">
               <Button
                 onClick={() => router.push('/')}
                 variant="default"
@@ -277,17 +284,8 @@ function NotificationActionContent() {
                 ניהול התראות
               </Button>
             </div>
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="py-8">
-              <div className="text-center space-y-4">
-                <XCircle className="h-12 w-12 text-destructive mx-auto" />
-                <p className="text-muted-foreground">משהו השתבש. אנא נסה שוב.</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

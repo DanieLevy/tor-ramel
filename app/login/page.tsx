@@ -4,16 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const { user, isLoading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const [emailValid, setEmailValid] = useState<boolean | null>(null)
   const router = useRouter()
 
@@ -51,14 +49,12 @@ export default function LoginPage() {
     const value = e.target.value
     setEmail(value)
     validateEmail(value)
-    if (error) setError('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!emailValid) return
     
-    setError('')
     setIsLoading(true)
 
     try {
@@ -74,9 +70,13 @@ export default function LoginPage() {
         throw new Error(data.error || 'שגיאה בשליחת קוד')
       }
 
-      setSuccess(true)
       // Store email for OTP verification page
       sessionStorage.setItem('tor-ramel-pending-email', email)
+      
+      // Show success toast
+      toast.success('קוד אימות נשלח!', {
+        description: 'מעביר אותך לעמוד האימות...',
+      })
       
       // Redirect to OTP page after short delay
       setTimeout(() => {
@@ -84,7 +84,9 @@ export default function LoginPage() {
       }, 1500)
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה לא צפויה')
+      toast.error('שגיאה', {
+        description: err instanceof Error ? err.message : 'שגיאה לא צפויה',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -134,7 +136,7 @@ export default function LoginPage() {
                 )}
                 dir="ltr"
                 required
-                disabled={isLoading || success}
+                disabled={isLoading}
               />
               
               {/* Validation Icons */}
@@ -170,21 +172,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Error/Success Messages */}
-          {error && (
-            <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-2 duration-300">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert className="animate-in fade-in slide-in-from-top-2 duration-300 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900">
-              <AlertDescription className="text-emerald-700 dark:text-emerald-400">
-                ✓ קוד אימות נשלח לדוא"ל שלך! מעביר אותך...
-              </AlertDescription>
-            </Alert>
-          )}
-
           {/* Submit Button */}
           <Button 
             type="submit" 
@@ -197,7 +184,7 @@ export default function LoginPage() {
               "hover:-translate-y-0.5",
               "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             )}
-            disabled={isLoading || success || !emailValid}
+            disabled={isLoading || !emailValid}
           >
             {isLoading ? (
               <span className="flex items-center justify-center">

@@ -4,14 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-context'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, RefreshCw, ArrowRight, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export default function VerifyOTPPage() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
   const [email, setEmail] = useState('')
   const [canResend, setCanResend] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
@@ -106,11 +105,10 @@ export default function VerifyOTPPage() {
   const handleSubmit = async (otpCode?: string) => {
     const code = otpCode || otp.join('')
     if (code.length !== 6) {
-      setError('נא להזין קוד בן 6 ספרות')
+      toast.error('נא להזין קוד בן 6 ספרות')
       return
     }
 
-    setError('')
     setIsLoading(true)
 
     try {
@@ -133,7 +131,7 @@ export default function VerifyOTPPage() {
       login(data.user)
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה לא צפויה')
+      toast.error(err instanceof Error ? err.message : 'שגיאה לא צפויה')
       // Shake animation on error
       inputRefs.current.forEach((input, idx) => {
         if (input) {
@@ -149,7 +147,6 @@ export default function VerifyOTPPage() {
   const handleResend = async () => {
     setCanResend(false)
     setResendTimer(60)
-    setError('')
 
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -165,8 +162,9 @@ export default function VerifyOTPPage() {
 
       setOtp(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
+      toast.success('קוד חדש נשלח לדוא"ל שלך')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בשליחת קוד חדש')
+      toast.error(err instanceof Error ? err.message : 'שגיאה בשליחת קוד חדש')
       setCanResend(true)
     }
   }
@@ -222,13 +220,6 @@ export default function VerifyOTPPage() {
               />
             ))}
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <Alert variant="destructive" className="animate-in fade-in slide-in-from-top-2 duration-300">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
 
           {/* Action Buttons */}
           <div className="space-y-3">
