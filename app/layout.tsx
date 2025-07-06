@@ -107,13 +107,13 @@ export default function RootLayout({
               <Toaster 
                 position="bottom-center" 
                 dir="rtl" 
-                className="!z-[100]"
+                className="pointer-events-none"
                 toastOptions={{
                   style: {
                     marginBottom: 'calc(var(--safe-area-inset-bottom, 0px) + 4.5rem)',
-                    zIndex: 100,
                   },
-                  className: 'font-sans',
+                  className: 'font-sans pointer-events-auto',
+                  duration: 3000,
                 }}
               />
             </PWAProvider>
