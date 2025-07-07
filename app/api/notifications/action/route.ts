@@ -86,10 +86,11 @@ export async function POST(request: NextRequest) {
             .from('ignored_appointment_times')
             .upsert({
               user_id: subscription.user_id,
+              subscription_id: subscriptionId,
               appointment_date: appointmentDate,
               ignored_times: appointmentTimes
             }, {
-              onConflict: 'user_id,appointment_date',
+              onConflict: 'subscription_id,appointment_date',
               ignoreDuplicates: false
             })
 
@@ -142,10 +143,11 @@ export async function POST(request: NextRequest) {
           .from('ignored_appointment_times')
           .upsert({
             user_id: subscription.user_id,
+            subscription_id: subscriptionId,
             appointment_date: date,
             ignored_times: times
           }, {
-            onConflict: 'user_id,appointment_date',
+            onConflict: 'subscription_id,appointment_date',
             ignoreDuplicates: false
           })
 

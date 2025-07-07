@@ -457,7 +457,7 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           const { data: ignoredData } = await supabase
             .from('ignored_appointment_times')
             .select('ignored_times')
-            .eq('user_id', subscription.user_id)
+            .eq('subscription_id', subscription.id)
             .eq('appointment_date', appointment.date)
           
           const ignoredTimes = ignoredData ? 
@@ -469,6 +469,11 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           if (newTimes.length === 0) {
             console.log(`All times ignored for subscription ${subscription.id} on ${appointment.date}`)
             continue
+          }
+          
+          // Log if some times were filtered
+          if (newTimes.length < appointment.times.length) {
+            console.log(`📝 Filtered ${appointment.times.length - newTimes.length} ignored times for subscription ${subscription.id} on ${appointment.date}`)
           }
           
           // Check if notification was already sent for these exact times
