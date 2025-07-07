@@ -6,7 +6,7 @@ import https from 'https'
 
 // Performance tracking
 const performanceStats = {
-  requestTimes: [],
+  requestTimes: [] as number[],
   retries: 0,
   errors: 0
 }
@@ -121,14 +121,11 @@ async function checkSingleDate(dateStr: string, retryCount = 0): Promise<any> {
     // Parse HTML with minimal processing
     let $
     try {
-      $ = cheerio.load(response.data, {
-        normalizeWhitespace: false,
-        decodeEntities: false,
-        xmlMode: false,
-        lowerCaseTags: false // Faster parsing
-      })
+      // Convert arraybuffer to string
+      const html = Buffer.from(response.data).toString('utf-8')
+      $ = cheerio.load(html)
     } catch (parseError) {
-      console.error(`📄 HTML parsing error for ${dateStr}:`, parseError.message)
+      console.error(`📄 HTML parsing error for ${dateStr}:`, parseError instanceof Error ? parseError.message : String(parseError))
       throw new Error('Failed to parse HTML response')
     }
     
