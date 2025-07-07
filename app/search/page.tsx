@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Calendar, Loader2, Search, CheckCircle2, X, Zap, Clock, ExternalLink, CalendarDays, Sparkles, TrendingUp, AlertCircle } from 'lucide-react'
+import { Calendar, Loader2, Search, CheckCircle2, X, Zap, Clock, ExternalLink, CalendarDays, Sparkles, TrendingUp, AlertCircle, Grid, List } from 'lucide-react'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import axios from 'axios'
@@ -13,6 +14,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { he } from 'date-fns/locale'
 
 interface AppointmentResult {
   date: string
@@ -38,6 +42,7 @@ function SearchPage() {
   const [cache, setCache] = useState<SearchCache | null>(null)
   const [isUsingCache, setIsUsingCache] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [viewType, setViewType] = useState<'list' | 'calendar'>('list')
   const [searchStats, setSearchStats] = useState({
     totalDays: 0,
     checkedDays: 0,
@@ -64,42 +69,58 @@ function SearchPage() {
   }, [])
 
   const formatDateForAPI = (date: Date) => {
-    return date.toISOString().split('T')[0]
+    // Format date in Israeli timezone to avoid UTC conversion issues
+    const israeliDate = new Date(date.toLocaleString("en-CA", { timeZone: "Asia/Jerusalem" }))
+    return israeliDate.toISOString().split('T')[0]
   }
 
   const getDayNameHebrew = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00')
+    // Parse date properly in Israeli timezone
+    const [year, monthNum, day] = dateStr.split('-').map(Number)
+    const date = new Date(year, monthNum - 1, day)
+    
     const dayName = new Intl.DateTimeFormat('he-IL', {
       timeZone: 'Asia/Jerusalem',
       weekday: 'long'
     }).format(date)
     
-    const dayNumber = date.getDate()
-    const month = new Intl.DateTimeFormat('he-IL', {
+    const dayNumber = new Intl.DateTimeFormat('he-IL', {
+      timeZone: 'Asia/Jerusalem',
+      day: 'numeric'
+    }).format(date)
+    
+    const monthName = new Intl.DateTimeFormat('he-IL', {
       timeZone: 'Asia/Jerusalem',
       month: 'long'
     }).format(date)
     
-    return { dayName, dayNumber, month }
+    return { dayName, dayNumber: parseInt(dayNumber), month: monthName }
   }
 
   const isClosedDay = (date: Date) => {
-    const dayOfWeek = date.getDay()
+    // Get day of week in Israeli timezone
+    const israeliDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
+    const dayOfWeek = israeliDate.getDay()
     return dayOfWeek === 1 || dayOfWeek === 6 // Monday (1) or Saturday (6)
+  }
+
+  // Helper function to create dates in Israeli timezone
+  const createIsraeliDate = (daysFromToday: number) => {
+    const now = new Date()
+    const israeliNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
+    israeliNow.setDate(israeliNow.getDate() + daysFromToday)
+    israeliNow.setHours(0, 0, 0, 0)
+    return israeliNow
   }
 
   const getOpenDays = (type: string): Date[] => {
     const dates: Date[] = []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
     const totalDays = type === 'week' ? 7 : type === 'two-weeks' ? 14 : 30
     let closedDaysCount = 0
     let daysChecked = 0
 
     while (dates.length < totalDays && daysChecked < totalDays * 2) {
-      const date = new Date(today)
-      date.setDate(today.getDate() + daysChecked)
+      const date = createIsraeliDate(daysChecked)
       
       if (!isClosedDay(date)) {
         dates.push(new Date(date))
@@ -227,6 +248,60 @@ function SearchPage() {
     return `https://mytor.co.il/home.php?i=cmFtZWwzMw==&s=MjY1&mm=y&lang=he&datef=${dateStr}&signup=הצג`
   }
 
+  // Calendar helper functions
+  const getResultForDate = (date: Date) => {
+    const dateStr = formatDateForAPI(date)
+    return results.find(r => r.date === dateStr)
+  }
+
+  const getCalendarDayModifiers = () => {
+    const available: Date[] = []
+    const unavailable: Date[] = []
+    const closed: Date[] = []
+    
+    // Generate all dates for the search period
+    const totalDays = searchType === 'week' ? 7 : searchType === 'two-weeks' ? 14 : 30
+    
+    for (let i = 0; i < totalDays * 2; i++) { // Check more days to account for closed ones
+      const date = createIsraeliDate(i)
+      
+      if (isClosedDay(date)) {
+        closed.push(new Date(date))
+      } else {
+        const result = getResultForDate(date)
+        if (result) {
+          if (result.available) {
+            available.push(new Date(date))
+          } else {
+            unavailable.push(new Date(date))
+          }
+        }
+      }
+    }
+    
+    return { available, unavailable, closed }
+  }
+
+  const getDayTooltipContent = (date: Date) => {
+    const result = getResultForDate(date)
+    const isClosed = isClosedDay(date)
+    const dayInfo = getDayNameHebrew(formatDateForAPI(date))
+    
+    if (isClosed) {
+      return `${dayInfo.dayName} - יום סגור`
+    }
+    
+    if (!result) {
+      return `${dayInfo.dayName} - טרם נבדק`
+    }
+    
+    if (result.available) {
+      return `${dayInfo.dayName} - ${result.times.length} תורים זמינים`
+    }
+    
+    return `${dayInfo.dayName} - אין תורים זמינים`
+  }
+
   const availableResults = results.filter(r => r.available)
   const unavailableResults = results.filter(r => !r.available && !r.loading)
   const loadingResults = results.filter(r => r.loading)
@@ -305,24 +380,61 @@ function SearchPage() {
                 ))}
               </div>
 
-              <Button
-                onClick={() => handleSearch()}
-                disabled={isSearching}
-                className="w-full h-12 text-base shadow-lg"
-                size="lg"
-              >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-                    סורק תורים...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="ml-2 h-5 w-5" />
-                    התחל סריקה
-                  </>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => handleSearch()}
+                  disabled={isSearching}
+                  className="w-full h-12 text-base shadow-lg"
+                  size="lg"
+                >
+                  {isSearching ? (
+                    <>
+                      <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                      סורק תורים...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="ml-2 h-5 w-5" />
+                      התחל סריקה
+                    </>
+                  )}
+                </Button>
+
+                {/* View Toggle */}
+                {results.length > 0 && !isSearching && (
+                  <div className="grid grid-cols-2 gap-2 p-2 bg-gradient-to-r from-background to-muted/20 rounded-xl border shadow-sm">
+                    {[
+                      { value: 'list', label: 'רשימה', icon: List, color: 'from-blue-500 to-blue-600' },
+                      { value: 'calendar', label: 'לוח שנה', icon: Grid, color: 'from-purple-500 to-purple-600' }
+                    ].map((option) => (
+                      <motion.button
+                        key={option.value}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setViewType(option.value as any)}
+                        className={cn(
+                          "relative py-2.5 px-3 rounded-lg text-sm font-medium transition-all overflow-hidden border",
+                          viewType === option.value
+                            ? "text-white shadow-lg border-transparent"
+                            : "bg-background/50 hover:bg-background border-border/50 text-foreground hover:shadow-sm"
+                        )}
+                      >
+                        {viewType === option.value && (
+                          <motion.div 
+                            layoutId="activeViewTab"
+                            className={`absolute inset-0 bg-gradient-to-r ${option.color}`}
+                            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                          />
+                        )}
+                        <span className="relative flex items-center justify-center gap-1.5">
+                          <option.icon className="h-4 w-4" />
+                          {option.label}
+                        </span>
+                      </motion.button>
+                    ))}
+                  </div>
                 )}
-              </Button>
+              </div>
 
               {/* Progress indicator */}
               {isSearching && (
@@ -352,21 +464,141 @@ function SearchPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
+            {/* Calendar View */}
+            {viewType === 'calendar' && (
+              <TooltipProvider>
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <Card className="border-2 shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <h3 className="text-lg font-semibold mb-4 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                            לוח שנה - מצב תורים
+                          </h3>
+                          <div className="flex items-center justify-center gap-6 mb-4">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                              <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm animate-pulse"></div>
+                              <span className="text-sm font-medium text-green-700 dark:text-green-300">זמין</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                              <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm"></div>
+                              <span className="text-sm font-medium text-red-700 dark:text-red-300">תפוס</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-950/30 rounded-lg border border-gray-200 dark:border-gray-800">
+                              <div className="w-3 h-3 bg-gray-400 rounded-full shadow-sm"></div>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">סגור</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-center">
+                          <CalendarComponent
+                            mode="single"
+                            locale={he}
+                            className="rounded-md border"
+                            classNames={{
+                              day: cn(
+                                "relative h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+                                "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                              )
+                            }}
+                            modifiers={getCalendarDayModifiers()}
+                            modifiersClassNames={{
+                              available: "!bg-green-100 !text-green-900 !border-2 !border-green-400 dark:!bg-green-900/40 dark:!text-green-100 dark:!border-green-600",
+                              unavailable: "!bg-red-100 !text-red-900 !border-2 !border-red-400 dark:!bg-red-900/40 dark:!text-red-100 dark:!border-red-600",
+                              closed: "!bg-gray-100 !text-gray-500 !opacity-50 dark:!bg-gray-800/40 dark:!text-gray-400"
+                            }}
+                            components={{
+                              DayButton: ({ day, modifiers, ...props }) => {
+                                const result = getResultForDate(day.date)
+                                const isClosed = isClosedDay(day.date)
+                                const tooltipContent = getDayTooltipContent(day.date)
+                                const dayNumber = day.date.getDate()
+                                
+                                let indicator = null
+                                if (isClosed) {
+                                  indicator = <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-gray-400 rounded-full" />
+                                } else if (result) {
+                                  if (result.available) {
+                                    indicator = <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                  } else {
+                                    indicator = <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+                                  }
+                                }
+                                
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className={cn(
+                                          "relative h-9 w-9 p-0 font-normal",
+                                          modifiers.available && "!bg-green-100 !text-green-900 !border-2 !border-green-400 dark:!bg-green-900/40 dark:!text-green-100 dark:!border-green-600",
+                                          modifiers.unavailable && "!bg-red-100 !text-red-900 !border-2 !border-red-400 dark:!bg-red-900/40 dark:!text-red-100 dark:!border-red-600",
+                                          modifiers.closed && "!bg-gray-100 !text-gray-500 !opacity-50 dark:!bg-gray-800/40 dark:!text-gray-400"
+                                        )}
+                                        onClick={() => {
+                                          if (result && result.available) {
+                                            window.open(generateBookingUrl(result.date), '_blank')
+                                          }
+                                        }}
+                                        {...props}
+                                      >
+                                        {dayNumber}
+                                        {indicator}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{tooltipContent}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )
+                              }
+                            }}
+                          />
+                        </div>
+                        
+                        {availableResults.length > 0 && (
+                          <div className="text-center text-sm text-muted-foreground">
+                            לחץ על יום זמין כדי להזמין תור
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </TooltipProvider>
+            )}
+
+            {/* List View (existing) */}
+            {viewType === 'list' && (
+              <div className="space-y-4"
+          >
             {/* Cache indicator */}
             {isUsingCache && !isSearching && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3"
+                className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm"
               >
-                <span className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
-                  <Zap className="h-3 w-3" />
-                  תוצאות מהירות מהזיכרון
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 shadow-sm">
+                    <Zap className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="text-sm">
+                    <div className="font-medium text-amber-800 dark:text-amber-200">תוצאות מהירות</div>
+                    <div className="text-xs text-amber-600 dark:text-amber-400">נטענו מהזיכרון המקומי</div>
+                  </div>
+                </div>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-6 text-xs px-2"
+                  variant="outline"
+                  className="h-8 text-xs px-3 bg-white/50 dark:bg-gray-800/50 border-amber-300 dark:border-amber-700 hover:bg-white dark:hover:bg-gray-800 shadow-sm"
                   onClick={() => handleSearch(true)}
                 >
                   רענן
@@ -464,22 +696,38 @@ function SearchPage() {
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="space-y-2"
+                className="space-y-4"
               >
-                <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3 w-3 animate-spin" />
-                  בודק תאריכים...
-                </h3>
-                {loadingResults.slice(0, 3).map((result, index) => (
-                  <Skeleton 
-                    key={result.date} 
-                    className="h-20 w-full"
-                    style={{ 
-                      animationDelay: `${index * 100}ms`,
-                      opacity: 1 - (index * 0.2)
-                    }}
-                  />
-                ))}
+                <Card className="border-blue-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500">
+                        <Clock className="h-4 w-4 text-white animate-spin" />
+                      </div>
+                      <div className="text-sm">
+                        <div className="font-medium text-blue-800 dark:text-blue-200">בודק תאריכים</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">סורק {loadingResults.length} תאריכים נוספים...</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {loadingResults.slice(0, 3).map((result, index) => (
+                        <motion.div
+                          key={result.date}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <Skeleton 
+                            className="h-16 w-full rounded-xl bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30"
+                            style={{ 
+                              animationDelay: `${index * 100}ms`,
+                            }}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             )}
 
@@ -489,39 +737,54 @@ function SearchPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="space-y-3"
+                className="space-y-4"
               >
-                <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                  <X className="h-3 w-3" />
-                  ללא תורים פנויים ({unavailableResults.length})
-                </h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {unavailableResults.map((result, index) => {
-                    const dateInfo = getDayNameHebrew(result.date)
-                    return (
-                      <motion.div
-                        key={result.date}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.01 }}
-                        className={cn(
-                          "p-3 rounded-lg text-center transition-all hover:scale-105",
-                          result.error 
-                            ? "bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-800" 
-                            : "bg-muted/30"
-                        )}
-                      >
-                        <div className="text-lg font-semibold">{dateInfo.dayNumber}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {dateInfo.dayName.slice(0, 3)}
+                <Card className="border-orange-200 bg-gradient-to-r from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+                          <X className="h-3 w-3 text-white" />
                         </div>
-                        {result.error && (
-                          <AlertCircle className="h-3 w-3 text-red-500 mx-auto mt-1" />
-                        )}
-                      </motion.div>
-                    )
-                  })}
-                </div>
+                        <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
+                          ללא תורים פנויים
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="border-orange-300 text-orange-700 dark:border-orange-700 dark:text-orange-300">
+                        {unavailableResults.length} תאריכים
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-6 gap-2">
+                      {unavailableResults.map((result, index) => {
+                        const dateInfo = getDayNameHebrew(result.date)
+                        return (
+                          <motion.div
+                            key={result.date}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: index * 0.01 }}
+                            className={cn(
+                              "p-2.5 rounded-lg text-center transition-all hover:scale-105 border shadow-sm",
+                              result.error 
+                                ? "bg-red-100/70 dark:bg-red-950/30 border-red-300 dark:border-red-700" 
+                                : "bg-white/70 dark:bg-gray-800/30 border-gray-200 dark:border-gray-700"
+                            )}
+                          >
+                            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              {dateInfo.dayNumber}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {dateInfo.dayName.slice(0, 3)}
+                            </div>
+                            {result.error && (
+                              <AlertCircle className="h-3 w-3 text-red-500 mx-auto mt-1" />
+                            )}
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             )}
 
@@ -534,6 +797,8 @@ function SearchPage() {
                   נסה לחפש בטווח תאריכים אחר או הירשם להתראות.
                 </AlertDescription>
               </Alert>
+            )}
+            </div>
             )}
           </motion.div>
         )}
