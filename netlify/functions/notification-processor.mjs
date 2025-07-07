@@ -972,3 +972,56 @@ export async function processNotificationQueue(limit = 10) {
     throw error
   }
 } 
+
+// ============================================================================
+// NETLIFY FUNCTION HANDLER
+// ============================================================================
+
+// Main handler for manual invocation
+export default async (req) => {
+  const functionStart = Date.now()
+  
+  try {
+    console.log('📧 NOTIFICATION-PROCESSOR: Starting manual execution')
+    
+    // Get limit from query params if provided
+    const url = new URL(req.url)
+    const limit = parseInt(url.searchParams.get('limit') || '10')
+    
+    const result = await processNotificationQueue(limit)
+    
+    const totalTime = Math.round((Date.now() - functionStart) / 1000)
+    console.log(`⚡ FUNCTION COMPLETED in ${totalTime}s`)
+    
+    return new Response(JSON.stringify({
+      success: true,
+      executionTime: totalTime,
+      timestamp: new Date().toISOString(),
+      data: result
+    }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
+    
+  } catch (error) {
+    const totalTime = Math.round((Date.now() - functionStart) / 1000)
+    console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
+    console.error(error.stack)
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      executionTime: totalTime,
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    })
+  }
+} 

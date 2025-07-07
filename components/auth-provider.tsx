@@ -32,6 +32,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = async () => {
     try {
       const response = await fetch('/api/auth/me')
+      
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        // Not JSON response (probably HTML error page)
+        setUser(null)
+        return
+      }
+      
       if (response.ok) {
         const data = await response.json()
         setUser({

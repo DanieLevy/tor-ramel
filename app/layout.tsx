@@ -8,6 +8,7 @@ import { PWAHead } from "@/components/pwa-head";
 import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
+import { FontLoader } from "@/components/font-loader";
 
 export const metadata: Metadata = {
   title: "תור רם-אל - זימון תורים",
@@ -97,6 +98,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <PWAProvider>
+              <FontLoader />
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />

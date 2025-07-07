@@ -1,9 +1,17 @@
 // Service Worker for Tor-Ramel PWA
-// Version 3.10 - UI improvements and search fixes
-const SW_VERSION = '2025-01-29-v3.10'
-const CACHE_NAME = 'tor-ramel-v3.10'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v20';
-const API_CACHE = 'tor-ramel-api-v20';
+// Version 3.13 - Enhanced font loading for PWA
+const SW_VERSION = '2025-01-29-v3.13'
+const CACHE_NAME = 'tor-ramel-v3.13'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v23';
+const API_CACHE = 'tor-ramel-api-v23';
+const FONT_CACHE = 'tor-ramel-fonts-v1';
+
+// Critical fonts to preload
+const CRITICAL_FONTS = [
+  '/fonts/ploni-regular-aaa.otf',
+  '/fonts/ploni-light-aaa.otf',
+  '/fonts/ploni-ultralight-aaa.otf'
+];
 
 // Assets to cache on install
 const STATIC_ASSETS = [
@@ -13,7 +21,9 @@ const STATIC_ASSETS = [
   '/favicon.ico',
   '/favicon-32x32.png',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  '/icons/icon-512x512.png',
+  // Include critical fonts in initial cache
+  ...CRITICAL_FONTS
 ];
 
 // Install event - cache static assets
@@ -21,11 +31,33 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
+    Promise.all([
+      // Cache static assets
+      caches.open(CACHE_NAME).then((cache) => {
         console.log('[SW] Caching static assets');
         return cache.addAll(STATIC_ASSETS);
+      }),
+      // Pre-cache fonts separately for better control
+      caches.open(FONT_CACHE).then((cache) => {
+        console.log('[SW] Pre-caching critical fonts');
+        return Promise.all(
+          CRITICAL_FONTS.map(font => 
+            fetch(font, { 
+              mode: 'cors',
+              credentials: 'omit',
+              cache: 'no-cache'
+            }).then(response => {
+              if (response.ok) {
+                return cache.put(font, response);
+              }
+              console.error(`[SW] Failed to cache font: ${font}`);
+            }).catch(err => {
+              console.error(`[SW] Error caching font ${font}:`, err);
+            })
+          )
+        );
       })
+    ])
   );
 });
 
@@ -37,8 +69,11 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) => {
         return Promise.all(
           cacheNames
-            .filter((name) => name !== CACHE_NAME && name !== DYNAMIC_CACHE && name !== API_CACHE)
-            .map((name) => caches.delete(name))
+            .filter((name) => name !== CACHE_NAME && name !== DYNAMIC_CACHE && name !== API_CACHE && name !== FONT_CACHE)
+            .map((name) => {
+              console.log('[SW] Deleting old cache:', name);
+              return caches.delete(name);
+            })
         );
       })
       .then(() => self.clients.claim())
@@ -65,6 +100,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Special handling for fonts
+  if (request.destination === 'font' || url.pathname.includes('/fonts/')) {
+    event.respondWith(
+      fontCacheStrategy(request)
+    );
+    return;
+  }
+
   // API calls - Special handling for subscriptions and auth-related endpoints
   if (url.pathname.startsWith('/api/')) {
     // Never cache auth or subscription endpoints
@@ -84,7 +127,6 @@ self.addEventListener('fetch', (event) => {
 
   // Static assets - Cache first, network fallback
   if (request.destination === 'image' || 
-      request.destination === 'font' || 
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js')) {
     event.respondWith(
@@ -226,6 +268,30 @@ self.addEventListener('message', (event) => {
       })
     );
   }
+  
+  // Handle font caching request
+  if (event.data && event.data.type === 'CACHE_FONTS' && event.data.fonts) {
+    event.waitUntil(
+      caches.open(FONT_CACHE).then((cache) => {
+        return Promise.all(
+          event.data.fonts.map(fontUrl => 
+            fetch(fontUrl, {
+              mode: 'cors',
+              credentials: 'omit',
+              cache: 'no-cache'
+            }).then(response => {
+              if (response.ok) {
+                console.log('[SW] Caching font on demand:', fontUrl);
+                return cache.put(fontUrl, response);
+              }
+            }).catch(err => {
+              console.error('[SW] Error caching font:', fontUrl, err);
+            })
+          )
+        );
+      })
+    );
+  }
 });
 
 // Handle notification clicks
@@ -295,4 +361,63 @@ self.addEventListener('fetch', event => {
       );
     }
   }
-}); 
+});
+
+// Enhanced font caching strategy
+async function fontCacheStrategy(request) {
+  // Try font cache first
+  const fontCache = await caches.open(FONT_CACHE);
+  const cachedFont = await fontCache.match(request);
+  
+  if (cachedFont) {
+    console.log('[SW] Serving font from cache:', request.url);
+    // Update cache in background
+    fetchAndCacheFont(request, fontCache);
+    return cachedFont;
+  }
+  
+  // If not in cache, fetch from network
+  try {
+    const response = await fetch(request, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'font/otf,font/woff2,font/woff,*/*'
+      }
+    });
+    
+    if (response.ok) {
+      // Clone the response before caching
+      const responseToCache = response.clone();
+      fontCache.put(request, responseToCache);
+      console.log('[SW] Font cached:', request.url);
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('[SW] Font fetch failed:', error);
+    // Return a fallback response
+    return new Response('', {
+      status: 404,
+      statusText: 'Font not found'
+    });
+  }
+}
+
+// Background font update
+async function fetchAndCacheFont(request, cache) {
+  try {
+    const response = await fetch(request, {
+      mode: 'cors',
+      credentials: 'omit',
+      cache: 'no-cache'
+    });
+    
+    if (response.ok) {
+      cache.put(request, response);
+    }
+  } catch (error) {
+    // Silent fail for background updates
+  }
+} 

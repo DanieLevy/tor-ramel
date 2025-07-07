@@ -1,13 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Hebrew Font Faces */
+/* Hebrew Font Faces with optimal loading strategy */
 @font-face {
   font-family: 'Ploni';
   src: url('/fonts/ploni-ultralight-aaa.otf') format('opentype');
   font-weight: 200;
   font-style: normal;
-  font-display: swap;
+  font-display: swap; /* Show text immediately with fallback */
+  /* Fallback font metrics to reduce layout shift */
+  ascent-override: 90%;
+  descent-override: 10%;
+  line-gap-override: normal;
 }
 
 @font-face {
@@ -16,6 +20,9 @@
   font-weight: 300;
   font-style: normal;
   font-display: swap;
+  ascent-override: 90%;
+  descent-override: 10%;
+  line-gap-override: normal;
 }
 
 @font-face {
@@ -24,6 +31,21 @@
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  ascent-override: 90%;
+  descent-override: 10%;
+  line-gap-override: normal;
+}
+
+/* Preload hint for critical fonts */
+@supports (font: -apple-system-body) {
+  /* Safari-specific font loading optimization */
+  @font-face {
+    font-family: 'Ploni';
+    src: url('/fonts/ploni-regular-aaa.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block; /* Block for 2s on Safari for better UX */
+  }
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -144,6 +166,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Ploni', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   }
   
   /* RTL Support */
@@ -386,6 +409,31 @@ input[type="text"] {
   main {
     /* Add padding at bottom for nav bar + safe area */
     padding-bottom: calc(5rem + var(--safe-area-inset-bottom, 0));
+  }
+}
+
+/* Progressive font loading */
+body {
+  /* Use system font initially to prevent invisible text */
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* When fonts are loaded, switch to Ploni */
+body.fonts-loaded {
+  font-family: 'Ploni', system-ui, -apple-system, sans-serif;
+}
+
+/* Fallback for font loading failure */
+body.fonts-failed {
+  /* Keep system fonts and log for debugging */
+  font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Optimize font rendering for Hebrew */
+@supports (font-synthesis: none) {
+  body {
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
 }
 

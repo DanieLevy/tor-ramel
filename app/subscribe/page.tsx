@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, AlertCircle, Clock, Sparkles } from 'lucide-react'
+import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, AlertCircle, Clock, Sparkles, Edit } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { format, addDays } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { cn, pwaFetch, isRunningAsPWA } from '@/lib/utils'
@@ -36,10 +37,37 @@ function SubscribePage() {
   const [loading, setLoading] = useState(false)
   const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
   const [tab, setTab] = useState<'single' | 'range'>('single')
+  
+  // Edit modal state
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null)
+  const [editTab, setEditTab] = useState<'single' | 'range'>('single')
+  const [editSelectedDate, setEditSelectedDate] = useState<Date>()
+  const [editDateRange, setEditDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  })
+  const [editLoading, setEditLoading] = useState(false)
 
   useEffect(() => {
     fetchSubscriptions()
   }, [])
+
+  useEffect(() => {
+    if (editingSubscription) {
+      if (editingSubscription.subscription_date) {
+        setEditTab('single')
+        setEditSelectedDate(new Date(editingSubscription.subscription_date + 'T00:00:00'))
+        setEditDateRange({ from: undefined, to: undefined })
+      } else if (editingSubscription.date_range_start && editingSubscription.date_range_end) {
+        setEditTab('range')
+        setEditDateRange({
+          from: new Date(editingSubscription.date_range_start + 'T00:00:00'),
+          to: new Date(editingSubscription.date_range_end + 'T00:00:00')
+        })
+        setEditSelectedDate(undefined)
+      }
+    }
+  }, [editingSubscription])
 
   const fetchSubscriptions = async () => {
     try {
@@ -118,6 +146,17 @@ function SubscribePage() {
     }
   }
 
+  const handleEditDateRangeSelect = (range: any) => {
+    if (range?.from || range?.to) {
+      setEditDateRange({
+        from: range.from || undefined,
+        to: range.to || undefined
+      })
+    } else {
+      setEditDateRange({ from: undefined, to: undefined })
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       const response = await pwaFetch(`/api/notifications/subscriptions/${id}`, {
@@ -133,6 +172,45 @@ function SubscribePage() {
     } catch (error) {
       console.error('🔍 Delete error:', error)
       toast.error('שגיאה בביטול המנוי')
+    }
+  }
+
+  const handleUpdate = async () => {
+    if (!editingSubscription) return
+    
+    setEditLoading(true)
+    
+    try {
+      const payload = editTab === 'single' 
+        ? { 
+            subscription_date: editSelectedDate ? format(editSelectedDate, 'yyyy-MM-dd') : null,
+            date_range_start: null,
+            date_range_end: null
+          }
+        : { 
+            subscription_date: null,
+            date_range_start: editDateRange.from ? format(editDateRange.from, 'yyyy-MM-dd') : null,
+            date_range_end: editDateRange.to ? format(editDateRange.to, 'yyyy-MM-dd') : null
+          }
+
+      const response = await pwaFetch(`/api/notifications/subscriptions/${editingSubscription.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      })
+
+      if (response.ok) {
+        toast.success('המנוי עודכן בהצלחה')
+        setEditingSubscription(null)
+        fetchSubscriptions()
+      } else {
+        const error = await response.json()
+        toast.error(error.message || 'שגיאה בעדכון המנוי')
+      }
+    } catch (error) {
+      console.error('🔍 Update error:', error)
+      toast.error('שגיאה בעדכון המנוי')
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -405,16 +483,26 @@ function SubscribePage() {
                             </p>
                           </div>
                         </div>
-                        {sub.is_active && (
+                        <div className="flex items-center gap-2">
+                          {sub.is_active && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setEditingSubscription(sub)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(sub.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
+                        </div>
                       </motion.div>
                     ))}
                   </AnimatePresence>
@@ -423,6 +511,126 @@ function SubscribePage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editingSubscription} onOpenChange={(open) => !open && setEditingSubscription(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>עריכת התראה</DialogTitle>
+              <DialogDescription>
+                שנה את התאריכים להתראה זו
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <Tabs value={editTab} onValueChange={(v) => setEditTab(v as 'single' | 'range')}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="single" className="gap-2">
+                    <Calendar className="h-4 w-4" />
+                    תאריך בודד
+                  </TabsTrigger>
+                  <TabsTrigger value="range" className="gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    טווח תאריכים
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="single" className="space-y-4 mt-4">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-right",
+                          !editSelectedDate && "text-muted-foreground"
+                        )}
+                      >
+                        <Calendar className="ml-2 h-4 w-4" />
+                        {editSelectedDate ? (
+                          format(editSelectedDate, "dd/MM/yyyy")
+                        ) : (
+                          "בחר תאריך"
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={editSelectedDate}
+                        onSelect={setEditSelectedDate}
+                        disabled={isDateDisabled}
+                        locale={he}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </TabsContent>
+
+                <TabsContent value="range" className="space-y-4 mt-4">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-right",
+                          !editDateRange.from && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarDays className="ml-2 h-4 w-4" />
+                        {editDateRange.from ? (
+                          editDateRange.to ? (
+                            <>
+                              {format(editDateRange.from, "dd/MM/yyyy")} -{" "}
+                              {format(editDateRange.to, "dd/MM/yyyy")}
+                            </>
+                          ) : (
+                            format(editDateRange.from, "dd/MM/yyyy")
+                          )
+                        ) : (
+                          "בחר טווח תאריכים"
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="range"
+                        selected={editDateRange}
+                        onSelect={handleEditDateRangeSelect}
+                        disabled={isDateDisabled}
+                        locale={he}
+                        initialFocus
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </TabsContent>
+              </Tabs>
+
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  onClick={handleUpdate}
+                  disabled={editLoading || (editTab === 'single' ? !editSelectedDate : !editDateRange.from || !editDateRange.to)}
+                  className="flex-1"
+                >
+                  {editLoading ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      מעדכן...
+                    </>
+                  ) : (
+                    'עדכן התראה'
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingSubscription(null)}
+                  disabled={editLoading}
+                >
+                  ביטול
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

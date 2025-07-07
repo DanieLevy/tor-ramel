@@ -1,6 +1,29 @@
 export function PWAHead() {
   return (
     <>
+      {/* Font Preloading - Critical for PWA performance */}
+      <link 
+        rel="preload" 
+        href="/fonts/ploni-regular-aaa.otf" 
+        as="font" 
+        type="font/otf" 
+        crossOrigin="anonymous"
+      />
+      <link 
+        rel="preload" 
+        href="/fonts/ploni-light-aaa.otf" 
+        as="font" 
+        type="font/otf" 
+        crossOrigin="anonymous"
+      />
+      <link 
+        rel="preload" 
+        href="/fonts/ploni-ultralight-aaa.otf" 
+        as="font" 
+        type="font/otf" 
+        crossOrigin="anonymous"
+      />
+      
       {/* PWA Meta Tags */}
       <meta name="mobile-web-app-capable" content="yes" />
       <meta name="apple-touch-fullscreen" content="yes" />

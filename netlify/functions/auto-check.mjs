@@ -21,15 +21,9 @@ const supabase = createClient(
 // Performance tracking
 const performanceStats = {
   requestTimes: [],
-  cacheHits: 0,
-  cacheMisses: 0,
   retries: 0,
   errors: 0
 }
-
-// Response cache for the current run (avoids duplicate requests)
-const responseCache = new Map()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minute cache for better performance
 
 // Create optimized HTTP agents with better connection pooling
 const httpAgent = new http.Agent({ 
@@ -219,23 +213,11 @@ function getAdaptiveBatchSize(elapsed, totalRemaining) {
   return Math.min(8, Math.max(3, batchSize))
 }
 
-// Single date check function with caching
+// Single date check function WITHOUT caching
 async function checkSingleDate(dateStr, retryCount = 0) {
   const maxRetries = 2 // Increased to handle more 500 errors
   
-  // Check cache first
-  const cacheKey = `date_${dateStr}`
-  const cached = responseCache.get(cacheKey)
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-    performanceStats.cacheHits++
-    console.log(`💾 Cache hit for ${dateStr}`)
-    return cached.data
-  }
-  performanceStats.cacheMisses++
-  
-  if (retryCount > 0 || performanceStats.requestTimes.length < 5) {
-    console.log(`🔍 Checking ${dateStr}${retryCount > 0 ? ` (retry ${retryCount})` : ''}...`)
-  }
+  console.log(`🔍 Checking ${dateStr}${retryCount > 0 ? ` (retry ${retryCount})` : ''}...`)
   
   try {
     const startTime = Date.now()
@@ -263,10 +245,7 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     
     const responseTime = Date.now() - startTime
     performanceStats.requestTimes.push(responseTime)
-    // Only log first few responses or slow ones
-    if (performanceStats.requestTimes.length <= 3 || responseTime > 1000) {
-      console.log(`📡 Response received for ${dateStr}: status=${response.status}, size=${response.data.length} bytes, time=${responseTime}ms`)
-    }
+    console.log(`📡 Response received for ${dateStr}: status=${response.status}, size=${response.data.length} bytes, time=${responseTime}ms`)
 
     // Parse HTML with minimal processing
     let $
@@ -287,11 +266,8 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     if (dangerElem.length > 0) {
       const dangerText = dangerElem.text()
       if (dangerText.includes('לא נשארו תורים פנויים') || dangerText.includes('אין תורים זמינים')) {
-        if (performanceStats.requestTimes.length <= 3) {
-          console.log(`❌ No appointments message found for ${dateStr}`)
-        }
+        console.log(`❌ No appointments message found for ${dateStr}`)
         const result = { date: dateStr, available: false, times: [] }
-        responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
         return result
       }
     }
@@ -312,9 +288,6 @@ async function checkSingleDate(dateStr, retryCount = 0) {
     }
     
     console.log(`📊 Result for ${dateStr}: ${result.available ? '✅' : '❌'} ${availableTimes.length} slots found`)
-    
-    // Cache successful results
-    responseCache.set(cacheKey, { data: result, timestamp: Date.now() })
     
     return result
     
@@ -602,8 +575,6 @@ async function findAppointments() {
   
   // Reset performance stats
   performanceStats.requestTimes = []
-  performanceStats.cacheHits = 0
-  performanceStats.cacheMisses = 0
   performanceStats.retries = 0
   performanceStats.errors = 0
   
@@ -691,7 +662,7 @@ async function findAppointments() {
     ? Math.round(performanceStats.requestTimes.reduce((a, b) => a + b, 0) / performanceStats.requestTimes.length)
     : 0
   
-  console.log(`📊 Performance: ${performanceStats.cacheHits} cache hits, ${performanceStats.retries} retries, avg response: ${avgResponseTime}ms`)
+  console.log(`📊 Performance: ${performanceStats.retries} retries, avg response: ${avgResponseTime}ms`)
   
   if (errorResults.length > 0) {
     console.log(`⚠️ Failed dates: ${errorResults.map(r => r.date).join(', ')}`)
@@ -730,7 +701,6 @@ async function findAppointments() {
     elapsed: elapsed,
     performance: {
       avgResponseTime: avgResponseTime,
-      cacheHits: performanceStats.cacheHits,
       retries: performanceStats.retries
     }
   }

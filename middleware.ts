@@ -18,7 +18,9 @@ const publicRoutes = [
   '/manifest.json',
   '/browserconfig.xml',
   '/.netlify/functions',
-  '/test-function'
+  '/test-function',
+  '/fonts',
+  '/icons'
 ]
 
 // Helper function to check if route is public
@@ -85,7 +87,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - font files
+     * - icon files
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/.*|icons/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp|otf|woff|woff2|ttf|eot)$).*)',
   ],
 } 
