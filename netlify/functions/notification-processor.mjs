@@ -896,7 +896,12 @@ export async function processNotificationQueue(limit = 10) {
                 })
 
               if (notifyError) {
-                console.error(`Error recording notification for ${apt.date}:`, notifyError)
+                // Check if it's a duplicate key error
+                if (notifyError.code === '23505') {
+                  console.log(`Notification already recorded for ${apt.date} (duplicate key) - treating as success`)
+                } else {
+                  console.error(`Error recording notification for ${apt.date}:`, notifyError)
+                }
               }
             }
           } else {
@@ -911,7 +916,12 @@ export async function processNotificationQueue(limit = 10) {
               })
 
             if (notifyError) {
-              console.error('Error recording notification:', notifyError)
+              // Check if it's a duplicate key error
+              if (notifyError.code === '23505') {
+                console.log(`Notification already recorded for ${appointment_date} (duplicate key) - treating as success`)
+              } else {
+                console.error('Error recording notification:', notifyError)
+              }
             }
           }
 

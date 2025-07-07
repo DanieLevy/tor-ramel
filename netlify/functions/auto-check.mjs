@@ -486,7 +486,7 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
             .single()
           
           if (existingNotification) {
-            console.log(`Notification already sent for subscription ${subscription.id} on ${appointment.date}`)
+            console.log(`Notification already sent for subscription ${subscription.id} on ${appointment.date} with times ${newTimes.join(',')}`)
             continue
           }
           
@@ -516,6 +516,21 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           
           if (existingPending) {
             console.log(`Pending notification already exists for subscription ${subscription.id}`)
+            continue
+          }
+          
+          // Also check if there's a recently sent notification in the queue (within last hour)
+          const { data: recentlySent } = await supabase
+            .from('notification_queue')
+            .select('id')
+            .eq('subscription_id', subscription.id)
+            .eq('status', 'sent')
+            .gte('processed_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .limit(1)
+            .single()
+          
+          if (recentlySent) {
+            console.log(`Recently sent notification exists for subscription ${subscription.id} (within last hour)`)
             continue
           }
           

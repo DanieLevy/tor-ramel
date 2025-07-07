@@ -120,47 +120,6 @@ function SearchPage() {
     return dates
   }
 
-  const checkSingleDate = async (dateStr: string, index: number, total: number): Promise<AppointmentResult> => {
-    try {
-      const response = await axios.post('/api/check-appointment', {
-        date: dateStr
-      }, {
-        timeout: 5000
-      })
-
-      // Update progress
-      const checkedCount = index + 1
-      setProgress((checkedCount / total) * 100)
-      setSearchStats(prev => ({ ...prev, checkedDays: checkedCount }))
-
-      const dayInfo = getDayNameHebrew(dateStr)
-      
-      return {
-        ...response.data,
-        dayName: dayInfo.dayName,
-        loading: false
-      }
-    } catch (error) {
-      console.error(`Error checking ${dateStr}:`, error)
-      
-      // Update progress even on error
-      const checkedCount = index + 1
-      setProgress((checkedCount / total) * 100)
-      setSearchStats(prev => ({ ...prev, checkedDays: checkedCount }))
-      
-      const dayInfo = getDayNameHebrew(dateStr)
-      
-      return {
-        date: dateStr,
-        available: false,
-        times: [],
-        dayName: dayInfo.dayName,
-        error: 'שגיאה בבדיקה',
-        loading: false
-      }
-    }
-  }
-
   const handleSearch = useCallback(async (forceRefresh = false) => {
     // Check cache first
     if (!forceRefresh && cache && cache.searchType === searchType) {
@@ -200,55 +159,38 @@ function SearchPage() {
     setResults(initialResults)
 
     try {
-      // Process dates in smaller batches with staggered start
-      const results: AppointmentResult[] = []
-      const batchSize = 6 // Optimal based on auto-check.mjs
+      // Use the batch endpoint for all dates at once
+      const dateStrings = dates.map(date => formatDateForAPI(date))
       
-      for (let i = 0; i < dates.length; i += batchSize) {
-        const batch = dates.slice(i, i + batchSize)
-        const batchStartIndex = i
-        
-        // Process batch with staggered start (100ms delay between requests)
-        const batchPromises = batch.map((date, batchIndex) => {
-          const globalIndex = batchStartIndex + batchIndex
-          const delay = batchIndex * 100
-          
-          return new Promise<void>(resolve => setTimeout(resolve, delay))
-            .then(() => checkSingleDate(formatDateForAPI(date), globalIndex, dates.length))
-        })
-        
-        const batchResults = await Promise.allSettled(batchPromises)
-        
-        batchResults.forEach((result, idx) => {
-          const globalIndex = batchStartIndex + idx
-          if (result.status === 'fulfilled') {
-            results[globalIndex] = result.value
-          } else {
-            const date = dates[globalIndex]
-            const dayInfo = getDayNameHebrew(formatDateForAPI(date))
-            results[globalIndex] = {
-              date: formatDateForAPI(date),
-              available: false,
-              times: [],
-              dayName: dayInfo.dayName,
-              error: 'שגיאה בבדיקה',
-              loading: false
-            }
+      const response = await axios.post('/api/check-appointment/batch', {
+        dates: dateStrings
+      }, {
+        timeout: 30000, // 30 seconds for batch
+        onDownloadProgress: (progressEvent) => {
+          // Update progress based on response download
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            setProgress(percentCompleted * 0.9) // Reserve 10% for processing
           }
-          
-          // Update results in real-time
-          setResults(prev => {
-            const newResults = [...prev]
-            newResults[globalIndex] = results[globalIndex]
-            return newResults
-          })
-        })
-        
-        // Small delay between batches if not the last batch
-        if (i + batchSize < dates.length) {
-          await new Promise(resolve => setTimeout(resolve, 200))
         }
-      }
+      })
+
+      // Process results
+      const results: AppointmentResult[] = response.data.results.map((result: any, index: number) => {
+        const dayInfo = getDayNameHebrew(result.date)
+        
+        // Update progress for each processed result
+        setProgress(90 + (10 * (index + 1) / response.data.results.length))
+        setSearchStats(prev => ({ ...prev, checkedDays: index + 1 }))
+        
+        return {
+          ...result,
+          dayName: dayInfo.dayName,
+          loading: false
+        }
+      })
+      
+      setResults(results)
       
       // Save to cache
       const newCache: SearchCache = {
@@ -266,7 +208,15 @@ function SearchPage() {
         toast.info('לא נמצאו תורים פנויים כרגע')
       }
     } catch (error) {
+      console.error('Search error:', error)
       toast.error('שגיאה בחיפוש')
+      
+      // Reset all results to error state
+      setResults(prev => prev.map(r => ({
+        ...r,
+        loading: false,
+        error: 'שגיאה בבדיקה'
+      })))
     } finally {
       setIsSearching(false)
       setProgress(100)
