@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Calendar, Loader2, Search, CheckCircle2, X, Zap, Clock, ExternalLink, CalendarDays, Sparkles, TrendingUp, AlertCircle, Grid, List } from 'lucide-react'
+import { Calendar, Loader2, Search, CheckCircle2, X, Zap, Clock, ExternalLink, CalendarDays, Sparkles, TrendingUp, AlertCircle, Grid, List, StopCircle } from 'lucide-react'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import axios from 'axios'
+import axios, { CancelTokenSource } from 'axios'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth-provider'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -49,6 +49,8 @@ function SearchPage() {
     openDays: 0,
     closedDays: 0
   })
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const cancelTokenRef = useRef<CancelTokenSource | null>(null)
 
   // Load cache from localStorage on mount
   useEffect(() => {
@@ -69,15 +71,34 @@ function SearchPage() {
   }, [])
 
   const formatDateForAPI = (date: Date) => {
-    // Format date in Israeli timezone to avoid UTC conversion issues
-    const israeliDate = new Date(date.toLocaleString("en-CA", { timeZone: "Asia/Jerusalem" }))
-    return israeliDate.toISOString().split('T')[0]
+    try {
+      // Ensure we have a valid date object
+      if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        console.error('Invalid date provided to formatDateForAPI:', date)
+        return null
+      }
+      
+      // Get year, month, day directly from the date object
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      
+      return `${year}-${month}-${day}`
+    } catch (error) {
+      console.error('Error formatting date:', error, date)
+      return null
+    }
   }
 
   const getDayNameHebrew = (dateStr: string) => {
+    try {
     // Parse date properly in Israeli timezone
     const [year, monthNum, day] = dateStr.split('-').map(Number)
     const date = new Date(year, monthNum - 1, day)
+      
+      if (isNaN(date.getTime())) {
+        return { dayName: 'שגיאה', dayNumber: 0, month: '' }
+      }
     
     const dayName = new Intl.DateTimeFormat('he-IL', {
       timeZone: 'Asia/Jerusalem',
@@ -95,6 +116,10 @@ function SearchPage() {
     }).format(date)
     
     return { dayName, dayNumber: parseInt(dayNumber), month: monthName }
+    } catch (error) {
+      console.error('Error getting Hebrew day name:', error, dateStr)
+      return { dayName: 'שגיאה', dayNumber: 0, month: '' }
+    }
   }
 
   const isClosedDay = (date: Date) => {
@@ -106,11 +131,16 @@ function SearchPage() {
 
   // Helper function to create dates in Israeli timezone
   const createIsraeliDate = (daysFromToday: number) => {
+    try {
     const now = new Date()
-    const israeliNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
-    israeliNow.setDate(israeliNow.getDate() + daysFromToday)
-    israeliNow.setHours(0, 0, 0, 0)
-    return israeliNow
+      const targetDate = new Date(now)
+      targetDate.setDate(targetDate.getDate() + daysFromToday)
+      targetDate.setHours(0, 0, 0, 0)
+      return targetDate
+    } catch (error) {
+      console.error('Error creating Israeli date:', error)
+      return new Date() // Return current date as fallback
+    }
   }
 
   const getOpenDays = (type: string): Date[] => {
@@ -141,7 +171,21 @@ function SearchPage() {
     return dates
   }
 
+  const cancelSearch = useCallback(() => {
+    if (cancelTokenRef.current) {
+      cancelTokenRef.current.cancel('Search cancelled by user')
+      cancelTokenRef.current = null
+    }
+    setIsSearching(false)
+    setProgress(0)
+    setSearchError(null)
+    toast.info('החיפוש בוטל')
+  }, [])
+
   const handleSearch = useCallback(async (forceRefresh = false) => {
+    // Reset error state
+    setSearchError(null)
+    
     // Check cache first
     if (!forceRefresh && cache && cache.searchType === searchType) {
       const age = Date.now() - cache.timestamp
@@ -156,6 +200,15 @@ function SearchPage() {
       }
     }
 
+    // Cancel any existing search
+    if (cancelTokenRef.current) {
+      cancelTokenRef.current.cancel()
+    }
+
+    // Create new cancel token
+    const source = axios.CancelToken.source()
+    cancelTokenRef.current = source
+
     // Haptic feedback for mobile
     if ('vibrate' in navigator) {
       navigator.vibrate(10)
@@ -164,13 +217,22 @@ function SearchPage() {
     setIsSearching(true)
     setIsUsingCache(false)
     setProgress(0)
+    
+    try {
     const dates = getOpenDays(searchType)
+      
+      // Validate and format dates
+      const validDates = dates.map(date => formatDateForAPI(date)).filter(date => date !== null)
+      
+      if (validDates.length === 0) {
+        throw new Error('לא ניתן לעבד את התאריכים המבוקשים')
+      }
     
     // Initialize results with loading states
-    const initialResults = dates.map(date => {
-      const dayInfo = getDayNameHebrew(formatDateForAPI(date))
+      const initialResults = validDates.map(dateStr => {
+        const dayInfo = getDayNameHebrew(dateStr!)
       return {
-        date: formatDateForAPI(date),
+          date: dateStr!,
         available: false,
         times: [],
         dayName: dayInfo.dayName,
@@ -179,14 +241,12 @@ function SearchPage() {
     })
     setResults(initialResults)
 
-    try {
       // Use the batch endpoint for all dates at once
-      const dateStrings = dates.map(date => formatDateForAPI(date))
-      
       const response = await axios.post('/api/check-appointment/batch', {
-        dates: dateStrings
+        dates: validDates
       }, {
         timeout: 30000, // 30 seconds for batch
+        cancelToken: source.token,
         onDownloadProgress: (progressEvent) => {
           // Update progress based on response download
           if (progressEvent.total) {
@@ -228,9 +288,17 @@ function SearchPage() {
       } else {
         toast.info('לא נמצאו תורים פנויים כרגע')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error)
-      toast.error('שגיאה בחיפוש')
+      
+      if (axios.isCancel(error)) {
+        // Search was cancelled by user
+        return
+      }
+      
+      const errorMessage = error.response?.data?.error || error.message || 'שגיאה בחיפוש'
+      setSearchError(errorMessage)
+      toast.error(errorMessage)
       
       // Reset all results to error state
       setResults(prev => prev.map(r => ({
@@ -241,6 +309,14 @@ function SearchPage() {
     } finally {
       setIsSearching(false)
       setProgress(100)
+      cancelTokenRef.current = null
+      
+      // Reset progress after a short delay
+      setTimeout(() => {
+        if (!isSearching) {
+          setProgress(0)
+        }
+      }, 1000)
     }
   }, [searchType, cache])
 
@@ -251,6 +327,7 @@ function SearchPage() {
   // Calendar helper functions
   const getResultForDate = (date: Date) => {
     const dateStr = formatDateForAPI(date)
+    if (!dateStr) return null
     return results.find(r => r.date === dateStr)
   }
 
@@ -285,7 +362,13 @@ function SearchPage() {
   const getDayTooltipContent = (date: Date) => {
     const result = getResultForDate(date)
     const isClosed = isClosedDay(date)
-    const dayInfo = getDayNameHebrew(formatDateForAPI(date))
+    const dateStr = formatDateForAPI(date)
+    
+    if (!dateStr) {
+      return 'תאריך לא תקין'
+    }
+    
+    const dayInfo = getDayNameHebrew(dateStr)
     
     if (isClosed) {
       return `${dayInfo.dayName} - יום סגור`
@@ -400,6 +483,19 @@ function SearchPage() {
                   )}
                 </Button>
 
+                {/* Cancel button */}
+                {isSearching && (
+                  <Button
+                    onClick={cancelSearch}
+                    variant="outline"
+                    className="w-full h-10 text-base border-red-300 hover:bg-red-50 hover:border-red-400 dark:border-red-700 dark:hover:bg-red-950/50"
+                    size="lg"
+                  >
+                    <StopCircle className="ml-2 h-4 w-4" />
+                    עצור חיפוש
+                  </Button>
+                )}
+
                 {/* View Toggle */}
                 {results.length > 0 && !isSearching && (
                   <div className="grid grid-cols-2 gap-2 p-2 bg-gradient-to-r from-background to-muted/20 rounded-xl border shadow-sm">
@@ -449,6 +545,16 @@ function SearchPage() {
                   </div>
                   <Progress value={progress} className="h-2" />
                 </motion.div>
+              )}
+
+              {/* Error state */}
+              {searchError && !isSearching && (
+                <Alert variant="destructive" className="mt-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {searchError}
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
           </CardContent>

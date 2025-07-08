@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { registerSchema } from '@/lib/auth/validation'
 import { hashPassword } from '@/lib/auth/password'
 import { generateTokens, setAuthCookies } from '@/lib/auth/jwt'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabaseAdmin } from '@/lib/supabase/client'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Register request received')
+    
     const body = await request.json()
     
     // Validate input
@@ -23,13 +20,32 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password } = validationResult.data
+    console.log('Attempting to register user:', email)
 
     // Check if user already exists
-    const { data: existingUser, error: checkError } = await supabase
+    const { data: existingUser, error: checkError } = await supabaseAdmin
       .from('users')
       .select('id, password')
       .eq('email', email)
       .single()
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // Database error (not "no rows found")
+      console.error('Database error checking existing user:', {
+        code: checkError.code,
+        message: checkError.message,
+        details: checkError.details,
+        hint: checkError.hint
+      })
+      
+      return NextResponse.json(
+        { 
+          error: 'שגיאת מסד נתונים',
+          details: process.env.NODE_ENV === 'development' ? checkError : undefined
+        },
+        { status: 500 }
+      )
+    }
 
     if (existingUser && existingUser.password) {
       return NextResponse.json(
@@ -38,6 +54,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('Hashing password...')
     // Hash password
     const hashedPassword = await hashPassword(password)
 
@@ -45,7 +62,9 @@ export async function POST(request: NextRequest) {
 
     // If user exists without password, update their password
     if (existingUser && !existingUser.password) {
-      const { data: updatedUser, error: updateError } = await supabase
+      console.log('Updating existing user password...')
+      
+      const { data: updatedUser, error: updateError } = await supabaseAdmin
         .from('users')
         .update({
           password: hashedPassword,
@@ -56,17 +75,28 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (updateError || !updatedUser) {
-        console.error('Error updating user:', updateError)
+        console.error('Error updating user:', {
+          error: updateError,
+          message: updateError?.message,
+          details: updateError?.details,
+          hint: updateError?.hint,
+          code: updateError?.code
+        })
         return NextResponse.json(
-          { error: 'שגיאה בעדכון משתמש' },
+          { 
+            error: 'שגיאה בעדכון משתמש',
+            details: process.env.NODE_ENV === 'development' ? updateError : undefined
+          },
           { status: 500 }
         )
       }
       
       user = updatedUser
     } else {
+      console.log('Creating new user...')
+      
       // Create new user
-      const { data: newUser, error: createError } = await supabase
+      const { data: newUser, error: createError } = await supabaseAdmin
         .from('users')
         .insert({
           email,
@@ -78,15 +108,26 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createError || !newUser) {
-        console.error('Error creating user:', createError)
+        console.error('Error creating user:', {
+          error: createError,
+          message: createError?.message,
+          details: createError?.details,
+          hint: createError?.hint,
+          code: createError?.code
+        })
         return NextResponse.json(
-          { error: 'שגיאה ביצירת משתמש' },
+          { 
+            error: 'שגיאה ביצירת משתמש',
+            details: process.env.NODE_ENV === 'development' ? createError : undefined
+          },
           { status: 500 }
         )
       }
       
       user = newUser
     }
+
+    console.log('User created/updated, generating tokens...')
 
     // Generate tokens
     const tokens = await generateTokens({
@@ -95,7 +136,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Update refresh token
-    await supabase
+    const { error: refreshError } = await supabaseAdmin
       .from('users')
       .update({ 
         refresh_token: tokens.refreshToken,
@@ -103,8 +144,15 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', user.id)
 
+    if (refreshError) {
+      console.error('Error updating refresh token:', refreshError)
+      // Don't fail the registration if refresh token update fails
+    }
+
     // Set cookies
     await setAuthCookies(tokens)
+
+    console.log('Registration successful for user:', email)
 
     return NextResponse.json({
       success: true,
@@ -118,8 +166,18 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Register error:', error)
+    
+    const errorDetails = error instanceof Error ? {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    } : { message: String(error) }
+    
     return NextResponse.json(
-      { error: 'שגיאת שרת פנימית' },
+      { 
+        error: 'שגיאת שרת פנימית',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+      },
       { status: 500 }
     )
   }

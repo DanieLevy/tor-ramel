@@ -1082,4 +1082,281 @@ ${declineUrl}
   `
   
   return { html, text }
+}
+
+export function generatePasswordResetOTPEmail(otp: string, email: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+  
+  return `
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>קוד אימות לאיפוס סיסמה - תור רם-אל</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #000000;
+      background-color: #ffffff;
+      direction: rtl;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    .container {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+    
+    .logo {
+      display: inline-block;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+    }
+    
+    .logo img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: block;
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .subtitle {
+      font-size: 16px;
+      color: #666666;
+    }
+    
+    .otp-container {
+      background-color: #f5f5f5;
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
+      text-align: center;
+      border: 2px solid #e5e5e5;
+    }
+    
+    .otp-label {
+      font-size: 14px;
+      color: #666666;
+      margin-bottom: 16px;
+    }
+    
+    .otp-code {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 8px;
+      color: #000000;
+      font-family: 'Courier New', monospace;
+      background-color: #ffffff;
+      padding: 16px 24px;
+      border-radius: 8px;
+      display: inline-block;
+      border: 2px solid #000000;
+      margin-bottom: 16px;
+    }
+    
+    .expiry-notice {
+      font-size: 14px;
+      color: #ef4444;
+      font-weight: 500;
+    }
+    
+    .instructions {
+      margin-bottom: 32px;
+      padding: 0 16px;
+    }
+    
+    .instructions p {
+      font-size: 16px;
+      color: #333333;
+      margin-bottom: 16px;
+    }
+    
+    .steps {
+      background-color: #fafafa;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .step-number {
+      display: inline-block;
+      min-width: 28px;
+      height: 28px;
+      background-color: #000000;
+      color: #ffffff;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-size: 14px;
+      font-weight: 600;
+      margin-left: 12px;
+    }
+    
+    .step-text {
+      font-size: 15px;
+      color: #333333;
+      flex: 1;
+    }
+    
+    .security-notice {
+      padding: 16px;
+      background-color: #fef3c7;
+      border-radius: 8px;
+      border: 1px solid #fcd34d;
+      margin-bottom: 32px;
+    }
+    
+    .security-notice-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #92400e;
+      margin-bottom: 8px;
+    }
+    
+    .security-notice-text {
+      font-size: 14px;
+      color: #92400e;
+    }
+    
+    .button {
+      display: inline-block;
+      padding: 16px 32px;
+      background-color: #000000;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 500;
+      text-align: center;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 14px;
+      color: #999999;
+      padding-top: 32px;
+      border-top: 1px solid #e5e5e5;
+    }
+    
+    .footer a {
+      color: #666666;
+      text-decoration: none;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    
+    @media only screen and (max-width: 600px) {
+      .container {
+        padding: 32px 16px;
+      }
+      
+      h1 {
+        font-size: 20px;
+      }
+      
+      .otp-code {
+        font-size: 28px;
+        letter-spacing: 6px;
+        padding: 12px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+      </div>
+      <h1>איפוס סיסמה</h1>
+      <p class="subtitle">קוד אימות חד-פעמי</p>
+    </div>
+    
+    <div class="otp-container">
+      <div class="otp-label">הקוד שלך:</div>
+      <div class="otp-code">${otp}</div>
+      <div class="expiry-notice">⏱️ תקף ל-10 דקות</div>
+    </div>
+    
+    <div class="instructions">
+      <p>ביקשת לאפס את הסיסמה שלך למערכת תור רם-אל.</p>
+      
+      <div class="steps">
+        <div class="step">
+          <span class="step-number">1</span>
+          <span class="step-text">חזור לעמוד האיפוס במערכת</span>
+        </div>
+        <div class="step">
+          <span class="step-number">2</span>
+          <span class="step-text">הזן את קוד האימות המופיע למעלה</span>
+        </div>
+        <div class="step">
+          <span class="step-number">3</span>
+          <span class="step-text">הגדר סיסמה חדשה</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="security-notice">
+      <div class="security-notice-title">⚠️ לתשומת לבך</div>
+      <div class="security-notice-text">
+        אם לא ביקשת לאפס את הסיסמה שלך, אנא התעלם מהודעה זו. החשבון שלך בטוח ולא בוצעו בו שינויים.
+      </div>
+    </div>
+    
+    <center>
+      <a href="${baseUrl}/login" class="button">
+        עבור לעמוד ההתחברות
+      </a>
+    </center>
+    
+    <div class="footer">
+      <p>נשלח עבור: ${email}</p>
+      <p style="margin-top: 8px;">
+        <a href="${baseUrl}">תור רם-אל</a> • 
+        <a href="${baseUrl}/subscribe">ניהול התראות</a>
+      </p>
+      <p style="margin-top: 16px; font-size: 12px; color: #cccccc;">
+        © 2025 תור רם-אל - כל הזכויות שמורות
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `
 } 

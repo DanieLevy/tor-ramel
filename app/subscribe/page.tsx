@@ -29,6 +29,7 @@ interface Subscription {
 
 function SubscribePage() {
   const { user } = useAuth()
+  const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: undefined,
@@ -51,8 +52,14 @@ function SubscribePage() {
   const [editLoading, setEditLoading] = useState(false)
 
   useEffect(() => {
-    fetchSubscriptions()
+    setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (mounted) {
+      fetchSubscriptions()
+    }
+  }, [mounted])
 
   useEffect(() => {
     if (editingSubscription) {
@@ -383,14 +390,10 @@ function SubscribePage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setTab(option.value as any)}
-                    className={cn(
-                      "relative py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200",
-                      tab === option.value
-                        ? "text-white"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
+                    className="relative py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 data-[active=true]:text-white data-[active=false]:text-muted-foreground data-[active=false]:hover:text-foreground"
+                    data-active={mounted ? (tab === option.value).toString() : "false"}
                   >
-                    {tab === option.value && (
+                    {mounted && tab === option.value && (
                       <motion.div 
                         layoutId="activeSubscriptionTab"
                         className={cn("absolute inset-0 rounded-lg bg-gradient-to-r", option.color)}
@@ -411,14 +414,11 @@ function SubscribePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn(
-                          "w-full justify-between text-right h-12 border-2 flex-row-reverse",
-                          !selectedDate && "text-muted-foreground",
-                          selectedDate && "border-primary"
-                        )}
+                        className="w-full justify-end text-right h-12 border-2 flex-row-reverse data-[state=selected]:border-primary data-[state=empty]:text-muted-foreground"
+                        data-state={mounted && selectedDate ? "selected" : "empty"}
                       >
                         <Calendar className="mr-2 h-4 w-4" />
-                        {selectedDate ? (
+                        {mounted && selectedDate ? (
                           format(selectedDate, "EEEE, dd בMMMM yyyy", { locale: he })
                         ) : (
                           "לחץ לבחירת תאריך"
@@ -437,7 +437,7 @@ function SubscribePage() {
                     </PopoverContent>
                   </Popover>
                   
-                  {selectedDate && (
+                  {mounted && selectedDate && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -457,14 +457,11 @@ function SubscribePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn(
-                          "w-full justify-between text-right h-12 border-2 flex-row-reverse",
-                          !dateRange.from && "text-muted-foreground",
-                          dateRange.from && "border-primary"
-                        )}
+                        className="w-full justify-between text-right h-12 border-2 flex-row-reverse data-[state=selected]:border-primary data-[state=empty]:text-muted-foreground"
+                        data-state={mounted && dateRange.from ? "selected" : "empty"}
                       >
                         <CalendarDays className="mr-2 h-4 w-4" />
-                        {dateRange.from ? (
+                        {mounted && dateRange.from ? (
                           dateRange.to ? (
                             <>
                               {format(dateRange.from, "dd/MM/yyyy")} -{" "}
@@ -491,7 +488,7 @@ function SubscribePage() {
                     </PopoverContent>
                   </Popover>
                   
-                  {dateRange.from && (
+                  {mounted && dateRange.from && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -697,13 +694,11 @@ function SubscribePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn(
-                          "w-full justify-start text-right",
-                          !editSelectedDate && "text-muted-foreground"
-                        )}
+                        className="w-full justify-start text-right data-[state=empty]:text-muted-foreground"
+                        data-state={mounted && editSelectedDate ? "selected" : "empty"}
                       >
                         <Calendar className="ml-2 h-4 w-4" />
-                        {editSelectedDate ? (
+                        {mounted && editSelectedDate ? (
                           format(editSelectedDate, "dd/MM/yyyy")
                         ) : (
                           "בחר תאריך"
@@ -728,13 +723,11 @@ function SubscribePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className={cn(
-                          "w-full justify-start text-right",
-                          !editDateRange.from && "text-muted-foreground"
-                        )}
+                        className="w-full justify-start text-right data-[state=empty]:text-muted-foreground"
+                        data-state={mounted && editDateRange.from ? "selected" : "empty"}
                       >
                         <CalendarDays className="ml-2 h-4 w-4" />
-                        {editDateRange.from ? (
+                        {mounted && editDateRange.from ? (
                           editDateRange.to ? (
                             <>
                               {format(editDateRange.from, "dd/MM/yyyy")} -{" "}

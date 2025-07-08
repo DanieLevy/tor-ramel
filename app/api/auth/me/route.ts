@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/auth/jwt'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabaseAdmin } from '@/lib/supabase/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user details from database
-    const { data: userDetails, error } = await supabase
+    const { data: userDetails, error } = await supabaseAdmin
       .from('users')
       .select('id, email, created_at, last_login')
       .eq('id', user.userId)

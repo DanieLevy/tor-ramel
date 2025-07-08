@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { loginSchema } from '@/lib/auth/validation'
 import { verifyPassword } from '@/lib/auth/password'
 import { generateTokens, setAuthCookies } from '@/lib/auth/jwt'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabaseAdmin } from '@/lib/supabase/client'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Login request received')
+    
     const body = await request.json()
     
     // Validate input
@@ -23,15 +20,39 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password } = validationResult.data
+    console.log('Attempting login for email:', email)
 
     // Check if user exists
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('id, email, password')
       .eq('email', email)
       .single()
 
-    if (userError || !user) {
+    if (userError) {
+      console.error('Database error during login:', {
+        code: userError.code,
+        message: userError.message,
+        details: userError.details,
+        hint: userError.hint
+      })
+      
+      if (userError.code === 'PGRST116') {
+        // No user found
+        return NextResponse.json(
+          { error: 'אימייל או סיסמה שגויים' },
+          { status: 401 }
+        )
+      }
+      
+      // Other database error
+      return NextResponse.json(
+        { error: 'שגיאת מסד נתונים' },
+        { status: 500 }
+      )
+    }
+
+    if (!user) {
       return NextResponse.json(
         { error: 'אימייל או סיסמה שגויים' },
         { status: 401 }
@@ -49,11 +70,14 @@ export async function POST(request: NextRequest) {
     // Verify password
     const passwordValid = await verifyPassword(password, user.password)
     if (!passwordValid) {
+      console.log('Invalid password for user:', email)
       return NextResponse.json(
         { error: 'אימייל או סיסמה שגויים' },
         { status: 401 }
       )
     }
+
+    console.log('Password verified, generating tokens...')
 
     // Generate tokens
     const tokens = await generateTokens({
@@ -62,7 +86,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Update refresh token in database
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ 
         refresh_token: tokens.refreshToken,
@@ -72,10 +96,13 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating refresh token:', updateError)
+      // Don't fail the login if refresh token update fails
     }
 
     // Set cookies
     await setAuthCookies(tokens)
+
+    console.log('Login successful for user:', email)
 
     return NextResponse.json({
       success: true,
@@ -86,8 +113,18 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Login error:', error)
+    
+    const errorDetails = error instanceof Error ? {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    } : { message: String(error) }
+    
     return NextResponse.json(
-      { error: 'שגיאת שרת פנימית' },
+      { 
+        error: 'שגיאת שרת פנימית',
+        details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
+      },
       { status: 500 }
     )
   }

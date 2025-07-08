@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail, KeyRound, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth-provider'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,6 +17,16 @@ export default function LoginPage() {
   const [emailValid, setEmailValid] = useState<boolean | null>(null)
   const [passwordVisible, setPasswordVisible] = useState(false)
   const { login } = useAuth()
+
+  // Forgot password states
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetStep, setResetStep] = useState<'email' | 'otp' | 'password'>('email')
+  const [otp, setOtp] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetToken, setResetToken] = useState('')
+  const [isResetting, setIsResetting] = useState(false)
 
   const validateEmail = (value: string) => {
     const emailRegex = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i
@@ -59,6 +71,108 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Forgot password handlers
+  const handleSendOTP = async () => {
+    if (!resetEmail) return
+    
+    setIsResetting(true)
+    
+    try {
+      const response = await fetch('/api/auth/send-reset-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast.success('קוד אימות נשלח לאימייל שלך')
+        setResetStep('otp')
+      } else {
+        toast.error(data.error || 'שגיאה בשליחת קוד אימות')
+      }
+    } catch (error) {
+      toast.error('שגיאה בשליחת קוד אימות')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  const handleVerifyOTP = async () => {
+    if (otp.length !== 6) return
+    
+    setIsResetting(true)
+    
+    try {
+      const response = await fetch('/api/auth/verify-reset-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, otp })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast.success('קוד האימות אומת בהצלחה')
+        setResetToken(data.resetToken)
+        setResetStep('password')
+      } else {
+        toast.error(data.error || 'קוד אימות שגוי')
+      }
+    } catch (error) {
+      toast.error('שגיאה באימות הקוד')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('הסיסמה חייבת להכיל לפחות 6 תווים')
+      return
+    }
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('הסיסמאות אינן תואמות')
+      return
+    }
+    
+    setIsResetting(true)
+    
+    try {
+      const response = await fetch('/api/auth/reset-password-with-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetToken, newPassword })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast.success('הסיסמה שונתה בהצלחה!')
+        resetForgotPasswordDialog()
+        setEmail(resetEmail) // Set email in login form
+      } else {
+        toast.error(data.error || 'שגיאה בשינוי הסיסמה')
+      }
+    } catch (error) {
+      toast.error('שגיאה בשינוי הסיסמה')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  const resetForgotPasswordDialog = () => {
+    setShowForgotPassword(false)
+    setResetEmail('')
+    setResetStep('email')
+    setOtp('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setResetToken('')
   }
 
   return (
@@ -107,9 +221,18 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium">
-              סיסמה
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="text-sm font-medium">
+                סיסמה
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-xs text-primary hover:text-primary/80 transition-colors"
+              >
+                שכחתי סיסמה
+              </button>
+            </div>
             <div className="relative">
               <input
                 id="password"
@@ -160,6 +283,174 @@ export default function LoginPage() {
             אין לך חשבון? הירשם כאן
           </Link>
         </div>
+
+        {/* Forgot Password Dialog */}
+        <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-center">איפוס סיסמה</DialogTitle>
+              <DialogDescription className="text-center">
+                {resetStep === 'email' && 'הזן את כתובת האימייל שלך ונשלח לך קוד אימות'}
+                {resetStep === 'otp' && 'הזן את קוד האימות שנשלח לאימייל שלך'}
+                {resetStep === 'password' && 'הגדר סיסמה חדשה לחשבון שלך'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {resetStep === 'email' && (
+                <>
+                  <div className="space-y-2">
+                    <label htmlFor="reset-email" className="text-sm font-medium">
+                      כתובת אימייל
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        id="reset-email"
+                        type="email"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                        placeholder="your@email.com"
+                        dir="ltr"
+                        autoComplete="email"
+                        disabled={isResetting}
+                      />
+                    </div>
+                  </div>
+                  
+                  <Button
+                    onClick={handleSendOTP}
+                    disabled={!resetEmail || isResetting}
+                    className="w-full"
+                  >
+                    {isResetting ? (
+                      <>
+                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        שולח...
+                      </>
+                    ) : (
+                      'שלח קוד אימות'
+                    )}
+                  </Button>
+                </>
+              )}
+              
+              {resetStep === 'otp' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-center block">
+                      הזן קוד אימות
+                    </label>
+                    <div className="flex justify-center">
+                      <InputOTP
+                        value={otp}
+                        onChange={setOtp}
+                        maxLength={6}
+                        disabled={isResetting}
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      הקוד נשלח אל: {resetEmail}
+                    </p>
+                  </div>
+                  
+                  <Button
+                    onClick={handleVerifyOTP}
+                    disabled={otp.length !== 6 || isResetting}
+                    className="w-full"
+                  >
+                    {isResetting ? (
+                      <>
+                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        מאמת...
+                      </>
+                    ) : (
+                      'אמת קוד'
+                    )}
+                  </Button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setResetStep('email')}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-center"
+                    disabled={isResetting}
+                  >
+                    חזור
+                  </button>
+                </>
+              )}
+              
+              {resetStep === 'password' && (
+                <>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="new-password" className="text-sm font-medium">
+                        סיסמה חדשה
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input
+                          id="new-password"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                          placeholder="הזן סיסמה חדשה"
+                          minLength={6}
+                          disabled={isResetting}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label htmlFor="confirm-password" className="text-sm font-medium">
+                        אימות סיסמה
+                      </label>
+                      <div className="relative">
+                        <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <input
+                          id="confirm-password"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                          placeholder="הזן סיסמה שוב"
+                          minLength={6}
+                          disabled={isResetting}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    onClick={handleResetPassword}
+                    disabled={!newPassword || !confirmPassword || isResetting}
+                    className="w-full"
+                  >
+                    {isResetting ? (
+                      <>
+                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        משנה סיסמה...
+                      </>
+                    ) : (
+                      'שנה סיסמה'
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
