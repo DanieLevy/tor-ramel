@@ -1,9 +1,9 @@
 // Service Worker for Tor-Ramel PWA
-// Version 3.13 - Enhanced font loading for PWA
-const SW_VERSION = '2025-01-29-v3.13'
-const CACHE_NAME = 'tor-ramel-v3.13'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v23';
-const API_CACHE = 'tor-ramel-api-v23';
+// Version 3.14 - Enhanced authentication handling
+const SW_VERSION = '2025-01-29-v3.14'
+const CACHE_NAME = 'tor-ramel-v3.14'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v24';
+const API_CACHE = 'tor-ramel-api-v24';
 const FONT_CACHE = 'tor-ramel-fonts-v1';
 
 // Critical fonts to preload
@@ -118,9 +118,9 @@ self.addEventListener('fetch', (event) => {
       return;
     }
     
-    // For other API calls, use network first with shorter cache
+    // For other API calls, use network first with auth handling
     event.respondWith(
-      networkFirst(request, API_CACHE, 1 * 60 * 1000) // 1 minute cache only
+      networkFirstWithAuth(request, API_CACHE, 1 * 60 * 1000) // 1 minute cache only
     );
     return;
   }
@@ -135,9 +135,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML pages - Network first, cache fallback, offline page as last resort
+  // HTML pages - Network first with auth handling, cache fallback, offline page as last resort
   event.respondWith(
-    networkFirst(request, DYNAMIC_CACHE, 60 * 60 * 1000) // 1 hour cache
+    networkFirstWithAuth(request, DYNAMIC_CACHE, 60 * 60 * 1000) // 1 hour cache
       .catch(() => caches.match('/offline'))
   );
 });
@@ -172,6 +172,57 @@ async function networkFirst(request, cacheName, maxAge) {
     const response = await fetch(request, {
       credentials: 'include' // Ensure cookies are sent
     });
+    
+    // Handle authentication errors
+    if (response.status === 401) {
+      console.log('[SW] Received 401, clearing auth-related caches');
+      // Clear API cache on auth failure
+      await caches.delete(API_CACHE);
+      // Don't cache 401 responses
+      return response;
+    }
+    
+    // Only cache GET requests with successful responses
+    if (response.ok && request.method === 'GET') {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    
+    return response;
+  } catch (error) {
+    console.log('[SW] Network failed, trying cache:', request.url);
+    
+    // Only try cache for GET requests
+    if (request.method === 'GET') {
+      const cache = await caches.open(cacheName);
+      const cached = await cache.match(request);
+      
+      if (cached) {
+        // Check if cache is still fresh
+        const cachedDate = new Date(cached.headers.get('date'));
+        if (Date.now() - cachedDate.getTime() < maxAge) {
+          return cached;
+        }
+      }
+    }
+    
+    throw error;
+  }
+}
+
+// New network first strategy with authentication handling
+async function networkFirstWithAuth(request, cacheName, maxAge) {
+  try {
+    const response = await fetch(request, {
+      credentials: 'include' // Ensure cookies are sent
+    });
+    
+    // Handle authentication errors
+    if (response.status === 401) {
+      console.log('[SW] Received 401 for:', request.url);
+      // Don't cache 401 responses
+      return response;
+    }
     
     // Only cache GET requests with successful responses
     if (response.ok && request.method === 'GET') {
@@ -265,6 +316,19 @@ self.addEventListener('message', (event) => {
             return caches.delete(cacheName);
           })
         );
+      })
+    );
+  }
+  
+  // Handle logout - clear auth-sensitive caches
+  if (event.data && event.data.type === 'LOGOUT') {
+    console.log('[SW] Handling logout, clearing auth-sensitive caches');
+    event.waitUntil(
+      Promise.all([
+        caches.delete(API_CACHE),
+        caches.delete(DYNAMIC_CACHE)
+      ]).then(() => {
+        console.log('[SW] Auth-sensitive caches cleared');
       })
     );
   }

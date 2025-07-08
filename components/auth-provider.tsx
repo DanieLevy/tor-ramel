@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { fetchWithAuth, fetchJSON } from '@/lib/auth/fetch-wrapper'
 
 interface User {
   id: string
@@ -29,9 +30,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
+  // Set up periodic token refresh
+  useEffect(() => {
+    if (!user) {
+      return
+    }
+
+    // Refresh token every 12 hours (before the 24-hour expiration)
+    const refreshInterval = 12 * 60 * 60 * 1000 // 12 hours in milliseconds
+    
+    console.log('⏰ Setting up periodic token refresh (every 12 hours)')
+    
+    const intervalId = setInterval(() => {
+      console.log('🔄 Performing periodic token refresh...')
+      refreshAuth()
+    }, refreshInterval)
+
+    // Also refresh on visibility change (when user returns to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user) {
+        console.log('👁️ Tab became visible, checking token freshness...')
+        // Refresh if it's been more than 6 hours since last activity
+        const lastRefresh = localStorage.getItem('lastTokenRefresh')
+        const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000)
+        
+        if (!lastRefresh || parseInt(lastRefresh) < sixHoursAgo) {
+          console.log('🔄 Token might be stale, refreshing...')
+          refreshAuth()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Cleanup
+    return () => {
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [user])
+
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const response = await fetchWithAuth('/api/auth/me')
       
       // Check if response is JSON before parsing
       const contentType = response.headers.get('content-type')
@@ -59,10 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
+    // Use regular fetch for login to avoid refresh loops
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
+      credentials: 'include'
     })
 
     if (!response.ok) {
@@ -83,10 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const register = async (email: string, password: string, confirmPassword: string) => {
+    // Use regular fetch for register to avoid refresh loops
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, confirmPassword })
+      body: JSON.stringify({ email, password, confirmPassword }),
+      credentials: 'include'
     })
 
     if (!response.ok) {
@@ -109,7 +154,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      // Use regular fetch for logout
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include' 
+      })
+      
+      // Notify service worker to clear auth-sensitive caches
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'LOGOUT'
+        })
+        console.log('🧹 Notified service worker to clear auth caches')
+      }
+      
+      // Clear local storage
+      localStorage.removeItem('lastTokenRefresh')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
@@ -120,12 +180,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAuth = async () => {
     try {
-      const response = await fetch('/api/auth/refresh', { method: 'POST' })
+      // Use regular fetch for refresh to avoid loops
+      const response = await fetch('/api/auth/refresh', { 
+        method: 'POST',
+        credentials: 'include'
+      })
       if (response.ok) {
+        // Store refresh timestamp
+        localStorage.setItem('lastTokenRefresh', Date.now().toString())
+        
         // Re-check auth status after refresh
         await checkAuth()
+        console.log('✅ Token refreshed successfully')
       } else {
         // Refresh failed, user needs to login again
+        console.error('❌ Token refresh failed')
         setUser(null)
         router.push('/login')
       }
