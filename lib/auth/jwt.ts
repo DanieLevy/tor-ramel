@@ -5,9 +5,6 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key'
 )
 
-const ACCESS_TOKEN_EXPIRES_IN = process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '1h'
-const REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_TOKEN_EXPIRES_IN || '7d'
-
 export interface JWTPayload {
   userId: string
   email: string
@@ -17,26 +14,19 @@ export interface JWTPayload {
 
 export interface AuthTokens {
   accessToken: string
-  refreshToken: string
 }
 
 /**
- * Generate JWT access and refresh tokens
+ * Generate JWT access token (no refresh token needed)
  */
 export async function generateTokens(payload: { userId: string; email: string }): Promise<AuthTokens> {
+  // Generate a long-lived access token without expiration
   const accessToken = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(ACCESS_TOKEN_EXPIRES_IN)
     .sign(JWT_SECRET)
 
-  const refreshToken = await new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(REFRESH_TOKEN_EXPIRES_IN)
-    .sign(JWT_SECRET)
-
-  return { accessToken, refreshToken }
+  return { accessToken }
 }
 
 /**
@@ -44,7 +34,10 @@ export async function generateTokens(payload: { userId: string; email: string })
  */
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      // Remove expiration check - tokens are valid until logout
+      clockTolerance: Infinity
+    })
     
     // Ensure the payload has the required fields
     if (typeof payload.userId === 'string' && typeof payload.email === 'string') {
@@ -73,21 +66,12 @@ export async function setAuthCookies(tokens: AuthTokens) {
     cookieStore.delete('tor-ramel-auth')
   }
   
-  // Set access token cookie
+  // Set access token cookie with 1 year expiration
   cookieStore.set('auth-token', tokens.accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24, // 24 hours
-    path: '/'
-  })
-  
-  // Set refresh token cookie
-  cookieStore.set('refresh-token', tokens.refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: 60 * 60 * 24 * 365, // 1 year
     path: '/'
   })
 }
@@ -98,13 +82,10 @@ export async function setAuthCookies(tokens: AuthTokens) {
 export async function clearAuthCookies() {
   const cookieStore = await cookies()
   
+  // Clear both old and new auth cookies
+  cookieStore.delete('tor-ramel-auth')
   cookieStore.delete('auth-token')
-  cookieStore.delete('refresh-token')
-  
-  // Also clear old auth cookie if it exists
-  if (cookieStore.get('tor-ramel-auth')) {
-    cookieStore.delete('tor-ramel-auth')
-  }
+  cookieStore.delete('refresh-token') // Clean up old refresh token cookie if exists
 }
 
 /**

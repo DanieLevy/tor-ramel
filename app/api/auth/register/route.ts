@@ -129,25 +129,11 @@ export async function POST(request: NextRequest) {
 
     console.log('User created/updated, generating tokens...')
 
-    // Generate tokens
+    // Generate token
     const tokens = await generateTokens({
       userId: user.id,
       email: user.email
     })
-
-    // Update refresh token
-    const { error: refreshError } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        refresh_token: tokens.refreshToken,
-        last_login: new Date().toISOString()
-      })
-      .eq('id', user.id)
-
-    if (refreshError) {
-      console.error('Error updating refresh token:', refreshError)
-      // Don't fail the registration if refresh token update fails
-    }
 
     // Set cookies
     await setAuthCookies(tokens)

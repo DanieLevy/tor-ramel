@@ -79,24 +79,23 @@ export async function POST(request: NextRequest) {
 
     console.log('Password verified, generating tokens...')
 
-    // Generate tokens
+    // Generate token
     const tokens = await generateTokens({
       userId: user.id,
       email: user.email
     })
 
-    // Update refresh token in database
+    // Update last login timestamp in database
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ 
-        refresh_token: tokens.refreshToken,
         last_login: new Date().toISOString()
       })
       .eq('id', user.id)
 
     if (updateError) {
-      console.error('Error updating refresh token:', updateError)
-      // Don't fail the login if refresh token update fails
+      console.error('Error updating last login:', updateError)
+      // Don't fail the login if update fails
     }
 
     // Set cookies
