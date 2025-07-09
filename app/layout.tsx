@@ -9,6 +9,7 @@ import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
 import { FontLoader } from "@/components/font-loader";
+import { SWUpdateNotification } from '@/components/sw-update-notification'
 
 export const metadata: Metadata = {
   title: "תור רם-אל - זימון תורים",
@@ -85,6 +86,7 @@ export default function RootLayout({
     <html lang="he" dir="rtl" suppressHydrationWarning>
       <head>
         <PWAHead />
+        <FontLoader />
       </head>
       <body
         className="antialiased font-sans"
@@ -104,6 +106,7 @@ export default function RootLayout({
                   <Header />
                   <main className="flex-1">{children}</main>
                   <BottomNav />
+                  <SWUpdateNotification />
                 </div>
               </HeaderProvider>
               <Toaster 

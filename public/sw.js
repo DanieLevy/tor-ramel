@@ -1,9 +1,9 @@
 // Service Worker for Tor-Ramel PWA
-// Version 3.16 - Fixed hydration mismatches in subscribe page
-const SW_VERSION = '2025-01-29-v3.16'
-const CACHE_NAME = 'tor-ramel-v3.16'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v24';
-const API_CACHE = 'tor-ramel-api-v24';
+// Version 4.0 - Simplified auth system + mobile-optimized email templates
+const SW_VERSION = '2025-01-29-v4.0'
+const CACHE_NAME = 'tor-ramel-v4.0'
+const DYNAMIC_CACHE = 'tor-ramel-dynamic-v25';
+const API_CACHE = 'tor-ramel-api-v25';
 const FONT_CACHE = 'tor-ramel-fonts-v1';
 
 // Critical fonts to preload

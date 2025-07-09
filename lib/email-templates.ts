@@ -32,6 +32,22 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}`
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   
+  // Group times by period
+  const groupedTimes = {
+    morning: times.filter(time => {
+      const hour = parseInt(time.split(':')[0])
+      return hour >= 6 && hour < 12
+    }),
+    afternoon: times.filter(time => {
+      const hour = parseInt(time.split(':')[0])
+      return hour >= 12 && hour < 17
+    }),
+    evening: times.filter(time => {
+      const hour = parseInt(time.split(':')[0])
+      return hour >= 17 && hour < 22
+    })
+  }
+  
   const html = `
 <!DOCTYPE html>
 <html dir="rtl" lang="he">
@@ -48,185 +64,260 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      line-height: 1.6;
-      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+      line-height: 1.5;
+      color: #1a1a1a;
       background-color: #ffffff;
       direction: rtl;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
     
     .container {
-      max-width: 560px;
+      max-width: 400px;
       margin: 0 auto;
-      padding: 40px 20px;
+      padding: 24px 16px;
     }
     
     .header {
       text-align: center;
-      margin-bottom: 48px;
-      padding-bottom: 32px;
-      border-bottom: 1px solid #e5e5e5;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e0e0e0;
     }
     
     .logo {
       display: inline-block;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
+      width: 40px;
+      height: 40px;
+      margin-bottom: 12px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      padding: 8px;
     }
     
-    .logo img {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: block;
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #1a1a1a;
     }
     
     h1 {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 600;
-      color: #000000;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
     }
     
     .subtitle {
-      font-size: 16px;
-      color: #666666;
-    }
-    
-    .date-badge {
-      display: inline-block;
-      padding: 12px 24px;
-      background-color: #f5f5f5;
-      border-radius: 8px;
-      margin-bottom: 32px;
-      border: 1px solid #e5e5e5;
-    }
-    
-    .date-badge strong {
-      display: block;
-      font-size: 18px;
-      color: #000000;
-      margin-bottom: 4px;
-    }
-    
-    .date-badge span {
       font-size: 14px;
       color: #666666;
     }
     
-    .section {
-      margin-bottom: 32px;
+    .date-section {
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: center;
     }
     
-    .section-title {
+    .date-section strong {
+      display: block;
       font-size: 16px;
+      color: #1a1a1a;
       font-weight: 600;
-      color: #000000;
-      margin-bottom: 16px;
+      margin-bottom: 4px;
     }
     
-    .times-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+    .date-section span {
+      font-size: 14px;
+      color: #666666;
+    }
+    
+    .times-section {
       margin-bottom: 24px;
     }
     
-    .time-chip {
-      display: inline-block;
-      padding: 8px 16px;
+    .times-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    
+    .time-period {
+      margin-bottom: 16px;
+    }
+    
+    .period-label {
+      font-size: 12px;
+      color: #666666;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .times-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 8px;
+    }
+    
+    .time-slot {
+      padding: 8px 4px;
       background-color: #ffffff;
-      border: 2px solid #000000;
-      border-radius: 24px;
-      font-size: 16px;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      font-size: 14px;
       font-weight: 500;
-      color: #000000;
+      color: #1a1a1a;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    /* For many times, switch to compact list */
+    .times-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 14px;
+      color: #1a1a1a;
+      line-height: 1.8;
+    }
+    
+    .times-list .time-slot {
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 13px;
     }
     
     .actions {
-      margin: 40px 0;
-      padding: 32px 0;
-      border-top: 1px solid #e5e5e5;
-      border-bottom: 1px solid #e5e5e5;
+      margin: 32px 0 24px;
     }
     
     .button {
       display: block;
       width: 100%;
-      padding: 16px 32px;
+      padding: 14px 24px;
       margin-bottom: 12px;
       text-align: center;
       text-decoration: none;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 500;
-      border-radius: 8px;
-      transition: all 0.2s ease;
+      border-radius: 6px;
+      transition: opacity 0.2s ease;
     }
     
     .button-primary {
-      background-color: #000000;
+      background-color: #1a1a1a;
       color: #ffffff;
-      border: 2px solid #000000;
     }
     
     .button-secondary {
       background-color: #ffffff;
-      color: #000000;
-      border: 2px solid #000000;
+      color: #1a1a1a;
+      border: 1px solid #1a1a1a;
     }
     
     .notice {
-      padding: 16px;
+      padding: 12px;
       background-color: #f5f5f5;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 6px;
+      font-size: 12px;
       color: #666666;
-      margin-bottom: 32px;
-    }
-    
-    .notice strong {
-      color: #000000;
+      margin-bottom: 24px;
+      line-height: 1.5;
     }
     
     .footer {
       text-align: center;
-      font-size: 14px;
+      font-size: 12px;
       color: #999999;
-      padding-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e0e0e0;
     }
     
     .footer a {
       color: #666666;
       text-decoration: none;
+    }
+    
+    .footer-links {
+      margin-bottom: 12px;
+    }
+    
+    .footer-links a {
       margin: 0 8px;
     }
     
-    .footer a:hover {
-      text-decoration: underline;
-    }
-    
-    .divider {
-      height: 1px;
-      background-color: #e5e5e5;
-      margin: 24px 0;
-    }
-    
-    @media only screen and (max-width: 600px) {
+    @media only screen and (max-width: 400px) {
       .container {
-        padding: 32px 16px;
+        padding: 20px 12px;
       }
       
       h1 {
-        font-size: 20px;
+        font-size: 18px;
+      }
+      
+      .times-grid {
+        grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
+        gap: 6px;
       }
       
       .button {
-        font-size: 15px;
-        padding: 14px 24px;
+        font-size: 14px;
+        padding: 12px 20px;
+      }
+    }
+    
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+      }
+      
+      .header {
+        border-bottom-color: #333333;
+      }
+      
+      h1 {
+        color: #ffffff;
+      }
+      
+      .date-section {
+        background-color: #2a2a2a;
+      }
+      
+      .date-section strong {
+        color: #ffffff;
+      }
+      
+      .time-slot {
+        background-color: #1a1a1a;
+        border-color: #e0e0e0;
+        color: #e0e0e0;
+      }
+      
+      .button-primary {
+        background-color: #ffffff;
+        color: #1a1a1a;
+      }
+      
+      .button-secondary {
+        background-color: #1a1a1a;
+        color: #ffffff;
+        border-color: #ffffff;
+      }
+      
+      .notice {
+        background-color: #2a2a2a;
+      }
+      
+      .footer {
+        border-top-color: #333333;
       }
     }
   </style>
@@ -235,24 +326,43 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   <div class="container">
     <div class="header">
       <div class="logo">
-        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+        </svg>
       </div>
-      <h1>נמצאו תורים פנויים</h1>
+      <h1>תורים פנויים</h1>
       <p class="subtitle">מספרת רם-אל</p>
     </div>
     
-    <center>
-      <div class="date-badge">
-        <strong>${dayName}</strong>
-        <span>${date}</span>
-      </div>
-    </center>
+    <div class="date-section">
+      <strong>${dayName}</strong>
+      <span>${date}</span>
+    </div>
     
-    <div class="section">
-      <h2 class="section-title">שעות זמינות</h2>
-      <div class="times-container">
-        ${times.map(time => `<span class="time-chip">${time}</span>`).join('')}
-      </div>
+    <div class="times-section">
+      <h2 class="times-title">${times.length} תורים זמינים</h2>
+      
+      ${Object.entries(groupedTimes)
+        .filter(([_, times]) => times.length > 0)
+        .map(([period, periodTimes]) => {
+          const periodLabels = {
+            morning: 'בוקר',
+            afternoon: 'צהריים',
+            evening: 'ערב'
+          }
+          
+          // Use compact list for more than 6 times in a period
+          const isCompact = periodTimes.length > 6
+          
+          return `
+            <div class="time-period">
+              <div class="period-label">${periodLabels[period as keyof typeof periodLabels]} (${periodTimes.length})</div>
+              <div class="${isCompact ? 'times-list' : 'times-grid'}">
+                ${periodTimes.map(time => `<div class="time-slot">${time}</div>`).join('')}
+              </div>
+            </div>
+          `
+        }).join('')}
     </div>
     
     <div class="actions">
@@ -260,22 +370,21 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
         מצאתי תור מתאים
       </a>
       <a href="${declineUrl}" class="button button-secondary">
-        אף תור לא מתאים
+        אף תור לא מתאים לי
       </a>
     </div>
     
     <div class="notice">
-      <strong>לתשומת לבך:</strong> בחירת "אף תור לא מתאים" תמנע התראות עתידיות על השעות הללו בלבד. תמשיך לקבל התראות על שעות חדשות שיתפנו.
+      💡 בחירת "אף תור לא מתאים" תמנע התראות על השעות הללו בלבד
     </div>
     
     <div class="footer">
-      <a href="${unsubscribeUrl}">ביטול הרשמה</a>
-      <span>•</span>
-      <a href="${baseUrl}/subscribe">ניהול התראות</a>
-      <span>•</span>
-      <a href="${baseUrl}">כניסה למערכת</a>
-      <div class="divider"></div>
-      <p>© 2025 תור רם-אל</p>
+      <div class="footer-links">
+        <a href="${unsubscribeUrl}">ביטול הרשמה</a>
+        <span>•</span>
+        <a href="${baseUrl}">כניסה למערכת</a>
+      </div>
+      <div>© 2025 תור רם-אל</div>
     </div>
   </div>
 </body>
@@ -283,25 +392,22 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   `
   
   const text = `
-נמצאו תורים פנויים - תור רם-אל
+תורים פנויים - תור רם-אל
 
-תאריך: ${dayName}, ${date}
+${dayName}, ${date}
 
-שעות זמינות:
+${times.length} תורים זמינים:
 ${times.join(', ')}
-
-מה ברצונך לעשות?
 
 מצאתי תור מתאים:
 ${approveUrl}
 
-אף תור לא מתאים:
+אף תור לא מתאים לי:
 ${declineUrl}
 
-לתשומת לבך: בחירת "אף תור לא מתאים" תמנע התראות עתידיות על השעות הללו בלבד.
+💡 בחירת "אף תור לא מתאים" תמנע התראות על השעות הללו בלבד
 
 ביטול הרשמה: ${unsubscribeUrl}
-ניהול התראות: ${baseUrl}/subscribe
 
 © 2025 תור רם-אל
   `
@@ -753,17 +859,24 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
   const { appointments, subscriptionId } = data
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
   
-  // Encode all appointment data for the action URLs
-  const appointmentData = appointments.map(apt => ({
-    date: apt.date,
-    times: apt.newTimes
-  }))
-  const encodedAppointments = encodeURIComponent(JSON.stringify(appointmentData))
+  // Filter out days with no times
+  const validAppointments = appointments.filter(apt => apt.times.length > 0)
   
-  // Create URL with parameters for approve/decline actions
-  const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}&appointments=${encodedAppointments}`
-  const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&appointments=${encodedAppointments}`
+  if (validAppointments.length === 0) {
+    return { html: '', text: '' }
+  }
+  
+  // Create URL with parameters for actions
+  const allTimes = validAppointments.flatMap(apt => 
+    apt.times.map(time => `${apt.date}:${time}`)
+  ).join(',')
+  
+  const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}`
+  const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(allTimes)}`
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
+  
+  // Calculate total appointments
+  const totalAppointments = validAppointments.reduce((sum, apt) => sum + apt.times.length, 0)
   
   const html = `
 <!DOCTYPE html>
@@ -781,212 +894,309 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-      line-height: 1.6;
-      color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+      line-height: 1.5;
+      color: #1a1a1a;
       background-color: #ffffff;
       direction: rtl;
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
     
     .container {
-      max-width: 560px;
+      max-width: 400px;
       margin: 0 auto;
-      padding: 40px 20px;
+      padding: 24px 16px;
     }
     
     .header {
       text-align: center;
-      margin-bottom: 48px;
-      padding-bottom: 32px;
-      border-bottom: 1px solid #e5e5e5;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid #e0e0e0;
     }
     
     .logo {
       display: inline-block;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
+      width: 40px;
+      height: 40px;
+      margin-bottom: 12px;
+      background-color: #f5f5f5;
+      border-radius: 8px;
+      padding: 8px;
     }
     
-    .logo img {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: block;
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #1a1a1a;
     }
     
     h1 {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 600;
-      color: #000000;
-      margin-bottom: 8px;
-      letter-spacing: -0.5px;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
     }
     
     .subtitle {
-      font-size: 16px;
+      font-size: 14px;
       color: #666666;
     }
     
-    .summary-badge {
-      display: inline-block;
-      padding: 12px 24px;
+    .summary {
       background-color: #f5f5f5;
       border-radius: 8px;
-      margin-bottom: 32px;
-      border: 1px solid #e5e5e5;
+      padding: 16px;
+      margin-bottom: 24px;
+      text-align: center;
     }
     
-    .summary-badge strong {
-      font-size: 20px;
-      color: #000000;
-      margin-left: 8px;
-    }
-    
-    .summary-badge span {
-      font-size: 16px;
-      color: #666666;
-    }
-    
-    .appointment-card {
-      background-color: #fafafa;
-      border: 1px solid #e5e5e5;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-    
-    .appointment-date {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    
-    .date-info strong {
-      display: block;
-      font-size: 18px;
-      color: #000000;
+    .summary-number {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1a1a1a;
       margin-bottom: 4px;
     }
     
-    .date-info span {
+    .summary-text {
       font-size: 14px;
       color: #666666;
     }
     
-    .times-count {
-      background-color: #000000;
-      color: #ffffff;
-      padding: 4px 12px;
-      border-radius: 20px;
+    .days-container {
+      margin-bottom: 24px;
+    }
+    
+    .day-section {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .day-section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .day-info {
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+    
+    .day-count {
+      font-size: 12px;
+      color: #666666;
+      background-color: #f5f5f5;
+      padding: 2px 8px;
+      border-radius: 12px;
     }
     
     .times-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
+      gap: 6px;
     }
     
-    .time-chip {
-      display: inline-block;
-      padding: 6px 14px;
+    .time-slot {
+      padding: 6px 4px;
       background-color: #ffffff;
-      border: 1px solid #000000;
-      border-radius: 20px;
-      font-size: 14px;
+      border: 1px solid #1a1a1a;
+      border-radius: 4px;
+      font-size: 13px;
       font-weight: 500;
-      color: #000000;
+      color: #1a1a1a;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    .time-slot.new {
+      background-color: #1a1a1a;
+      color: #ffffff;
     }
     
     .actions {
-      margin: 40px 0;
-      padding: 32px 0;
-      border-top: 1px solid #e5e5e5;
-      border-bottom: 1px solid #e5e5e5;
+      margin: 32px 0 24px;
     }
     
     .button {
       display: block;
       width: 100%;
-      padding: 16px 32px;
+      padding: 14px 24px;
       margin-bottom: 12px;
       text-align: center;
       text-decoration: none;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 500;
-      border-radius: 8px;
-      transition: all 0.2s ease;
+      border-radius: 6px;
     }
     
     .button-primary {
-      background-color: #000000;
+      background-color: #1a1a1a;
       color: #ffffff;
-      border: 2px solid #000000;
     }
     
     .button-secondary {
       background-color: #ffffff;
-      color: #000000;
-      border: 2px solid #000000;
+      color: #1a1a1a;
+      border: 1px solid #1a1a1a;
     }
     
     .notice {
-      padding: 16px;
+      padding: 12px;
       background-color: #f5f5f5;
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 6px;
+      font-size: 12px;
       color: #666666;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
+      line-height: 1.5;
     }
     
-    .notice strong {
-      color: #000000;
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .legend-box {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #1a1a1a;
+      border-radius: 3px;
+    }
+    
+    .legend-box.new {
+      background-color: #1a1a1a;
     }
     
     .footer {
       text-align: center;
-      font-size: 14px;
+      font-size: 12px;
       color: #999999;
-      padding-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e0e0e0;
     }
     
     .footer a {
       color: #666666;
       text-decoration: none;
+    }
+    
+    .footer-links {
+      margin-bottom: 12px;
+    }
+    
+    .footer-links a {
       margin: 0 8px;
     }
     
-    .footer a:hover {
-      text-decoration: underline;
-    }
-    
-    .divider {
-      height: 1px;
-      background-color: #e5e5e5;
-      margin: 24px 0;
-    }
-    
-    @media only screen and (max-width: 600px) {
+    @media only screen and (max-width: 400px) {
       .container {
-        padding: 32px 16px;
+        padding: 20px 12px;
       }
       
       h1 {
-        font-size: 20px;
+        font-size: 18px;
       }
       
-      .button {
-        font-size: 15px;
-        padding: 14px 24px;
+      .times-container {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 4px;
       }
       
-      .appointment-card {
-        padding: 16px;
+      .time-slot {
+        font-size: 12px;
+        padding: 5px 2px;
+      }
+    }
+    
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1a1a1a;
+        color: #e0e0e0;
+      }
+      
+      .header {
+        border-bottom-color: #333333;
+      }
+      
+      h1 {
+        color: #ffffff;
+      }
+      
+      .summary {
+        background-color: #2a2a2a;
+      }
+      
+      .summary-number {
+        color: #ffffff;
+      }
+      
+      .day-section {
+        border-bottom-color: #333333;
+      }
+      
+      .day-info {
+        color: #ffffff;
+      }
+      
+      .day-count {
+        background-color: #2a2a2a;
+      }
+      
+      .time-slot {
+        background-color: #1a1a1a;
+        border-color: #666666;
+        color: #e0e0e0;
+      }
+      
+      .time-slot.new {
+        background-color: #ffffff;
+        color: #1a1a1a;
+      }
+      
+      .button-primary {
+        background-color: #ffffff;
+        color: #1a1a1a;
+      }
+      
+      .button-secondary {
+        background-color: #1a1a1a;
+        color: #ffffff;
+        border-color: #ffffff;
+      }
+      
+      .notice {
+        background-color: #2a2a2a;
+      }
+      
+      .legend-box {
+        border-color: #666666;
+      }
+      
+      .legend-box.new {
+        background-color: #ffffff;
+      }
+      
+      .footer {
+        border-top-color: #333333;
       }
     }
   </style>
@@ -995,35 +1205,72 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
   <div class="container">
     <div class="header">
       <div class="logo">
-        <img src="${baseUrl}/icons/icon-128x128.png" alt="תור רם-אל" width="48" height="48" style="border-radius: 12px;">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+        </svg>
       </div>
-      <h1>נמצאו תורים פנויים</h1>
+      <h1>תורים פנויים</h1>
       <p class="subtitle">מספרת רם-אל</p>
     </div>
     
-    <center>
-      <div class="summary-badge">
-        <span>נמצאו תורים ב-</span>
-        <strong>${appointments.length} ${appointments.length === 1 ? 'יום' : 'ימים'}</strong>
-      </div>
-    </center>
+    <div class="summary">
+      <div class="summary-number">${totalAppointments}</div>
+      <div class="summary-text">תורים זמינים ב-${validAppointments.length} ימים</div>
+    </div>
     
-    <div style="margin-bottom: 32px;">
-      ${appointments.map(apt => `
-        <div class="appointment-card">
-          <div class="appointment-date">
-            <div class="date-info">
-              <strong>${apt.dayName}</strong>
-              <span>${apt.date}</span>
-            </div>
-            <div class="times-count">${apt.newTimes.length} שעות</div>
-          </div>
-          <div class="times-container">
-            ${apt.newTimes.slice(0, 10).map(time => `<span class="time-chip">${time}</span>`).join('')}
-            ${apt.newTimes.length > 10 ? `<span class="time-chip">+${apt.newTimes.length - 10}</span>` : ''}
-          </div>
+    ${validAppointments.some(apt => apt.newTimes && apt.newTimes.length > 0) ? `
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-box"></div>
+          <span>תורים קיימים</span>
         </div>
-      `).join('')}
+        <div class="legend-item">
+          <div class="legend-box new"></div>
+          <span>תורים חדשים</span>
+        </div>
+      </div>
+    ` : ''}
+    
+    <div class="days-container">
+      ${validAppointments.map(apt => {
+        const date = new Date(apt.date + 'T00:00:00')
+        const dateDisplay = date.toLocaleDateString('he-IL', { 
+          weekday: 'short',
+          day: 'numeric',
+          month: 'numeric'
+        })
+        
+        // Combine all times and mark new ones
+        const allTimes = apt.times.map(time => ({ time, isNew: false }))
+        if (apt.newTimes) {
+          apt.newTimes.forEach(time => {
+            if (!apt.times.includes(time)) {
+              allTimes.push({ time, isNew: true })
+            }
+          })
+        }
+        
+        // Sort times
+        allTimes.sort((a, b) => {
+          const timeA = parseInt(a.time.replace(':', ''))
+          const timeB = parseInt(b.time.replace(':', ''))
+          return timeA - timeB
+        })
+        
+        return `
+          <div class="day-section">
+            <div class="day-header">
+              <div class="day-info">${apt.dayName}, ${dateDisplay}</div>
+              <div class="day-count">${allTimes.length} תורים</div>
+            </div>
+            <div class="times-container">
+              ${allTimes.map(({ time, isNew }) => 
+                `<div class="time-slot${isNew ? ' new' : ''}">${time}</div>`
+              ).join('')}
+            </div>
+          </div>
+        `
+      }).join('')}
     </div>
     
     <div class="actions">
@@ -1031,57 +1278,46 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
         מצאתי תור מתאים
       </a>
       <a href="${declineUrl}" class="button button-secondary">
-        אף תור לא מתאים
+        אף תור לא מתאים לי
       </a>
     </div>
     
     <div class="notice">
-      <strong>לתשומת לבך:</strong> בחירת "אף תור לא מתאים" תמנע התראות עתידיות על כל השעות המוצגות למעלה. תמשיך לקבל התראות על שעות חדשות שיתפנו.
+      💡 בחירת "אף תור לא מתאים" תמנע התראות עתידיות על כל התורים המוצגים
     </div>
     
     <div class="footer">
-      <a href="${unsubscribeUrl}">ביטול הרשמה</a>
-      <span>•</span>
-      <a href="${baseUrl}/subscribe">ניהול התראות</a>
-      <span>•</span>
-      <a href="${baseUrl}">כניסה למערכת</a>
-      <div class="divider"></div>
-      <p>© 2025 תור רם-אל</p>
+      <div class="footer-links">
+        <a href="${unsubscribeUrl}">ביטול הרשמה</a>
+        <span>•</span>
+        <a href="${baseUrl}">כניסה למערכת</a>
+      </div>
+      <div>© 2025 תור רם-אל</div>
     </div>
   </div>
 </body>
 </html>
   `
   
-  // Generate text version
-  const appointmentsList = appointments.map(apt => 
-    `${apt.dayName}, ${apt.date}:\n${apt.newTimes.join(', ')}`
-  ).join('\n\n')
+  const text = validAppointments.map(apt => {
+    return `${apt.dayName}, ${apt.date}: ${apt.times.join(', ')}`
+  }).join('\n\n')
   
-  const text = `
-נמצאו תורים פנויים - תור רם-אל
+  return { 
+    html, 
+    text: `תורים פנויים - תור רם-אל
 
-נמצאו תורים ב-${appointments.length} ${appointments.length === 1 ? 'יום' : 'ימים'}:
+נמצאו ${totalAppointments} תורים זמינים ב-${validAppointments.length} ימים:
 
-${appointmentsList}
+${text}
 
-מה ברצונך לעשות?
-
-מצאתי תור מתאים:
-${approveUrl}
-
-אף תור לא מתאים:
-${declineUrl}
-
-לתשומת לבך: בחירת "אף תור לא מתאים" תמנע התראות עתידיות על כל השעות המוצגות למעלה.
+מצאתי תור מתאים: ${approveUrl}
+אף תור לא מתאים לי: ${declineUrl}
 
 ביטול הרשמה: ${unsubscribeUrl}
-ניהול התראות: ${baseUrl}/subscribe
 
-© 2025 תור רם-אל
-  `
-  
-  return { html, text }
+© 2025 תור רם-אל` 
+  }
 }
 
 export function generatePasswordResetOTPEmail(otp: string, email: string): string {
