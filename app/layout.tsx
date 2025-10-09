@@ -9,7 +9,7 @@ import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
 import { FontLoader } from "@/components/font-loader";
-import { SWUpdateNotification } from '@/components/sw-update-notification';
+import { SwUpdateBanner } from '@/components/sw-update-banner';
 import { PushNotificationBanner } from '@/components/push-notification-banner';
 
 export const metadata: Metadata = {
@@ -107,7 +107,7 @@ export default function RootLayout({
                   <Header />
                   <main className="flex-1">{children}</main>
                   <BottomNav />
-                  <SWUpdateNotification />
+                  <SwUpdateBanner />
                   <PushNotificationBanner />
                 </div>
               </HeaderProvider>

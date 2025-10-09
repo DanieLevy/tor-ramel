@@ -1,10 +1,11 @@
 // Service Worker for Tor-Ramel PWA
-// Version 4.0 - Simplified auth system + mobile-optimized email templates
-const SW_VERSION = '2025-01-29-v4.0'
-const CACHE_NAME = 'tor-ramel-v4.0'
-const DYNAMIC_CACHE = 'tor-ramel-dynamic-v25';
-const API_CACHE = 'tor-ramel-api-v25';
-const FONT_CACHE = 'tor-ramel-fonts-v1';
+// AUTO-GENERATED VERSION - DO NOT EDIT
+const SW_VERSION = 'v1760013760483'
+const BUILD_TIME = '2025-10-09T12:42:40.483Z'
+const CACHE_NAME = `tor-ramel-${SW_VERSION}`
+const DYNAMIC_CACHE = `tor-ramel-dynamic-${SW_VERSION}`;
+const API_CACHE = `tor-ramel-api-${SW_VERSION}`;
+const FONT_CACHE = 'tor-ramel-fonts-v2';
 
 // Critical fonts to preload
 const CRITICAL_FONTS = [
@@ -360,8 +361,34 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// Broadcast version info to clients
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    clients.claim().then(() => {
+      // Notify all clients about the new version
+      return clients.matchAll({ type: 'window' }).then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_UPDATED',
+            version: SW_VERSION,
+            buildTime: BUILD_TIME
+          });
+        });
+      });
+    })
+  );
+});
+
 // Message handling for skip waiting and cache clearing
 self.addEventListener('message', (event) => {
+  // Send version info on request
+  if (event.data && event.data.type === 'GET_VERSION') {
+    event.ports[0].postMessage({
+      version: SW_VERSION,
+      buildTime: BUILD_TIME
+    });
+  }
+  
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }

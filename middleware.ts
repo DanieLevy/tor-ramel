@@ -13,6 +13,7 @@ const publicRoutes = [
   '/offline',
   '/api/auth/login',
   '/api/auth/register',
+  '/api/push/vapid-key',  // Public VAPID key for push notifications
   '/sw.js',
   '/manifest.json',
   '/browserconfig.xml',

@@ -42,6 +42,7 @@ function SubscribePage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(false)
   const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   
   // Edit modal state
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null)
@@ -236,6 +237,9 @@ function SubscribePage() {
   }
 
   const handleDelete = async (id: string) => {
+    // Add to deleting set
+    setDeletingIds(prev => new Set(prev).add(id))
+    
     try {
       const response = await pwaFetch(`/api/notifications/subscriptions/${id}`, {
         method: 'DELETE'
@@ -250,6 +254,13 @@ function SubscribePage() {
     } catch (error) {
       console.error('Delete error:', error)
       toast.error('שגיאה בביטול')
+    } finally {
+      // Remove from deleting set
+      setDeletingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
     }
   }
 
@@ -603,7 +614,11 @@ function SubscribePage() {
               <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 פעילים
               </h3>
-              <Badge variant="default" className="h-5 text-xs bg-green-600">
+              <Badge 
+                variant="default" 
+                className="h-6 px-3 text-xs font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 dark:from-green-500 dark:via-emerald-500 dark:to-teal-500 text-white border-0 shadow-lg shadow-green-500/30 dark:shadow-green-500/20"
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
                 {activeSubscriptions.length}
               </Badge>
             </div>
@@ -691,6 +706,7 @@ function SubscribePage() {
                             size="icon"
                             onClick={() => setEditingSubscription(sub)}
                               className="h-8 w-8 hover:bg-white/50 dark:hover:bg-black/20"
+                              disabled={deletingIds.has(sub.id)}
                           >
                               <Edit className="h-4 w-4" />
                           </Button>
@@ -699,8 +715,13 @@ function SubscribePage() {
                           size="icon"
                           onClick={() => handleDelete(sub.id)}
                               className="h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-600 dark:text-red-400"
+                              disabled={deletingIds.has(sub.id)}
                         >
-                              <X className="h-4 w-4" />
+                              {deletingIds.has(sub.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
                         </Button>
                           </div>
                         </div>
@@ -765,8 +786,13 @@ function SubscribePage() {
                             size="icon"
                             onClick={() => handleDelete(sub.id)}
                             className="h-7 w-7 hover:bg-red-50 dark:hover:bg-red-950/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 flex-shrink-0"
+                            disabled={deletingIds.has(sub.id)}
                           >
-                            <X className="h-3.5 w-3.5" />
+                            {deletingIds.has(sub.id) ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <X className="h-3.5 w-3.5" />
+                            )}
                           </Button>
               </div>
                       </div>
@@ -806,7 +832,7 @@ function SubscribePage() {
             <div className="grid grid-cols-2 gap-2">
               {[
                 { value: 'single' as const, label: 'תאריך בודד', icon: Calendar },
-                { value: 'range' as const, label: 'טווח', icon: CalendarDays }
+                { value: 'range' as const, label: 'טווח תאריכים', icon: CalendarDays }
               ].map((mode) => {
                 const isSelected = editDateMode === mode.value
                 const Icon = mode.icon
