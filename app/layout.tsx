@@ -106,9 +106,9 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1">{children}</main>
-                  <BottomNav />
+                  <main className="flex-1 pb-20">{children}</main>
                   <Footer />
+                  <BottomNav />
                   <SwUpdateBanner />
                   <PushNotificationBanner />
                 </div>

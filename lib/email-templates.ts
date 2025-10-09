@@ -29,7 +29,7 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
   
   // Create URL with parameters for approve/decline actions
   const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}`
-  const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(times.join(','))}&date=${date}`
+  const manageTimesUrl = `${baseUrl}/notifications` // Takes user to manage ignored times
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   
   // Group times by period
@@ -369,13 +369,13 @@ export function generateNotificationEmail(data: AppointmentData): { html: string
       <a href="${approveUrl}" class="button button-primary">
         מצאתי תור מתאים
       </a>
-      <a href="${declineUrl}" class="button button-secondary">
-        אף תור לא מתאים לי
+      <a href="${manageTimesUrl}" class="button button-secondary">
+        ניהול זמנים מתעלמים
       </a>
     </div>
     
     <div class="notice">
-      💡 בחירת "אף תור לא מתאים" תמנע התראות על השעות הללו בלבד
+      💡 ניהול הזמנים שהתעלמת מהם - בחר אילו זמנים לא מעניינים אותך
     </div>
     
     <div class="footer">
@@ -402,10 +402,10 @@ ${times.join(', ')}
 מצאתי תור מתאים:
 ${approveUrl}
 
-אף תור לא מתאים לי:
-${declineUrl}
+ניהול זמנים מתעלמים:
+${manageTimesUrl}
 
-💡 בחירת "אף תור לא מתאים" תמנע התראות על השעות הללו בלבד
+💡 ניהול הזמנים שהתעלמת מהם - בחר אילו זמנים לא מעניינים אותך
 
 ביטול הרשמה: ${unsubscribeUrl}
 
@@ -867,12 +867,8 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
   }
   
   // Create URL with parameters for actions
-  const allTimes = validAppointments.flatMap(apt => 
-    apt.times.map(time => `${apt.date}:${time}`)
-  ).join(',')
-  
   const approveUrl = `${baseUrl}/notification-action?action=approve&subscription=${subscriptionId}`
-  const declineUrl = `${baseUrl}/notification-action?action=decline&subscription=${subscriptionId}&times=${encodeURIComponent(allTimes)}`
+  const manageTimesUrl = `${baseUrl}/notifications` // Takes user to manage ignored times
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   
   // Calculate total appointments
@@ -1277,8 +1273,8 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
       <a href="${approveUrl}" class="button button-primary">
         מצאתי תור מתאים
       </a>
-      <a href="${declineUrl}" class="button button-secondary">
-        אף תור לא מתאים לי
+      <a href="${manageTimesUrl}" class="button button-secondary">
+        ניהול זמנים מתעלמים
       </a>
     </div>
     
@@ -1312,7 +1308,7 @@ export function generateMultiDateNotificationEmail(data: MultiDateAppointmentDat
 ${text}
 
 מצאתי תור מתאים: ${approveUrl}
-אף תור לא מתאים לי: ${declineUrl}
+אף תור לא מתאים לי: ${manageTimesUrl}
 
 ביטול הרשמה: ${unsubscribeUrl}
 

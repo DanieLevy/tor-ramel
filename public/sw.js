@@ -1,7 +1,7 @@
 // Service Worker for Tor-Ramel PWA
 // AUTO-GENERATED VERSION - DO NOT EDIT
-const VERSION = 'v0.3';
-const BUILD_TIME = '2025-10-09T14:45:01.290Z';
+const VERSION = 'v0.7';
+const BUILD_TIME = '2025-10-09T15:35:49.289Z';
 const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
 const DYNAMIC_CACHE = `tor-ramel-dynamic-${SW_VERSION}`;

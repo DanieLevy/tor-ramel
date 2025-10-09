@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Home, Search, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface NavItem {
   href: string
@@ -22,6 +22,45 @@ const navItems: NavItem[] = [
 export function BottomNav() {
   const pathname = usePathname()
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // Clear any existing timeout
+      clearTimeout(timeoutId)
+      
+      // Show nav when at the top
+      if (currentScrollY < 50) {
+        setIsVisible(true)
+      } else {
+        // Hide when scrolling down, show when scrolling up
+        if (currentScrollY > lastScrollY && currentScrollY > 100) {
+          setIsVisible(false)
+        } else if (currentScrollY < lastScrollY) {
+          setIsVisible(true)
+        }
+      }
+      
+      setLastScrollY(currentScrollY)
+      
+      // Auto-show after 2 seconds of no scrolling
+      timeoutId = setTimeout(() => {
+        setIsVisible(true)
+      }, 2000)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      clearTimeout(timeoutId)
+    }
+  }, [lastScrollY])
 
   // Don't show bottom nav on auth pages
   if (pathname === '/login' || pathname === '/verify-otp' || pathname === '/register') {
@@ -33,9 +72,14 @@ export function BottomNav() {
       {/* Spacer to prevent content from being hidden behind nav */}
       <div className="h-20" />
       
-      <nav className="fixed bottom-0 left-0 right-0 z-50">
-        {/* Minimal background with subtle border */}
-        <div className="absolute inset-0 bg-white/95 dark:bg-black/95 backdrop-blur-md border-t border-gray-200/20 dark:border-gray-800/20" />
+      <motion.nav 
+        className="fixed bottom-0 left-0 right-0 z-50"
+        initial={{ y: 0 }}
+        animate={{ y: isVisible ? 0 : 100 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      >
+        {/* Minimal background - NO border-top */}
+        <div className="absolute inset-0 bg-white/95 dark:bg-black/95 backdrop-blur-md" />
         
         {/* Container with safe area padding */}
         <div className="relative pb-[env(safe-area-inset-bottom)]">
@@ -146,15 +190,7 @@ export function BottomNav() {
             </div>
           </div>
         </div>
-        
-        {/* Minimal bottom indicator */}
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: 32 }}
-          className="absolute bottom-0 left-1/2 transform -translate-x-1/2 h-0.5 bg-gray-300 dark:bg-gray-700 rounded-t-full"
-          transition={{ delay: 0.5, duration: 0.8 }}
-        />
-      </nav>
+      </motion.nav>
     </>
   )
 } 

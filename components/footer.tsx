@@ -26,9 +26,9 @@ export function Footer() {
   if (!version) return null
 
   return (
-    <footer className="fixed bottom-16 left-0 right-0 z-40 pointer-events-none">
+    <footer className="w-full mt-auto py-4 border-t border-border/50 bg-background">
       <div className="container mx-auto px-4 flex justify-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/80 backdrop-blur-sm rounded-full border border-border/50 text-xs text-muted-foreground pointer-events-auto">
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
           <Code className="h-3 w-3" />
           <span className="font-mono">{version}</span>
           {buildTime && (
