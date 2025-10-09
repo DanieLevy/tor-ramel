@@ -65,6 +65,7 @@ export default function RegisterPage() {
               alt="תור רם-אל" 
               width={80}
               height={80}
+              priority
               className="rounded-3xl mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg"
             />
           </div>

@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
+  
+  // Explicitly set project root to avoid workspace inference warnings
+  outputFileTracingRoot: path.join(__dirname),
   
   // Image optimization - disable for Netlify compatibility
   images: {
@@ -69,18 +73,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ]
-  },
-  
-  async rewrites() {
-    return {
-      beforeFiles: [
-        // Prevent Next.js from handling Netlify function URLs
-        {
-          source: '/.netlify/functions/:path*',
-          destination: '/.netlify/functions/:path*',
-        },
-      ],
-    }
   },
   
   async redirects() {

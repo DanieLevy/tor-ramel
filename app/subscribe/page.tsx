@@ -76,8 +76,27 @@ function SubscribePage() {
   useEffect(() => {
     if (mounted) {
       fetchSubscriptions()
+      fetchNotificationPreference()
     }
   }, [mounted])
+  
+  const fetchNotificationPreference = async () => {
+    try {
+      const response = await pwaFetch('/api/notifications/preferences', {
+        method: 'GET',
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.notification_method) {
+          setNotificationMethod(data.notification_method)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch notification preference:', error)
+    }
+  }
 
   useEffect(() => {
     if (editingSubscription) {
@@ -138,6 +157,8 @@ function SubscribePage() {
   }
 
   const handleNotificationMethodChange = async (method: NotificationMethod) => {
+    console.log('🔔 [Subscribe Page] Changing notification method to:', method)
+    
     // If switching to push or both, need to subscribe first
     if ((method === 'push' || method === 'both') && !isPushSubscribed) {
       if (isIOS && !isPWA) {
@@ -147,13 +168,42 @@ function SubscribePage() {
       
       try {
         await subscribeToPush()
-        setNotificationMethod(method)
+        console.log('✅ [Subscribe Page] Push subscription successful')
       } catch (error) {
-        console.error('Failed to subscribe to push:', error)
+        console.error('❌ [Subscribe Page] Failed to subscribe to push:', error)
+        toast.error('שגיאה בהפעלת התראות Push')
         return
       }
-    } else {
-      setNotificationMethod(method)
+    }
+    
+    // Save preference to backend
+    console.log('💾 [Subscribe Page] Saving preference to backend...')
+    console.log('🔐 [Subscribe Page] Credentials:', document.cookie ? 'Cookies present' : 'No cookies')
+    
+    try {
+      const response = await pwaFetch('/api/notifications/preferences', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notification_method: method })
+      })
+      
+      console.log('📡 [Subscribe Page] API response status:', response.status)
+      
+      if (response.ok) {
+        setNotificationMethod(method)
+        console.log('✅ [Subscribe Page] Preference saved successfully')
+        toast.success('העדפת ההתראות נשמרה')
+      } else {
+        const error = await response.json()
+        console.error('❌ [Subscribe Page] API error:', error)
+        toast.error(error.message || 'שגיאה בשמירת העדפות')
+      }
+    } catch (error) {
+      console.error('❌ [Subscribe Page] Network error:', error)
+      toast.error('שגיאה בשמירת העדפות')
     }
   }
 
@@ -437,50 +487,88 @@ function SubscribePage() {
           )}
         </div>
 
+        {/* User Settings Card - Notification Preferences */}
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-xl p-4 border border-purple-200/50 dark:border-purple-800/30">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+              <Bell className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-0.5">
+                העדפות התראות
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                בחר איך תרצה לקבל עדכונים על תורים פנויים
+              </p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: 'email' as NotificationMethod, icon: Mail, label: 'מייל', desc: 'דוא״ל', available: true },
+              { value: 'push' as NotificationMethod, icon: Smartphone, label: 'Push', desc: 'התראות', available: pushSupported && (isPWA || !isIOS) },
+              { value: 'both' as NotificationMethod, icon: Bell, label: 'שניהם', desc: 'הכל', available: pushSupported && (isPWA || !isIOS) }
+            ].map((method) => {
+              const isSelected = notificationMethod === method.value
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.value}
+                  onClick={() => method.available && handleNotificationMethodChange(method.value)}
+                  disabled={!method.available || pushLoading}
+                  className={cn(
+                    "relative p-3 rounded-lg transition-all text-center border-2 flex flex-col items-center gap-1.5",
+                    isSelected 
+                      ? "bg-gradient-to-br from-purple-600 to-blue-600 text-white border-purple-600 dark:border-blue-600 shadow-lg scale-105" 
+                      : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-600 hover:scale-102",
+                    !method.available && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  {isSelected && (
+                    <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                      <CheckCircle className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  <Icon className={cn("h-5 w-5", isSelected ? "text-white" : "text-gray-600 dark:text-gray-400")} />
+                  <div>
+                    <span className={cn("text-xs font-bold block", isSelected ? "text-white" : "text-gray-900 dark:text-gray-100")}>{method.label}</span>
+                    <span className={cn("text-[10px] block", isSelected ? "text-purple-100" : "text-gray-500 dark:text-gray-500")}>{method.desc}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Status Message */}
+          <div className="mt-3 p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-purple-200/30 dark:border-purple-800/20">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <p className="text-xs text-gray-700 dark:text-gray-300">
+                <span className="font-semibold">ההגדרה נשמרת אוטומטית</span> ותחול על כל ההתראות החדשות
+              </p>
+            </div>
+          </div>
+
+          {/* iOS PWA Notice */}
+          {isIOS && !isPWA && (
+            <div className="mt-3 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-0.5">
+                    דרוש התקנת אפליקציה
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    התקן את האפליקציה מהדפדפן כדי לקבל התראות Push
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Main Card - Clean & Compact */}
         <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-          
-          {/* Notification Method - Compact Buttons */}
-          <div className="p-3 border-b border-gray-200 dark:border-gray-800">
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block mb-2">
-              אופן התראה
-            </label>
-            
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'email' as NotificationMethod, icon: Mail, label: 'מייל', available: true },
-                { value: 'push' as NotificationMethod, icon: Smartphone, label: 'Push', available: pushSupported && (isPWA || !isIOS) },
-                { value: 'both' as NotificationMethod, icon: Bell, label: 'שניהם', available: pushSupported && (isPWA || !isIOS) }
-              ].map((method) => {
-                const isSelected = notificationMethod === method.value
-                const Icon = method.icon
-                return (
-                  <button
-                    key={method.value}
-                    onClick={() => method.available && handleNotificationMethodChange(method.value)}
-                    disabled={!method.available || pushLoading}
-                    className={cn(
-                      "relative p-2 rounded-md transition-all text-center border",
-                      isSelected 
-                        ? "bg-black dark:bg-white text-white dark:text-black border-black dark:border-white" 
-                        : "bg-white dark:bg-black border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600",
-                      !method.available && "opacity-40 cursor-not-allowed"
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4 mx-auto mb-1", isSelected ? "" : "text-gray-600 dark:text-gray-400")} />
-                    <span className="text-xs font-medium block">{method.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* iOS PWA Notice - Minimal */}
-            {isIOS && !isPWA && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded">
-                💡 התקן את האפליקציה לקבלת Push
-              </p>
-            )}
-          </div>
           
           {/* Date Selection - Compact */}
           <div className="p-3 space-y-3">

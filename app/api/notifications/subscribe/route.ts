@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const { subscription_date, date_range_start, date_range_end } = body
+    const { subscription_date, date_range_start, date_range_end, notification_method = 'email' } = body
+    
+    console.log(`📝 [Subscribe API] Creating subscription with notification_method: ${notification_method}`)
 
     // Check for existing active subscription with same dates
     let existingSubscription
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
         subscription_date,
         date_range_start,
         date_range_end,
+        notification_method,
         is_active: true
       })
       .select()
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log(`✅ Created subscription ${newSubscription.id} for user ${user.userId}`)
+    console.log(`✅ Created subscription ${newSubscription.id} for user ${user.userId} with notification_method: ${newSubscription.notification_method}`)
 
     // Send confirmation email
     try {
