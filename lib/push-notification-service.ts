@@ -203,18 +203,18 @@ class PushNotificationService {
   }
 
   /**
-   * Save push subscription
+   * Save push subscription (requires authentication)
    */
   async savePushSubscription(data: {
-    userId: string | null;
+    userId: string;  // ✅ Required - no anonymous subscriptions
     username: string;
-    email: string | null;
+    email: string;  // ✅ Required - from authenticated user
     subscription: any;
     deviceType: 'ios' | 'android' | 'desktop';
     userAgent: string;
   }): Promise<void> {
     try {
-      console.log(`💾 [Push Service] Saving subscription for ${data.username} (${data.deviceType})`);
+      console.log(`💾 [Push Service] Saving subscription for user ${data.userId} (${data.username}, ${data.deviceType})`);
 
       const { data: existing, error: checkError } = await supabase
         .from('push_subscriptions')
@@ -240,7 +240,7 @@ class PushNotificationService {
           .eq('endpoint', data.subscription.endpoint);
 
         if (error) throw error;
-        console.log('✅ [Push Service] Subscription updated');
+        console.log('✅ [Push Service] Subscription updated for user', data.userId);
       } else {
         // Insert new subscription
         const { error } = await supabase
@@ -260,7 +260,7 @@ class PushNotificationService {
           });
 
         if (error) throw error;
-        console.log('✅ [Push Service] New subscription created');
+        console.log('✅ [Push Service] New subscription created for user', data.userId);
       }
     } catch (error) {
       console.error('❌ [Push Service] Save subscription error:', error);

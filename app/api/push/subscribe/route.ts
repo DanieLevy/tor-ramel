@@ -4,22 +4,49 @@ import { verifyToken } from '@/lib/auth/jwt';
 
 export async function POST(request: NextRequest) {
   try {
-    // Optional authentication - supports anonymous users
-    const authHeader = request.headers.get('authorization');
-    let userId: string | null = null;
-    let userEmail: string | null = null;
+    // ✅ AUTHENTICATION REQUIRED - Support both Bearer token and cookies
+    let userId: string;
+    let userEmail: string;
     
+    // Try Bearer token first
+    const authHeader = request.headers.get('authorization');
     if (authHeader) {
+      console.log('🔐 [Push Subscribe API] Using Bearer token authentication');
       try {
         const token = authHeader.replace('Bearer ', '');
         const payload = await verifyToken(token);
-        if (payload) {
-          userId = payload.userId;
-          userEmail = payload.email;
+        if (!payload) {
+          throw new Error('Invalid token');
         }
+        userId = payload.userId;
+        userEmail = payload.email;
+        console.log(`✅ [Push Subscribe API] Authenticated via Bearer token: ${userEmail}`);
       } catch (error) {
-        console.log('⚠️ [Push Subscribe API] Invalid token, continuing as anonymous');
+        console.error('❌ [Push Subscribe API] Invalid Bearer token:', error);
+        return NextResponse.json({
+          error: 'Invalid authentication token',
+          success: false,
+          requiresAuth: true
+        }, { status: 401 });
       }
+    } else {
+      // Fallback to cookie-based auth
+      console.log('🔐 [Push Subscribe API] Using cookie authentication');
+      const { getCurrentUser } = await import('@/lib/auth/jwt');
+      const user = await getCurrentUser();
+      
+      if (!user) {
+        console.error('❌ [Push Subscribe API] No authentication found - neither Bearer token nor cookies');
+        return NextResponse.json({
+          error: 'Authentication required for push notifications',
+          success: false,
+          requiresAuth: true
+        }, { status: 401 });
+      }
+      
+      userId = user.userId;
+      userEmail = user.email;
+      console.log(`✅ [Push Subscribe API] Authenticated via cookies: ${userEmail}`);
     }
 
     // Parse subscription data
@@ -43,12 +70,12 @@ export async function POST(request: NextRequest) {
     if (isIOS) deviceType = 'ios';
     else if (isAndroid) deviceType = 'android';
 
-    // User data (anonymous or authenticated)
-    const username = userName || 'משתמש אנונימי';
+    // User data from authenticated user
+    const username = userName || userEmail || 'משתמש';
 
     console.log(`📱 [Push Subscribe API] Subscription request from ${username} (${deviceType})`);
 
-    // Save subscription
+    // Save subscription (user is authenticated)
     await pushService.savePushSubscription({
       userId,
       username,
@@ -58,14 +85,14 @@ export async function POST(request: NextRequest) {
       userAgent
     });
 
-    // Send welcome notification (only for authenticated users)
-    if (userId) {
-      try {
-        await pushService.sendTestNotification(userId, username);
-      } catch (error) {
-        console.error('❌ [Push Subscribe API] Failed to send welcome notification:', error);
-        // Don't fail the subscription if welcome notification fails
-      }
+    // Send welcome notification
+    try {
+      console.log(`📧 [Push Subscribe API] Sending welcome notification to ${username}`);
+      const testResult = await pushService.sendTestNotification(userId, username);
+      console.log(`✅ [Push Subscribe API] Welcome notification sent: ${testResult.sent} sent, ${testResult.failed} failed`);
+    } catch (error) {
+      console.error('❌ [Push Subscribe API] Failed to send welcome notification:', error);
+      // Don't fail the subscription if welcome notification fails
     }
 
     console.log(`✅ [Push Subscribe API] Subscription saved successfully for ${username}`);

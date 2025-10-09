@@ -757,7 +757,7 @@ async function sendPushNotification(data) {
 
     if (!pushSubscriptions || pushSubscriptions.length === 0) {
       console.log(`⚠️ [Push] No active push subscriptions for user ${userId}`)
-      return true // Not an error, just no subscriptions
+      return false // Return false - push was NOT sent
     }
 
     console.log(`📱 [Push] Found ${pushSubscriptions.length} active push subscriptions`)
@@ -988,29 +988,42 @@ export async function processNotificationQueue(limit = 10) {
         // Get notification method preference (default to 'email' for backward compatibility)
         const notificationMethod = subscription.notification_method || 'email'
         console.log(`📬 [Queue] Notification method for subscription ${subscription.id}: ${notificationMethod}`)
+        console.log(`📬 [Queue] User: ${userEmail}, User ID: ${subscription.user_id}`)
 
         // Send notifications based on preference
         let emailSent = false
         let pushSent = false
+        let emailError = null
+        let pushError = null
 
         // Send email if method is 'email' or 'both'
         if (notificationMethod === 'email' || notificationMethod === 'both') {
-          const emailTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Email timeout')), 8000)
-          )
-          
-          const emailPromise = sendNotificationEmail(emailData)
-          emailSent = await Promise.race([emailPromise, emailTimeout])
-          
-          if (emailSent) {
-            console.log(`✅ [Queue] Email sent successfully`)
-          } else {
-            console.error(`❌ [Queue] Email failed to send`)
+          console.log(`📧 [Queue] Attempting to send email...`)
+          try {
+            const emailTimeout = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Email timeout')), 8000)
+            )
+            
+            const emailPromise = sendNotificationEmail(emailData)
+            emailSent = await Promise.race([emailPromise, emailTimeout])
+            
+            if (emailSent) {
+              console.log(`✅ [Queue] Email sent successfully to ${userEmail}`)
+            } else {
+              emailError = 'Email sending returned false'
+              console.error(`❌ [Queue] Email failed to send to ${userEmail}`)
+            }
+          } catch (error) {
+            emailError = error.message
+            console.error(`❌ [Queue] Email exception:`, error)
           }
+        } else {
+          console.log(`📧 [Queue] Email not required for method: ${notificationMethod}`)
         }
 
         // Send push notification if method is 'push' or 'both'
         if (notificationMethod === 'push' || notificationMethod === 'both') {
+          console.log(`📱 [Queue] Attempting to send push notification...`)
           // Prepare push notification data
           let pushTitle, pushBody, pushUrl
           
@@ -1024,25 +1037,46 @@ export async function processNotificationQueue(limit = 10) {
             pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscription.id}&times=${encodeURIComponent(emailData.times.join(','))}&date=${emailData.date}`
           }
           
-          pushSent = await sendPushNotification({
-            userId: subscription.user_id,
-            title: pushTitle,
-            body: pushBody,
-            url: pushUrl,
-            appointments: isGrouped ? appointments : null
-          })
-          
-          if (pushSent) {
-            console.log(`✅ [Queue] Push notification sent successfully`)
-          } else {
-            console.error(`❌ [Queue] Push notification failed to send`)
+          try {
+            pushSent = await sendPushNotification({
+              userId: subscription.user_id,
+              title: pushTitle,
+              body: pushBody,
+              url: pushUrl,
+              appointments: isGrouped ? appointments : null
+            })
+            
+            if (pushSent) {
+              console.log(`✅ [Queue] Push notification sent successfully`)
+            } else {
+              pushError = 'No active push subscriptions found for user'
+              console.error(`❌ [Queue] Push notification failed: ${pushError}`)
+            }
+          } catch (error) {
+            pushError = error.message
+            console.error(`❌ [Queue] Push notification exception:`, error)
           }
+        } else {
+          console.log(`📱 [Queue] Push not required for method: ${notificationMethod}`)
         }
 
         // Check if at least one notification method succeeded
         const notificationSent = (notificationMethod === 'email' && emailSent) || 
                                   (notificationMethod === 'push' && pushSent) || 
                                   (notificationMethod === 'both' && (emailSent || pushSent))
+        
+        // Log detailed results
+        if (notificationMethod === 'both') {
+          if (emailSent && pushSent) {
+            console.log(`✅ [Queue] Both email and push sent successfully`)
+          } else if (emailSent && !pushSent) {
+            console.warn(`⚠️ [Queue] Email sent but push failed: ${pushError}`)
+          } else if (!emailSent && pushSent) {
+            console.warn(`⚠️ [Queue] Push sent but email failed: ${emailError}`)
+          } else {
+            console.error(`❌ [Queue] Both email and push failed - Email: ${emailError}, Push: ${pushError}`)
+          }
+        }
 
         if (notificationSent) {
           // Record successful notifications
@@ -1098,12 +1132,36 @@ export async function processNotificationQueue(limit = 10) {
             .eq('id', item.id)
 
           processed++
-          const message = isGrouped 
-            ? `✅ Email sent to ${userEmail} for ${appointments.length} dates`
-            : `✅ Email sent to ${userEmail} for ${appointment_date}`
-          console.log(message)
+          let successMessage = ''
+          if (notificationMethod === 'email') {
+            successMessage = isGrouped 
+              ? `✅ Email sent to ${userEmail} for ${appointments.length} dates`
+              : `✅ Email sent to ${userEmail} for ${appointment_date}`
+          } else if (notificationMethod === 'push') {
+            successMessage = isGrouped
+              ? `✅ Push sent to ${userEmail} for ${appointments.length} dates`
+              : `✅ Push sent to ${userEmail} for ${appointment_date}`
+          } else {
+            // both
+            const methods = []
+            if (emailSent) methods.push('Email')
+            if (pushSent) methods.push('Push')
+            successMessage = isGrouped
+              ? `✅ ${methods.join(' & ')} sent to ${userEmail} for ${appointments.length} dates`
+              : `✅ ${methods.join(' & ')} sent to ${userEmail} for ${appointment_date}`
+          }
+          console.log(successMessage)
         } else {
-          throw new Error('Email sending failed')
+          // Build detailed error message
+          let errorMessage = 'Notification sending failed'
+          if (notificationMethod === 'both') {
+            errorMessage = `Both methods failed - Email: ${emailError || 'not sent'}, Push: ${pushError || 'not sent'}`
+          } else if (notificationMethod === 'email') {
+            errorMessage = `Email failed: ${emailError || 'unknown error'}`
+          } else if (notificationMethod === 'push') {
+            errorMessage = `Push failed: ${pushError || 'unknown error'}`
+          }
+          throw new Error(errorMessage)
         }
 
       } catch (error) {

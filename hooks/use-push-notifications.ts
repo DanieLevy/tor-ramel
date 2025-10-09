@@ -120,11 +120,23 @@ export const usePushNotifications = () => {
       // Get VAPID key
       console.log('🔑 [Push Hook] Fetching VAPID key...');
       const vapidResponse = await fetch('/api/push/vapid-key');
+      console.log(`📡 [Push Hook] VAPID response status: ${vapidResponse.status}`);
+      
       if (!vapidResponse.ok) {
-        throw new Error('Failed to fetch VAPID key');
+        const errorText = await vapidResponse.text();
+        console.error('❌ [Push Hook] VAPID fetch failed:', errorText.substring(0, 200));
+        throw new Error(`Failed to fetch VAPID key: ${vapidResponse.status}`);
       }
-      const { publicKey } = await vapidResponse.json();
-      console.log('✅ [Push Hook] VAPID key received');
+      
+      const vapidData = await vapidResponse.json();
+      const publicKey = vapidData.publicKey;
+      
+      if (!publicKey) {
+        console.error('❌ [Push Hook] No public key in response:', vapidData);
+        throw new Error('VAPID public key not found in response');
+      }
+      
+      console.log('✅ [Push Hook] VAPID key received:', publicKey.substring(0, 20) + '...');
 
       // Convert VAPID key
       const applicationServerKey = urlBase64ToUint8Array(publicKey);
@@ -137,8 +149,9 @@ export const usePushNotifications = () => {
       });
       console.log('✅ [Push Hook] Push subscription created');
 
-      // Get token (optional)
+      // Get token from localStorage
       const token = localStorage.getItem('token');
+      console.log('🔐 [Push Hook] Token from localStorage:', token ? `${token.substring(0, 20)}...` : 'NOT FOUND');
       
       // Save subscription to server
       console.log('💾 [Push Hook] Saving subscription to server...');
@@ -147,19 +160,26 @@ export const usePushNotifications = () => {
       };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('✅ [Push Hook] Authorization header added');
+      } else {
+        console.warn('⚠️ [Push Hook] No token found - using cookies for auth');
       }
       
       const response = await fetch('/api/push/subscribe', {
         method: 'POST',
         headers,
+        credentials: 'include', // ✅ Send cookies for authentication
         body: JSON.stringify({
           subscription: pushSubscription.toJSON()
         })
       });
 
+      console.log(`📡 [Push Hook] Subscribe response status: ${response.status}`);
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Failed to save subscription: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ [Push Hook] Subscribe failed:', errorData);
+        throw new Error(`Failed to save subscription: ${response.status} - ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
