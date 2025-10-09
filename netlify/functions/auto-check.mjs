@@ -371,6 +371,42 @@ async function saveToSupabase(results) {
 // NOTIFICATION SYSTEM
 // ============================================================================
 
+// Helper function to filter times by preferred time ranges
+function filterTimesByPreferences(times, preferredTimeRanges) {
+  if (!preferredTimeRanges || preferredTimeRanges.length === 0) {
+    return times // No filter, return all times
+  }
+  
+  return times.filter(time => {
+    // Check if time falls within any preferred range
+    return preferredTimeRanges.some(range => {
+      return time >= range.start && time <= range.end
+    })
+  })
+}
+
+// Helper function to check if current time is within quiet hours
+function isWithinQuietHours(quietHoursStart, quietHoursEnd) {
+  if (!quietHoursStart || !quietHoursEnd) {
+    return false // No quiet hours set
+  }
+  
+  const now = new Date()
+  const currentTime = now.toLocaleTimeString('en-US', { 
+    timeZone: 'Asia/Jerusalem',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+  
+  // Handle quiet hours that span midnight
+  if (quietHoursStart > quietHoursEnd) {
+    return currentTime >= quietHoursStart || currentTime <= quietHoursEnd
+  }
+  
+  return currentTime >= quietHoursStart && currentTime <= quietHoursEnd
+}
+
 // Helper function to check for pending notifications
 async function checkPendingNotifications() {
   try {
@@ -398,11 +434,12 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
   try {
     console.log('🔔 Checking notification subscriptions...')
     
-    // Get all active subscriptions
+    // Get all active subscriptions (excluding paused)
     const { data: subscriptions, error: subError } = await supabase
       .from('notification_subscriptions')
       .select('*')
       .eq('is_active', true)
+      .in('subscription_status', ['active'])
     
     if (subError) {
       console.error('Error fetching subscriptions:', subError)
@@ -429,6 +466,12 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
     // Check each subscription
     for (const subscription of subscriptions) {
       try {
+        // Check quiet hours
+        if (isWithinQuietHours(subscription.quiet_hours_start, subscription.quiet_hours_end)) {
+          console.log(`🔕 Subscription ${subscription.id} is in quiet hours, skipping`)
+          continue
+        }
+        
         let matchingDates = []
         
         if (subscription.subscription_date) {
@@ -463,17 +506,24 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
           const ignoredTimes = ignoredData ? 
             ignoredData.flatMap(d => d.ignored_times || []) : []
           
-          // Filter out ignored times
-          const newTimes = appointment.times.filter(time => !ignoredTimes.includes(time))
+          // Filter out ignored times first
+          let filteredTimes = appointment.times.filter(time => !ignoredTimes.includes(time))
+          
+          // Then filter by preferred time ranges
+          filteredTimes = filterTimesByPreferences(filteredTimes, subscription.preferred_time_ranges)
+          
+          const newTimes = filteredTimes
           
           if (newTimes.length === 0) {
-            console.log(`All times ignored for subscription ${subscription.id} on ${appointment.date}`)
+            console.log(`All times filtered out for subscription ${subscription.id} on ${appointment.date}`)
             continue
           }
           
-          // Log if some times were filtered
+          // Log filtering results
           if (newTimes.length < appointment.times.length) {
-            console.log(`📝 Filtered ${appointment.times.length - newTimes.length} ignored times for subscription ${subscription.id} on ${appointment.date}`)
+            const ignoredCount = ignoredTimes.length
+            const timeRangeCount = (appointment.times.length - ignoredTimes.length) - newTimes.length
+            console.log(`📝 Filtered ${appointment.times.length - newTimes.length} times for subscription ${subscription.id} on ${appointment.date} (ignored: ${ignoredCount}, time range: ${timeRangeCount})`)
           }
           
           // Check if notification was already sent for these exact times

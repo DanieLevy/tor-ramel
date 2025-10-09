@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Bell, Loader2, Trash2, CheckCircle, AlertCircle, CalendarDays, Search, Zap, TrendingUp, Clock, Target, Award, Activity, Sparkles, BarChart3, Calendar, Users, Shield } from 'lucide-react'
+import { Bell, Loader2, Trash2, CheckCircle, AlertCircle, CalendarDays, Search, Zap, TrendingUp, Clock, Target, Award, Activity, Sparkles, BarChart3, Calendar, Users, Shield, Pause, Play, Mail, MessageSquare, BellRing, Undo2 } from 'lucide-react'
 import { AppointmentBanner } from '@/components/appointment-banner'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -23,6 +23,11 @@ interface Subscription {
   is_active: boolean
   created_at: string
   completed_at: string | null
+  subscription_status?: 'active' | 'paused' | 'completed'
+  notification_method?: 'email' | 'push' | 'both'
+  preferred_time_ranges?: Array<{ start: string; end: string }>
+  paused_at?: string | null
+  paused_until?: string | null
 }
 
 interface DashboardStats {
@@ -43,6 +48,7 @@ export default function HomePage() {
   const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
   const [nextCheckCountdown, setNextCheckCountdown] = useState(300) // 5 minutes in seconds
+  const [ignoredTimesCount, setIgnoredTimesCount] = useState<{ count: number; dates: number } | null>(null)
 
   useEffect(() => {
     updateHeader({
@@ -54,8 +60,22 @@ export default function HomePage() {
   useEffect(() => {
     if (user) {
       fetchSubscriptions()
+      fetchIgnoredTimesCount()
     }
   }, [user])
+
+  const fetchIgnoredTimesCount = async () => {
+    try {
+      const response = await pwaFetch('/api/notifications/ignored-times?count_only=true')
+      
+      if (response.ok) {
+        const data = await response.json()
+        setIgnoredTimesCount(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch ignored times count:', error)
+    }
+  }
 
   const calculateDashboardStats = useCallback(() => {
     const total = subscriptions.length
@@ -151,12 +171,55 @@ export default function HomePage() {
       if (response.ok) {
         toast.success('המנוי בוטל בהצלחה')
         fetchSubscriptions()
+        fetchIgnoredTimesCount() // Refresh ignored times count
       } else {
         toast.error('שגיאה בביטול המנוי')
       }
     } catch (error) {
       console.error('Delete error:', error)
       toast.error('שגיאה בביטול המנוי')
+    }
+  }
+
+  const handlePauseResume = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'paused' ? 'active' : 'paused'
+    
+    try {
+      const response = await pwaFetch(`/api/notifications/subscriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription_status: newStatus })
+      })
+
+      if (response.ok) {
+        toast.success(newStatus === 'paused' ? 'המנוי הושהה' : 'המנוי חודש')
+        fetchSubscriptions()
+      } else {
+        toast.error('שגיאה בעדכון המנוי')
+      }
+    } catch (error) {
+      console.error('Pause/Resume error:', error)
+      toast.error('שגיאה בעדכון המנוי')
+    }
+  }
+
+  const handleNotificationMethodChange = async (id: string, method: 'email' | 'push' | 'both') => {
+    try {
+      const response = await pwaFetch(`/api/notifications/subscriptions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notification_method: method })
+      })
+
+      if (response.ok) {
+        toast.success('שיטת ההתראה עודכנה')
+        fetchSubscriptions()
+      } else {
+        toast.error('שגיאה בעדכון שיטת ההתראה')
+      }
+    } catch (error) {
+      console.error('Notification method change error:', error)
+      toast.error('שגיאה בעדכון שיטת ההתראה')
     }
   }
 
@@ -306,6 +369,49 @@ export default function HomePage() {
         </div>
       </motion.div>
 
+      {/* Ignored Times Card */}
+      {ignoredTimesCount && ignoredTimesCount.count > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <Link href="/notifications">
+            <Card className="border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-r from-amber-50/50 via-orange-50/30 to-amber-50/50 dark:from-amber-950/10 dark:via-orange-950/5 dark:to-amber-950/10 hover:shadow-lg transition-all duration-300 cursor-pointer group">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg group-hover:scale-110 transition-transform">
+                      <Undo2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-0.5">
+                        זמנים שהתעלמת מהם
+                      </h3>
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        {ignoredTimesCount.count} {ignoredTimesCount.count === 1 ? 'זמן' : 'זמנים'} ב-{ignoredTimesCount.dates} {ignoredTimesCount.dates === 1 ? 'תאריך' : 'תאריכים'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                      {ignoredTimesCount.count}
+                    </Badge>
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-amber-200/50 dark:border-amber-800/30">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    לחץ כדי לנהל ולהחזיר זמנים
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </motion.div>
+      )}
+
               {/* Active Subscriptions - Improved Design */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -354,29 +460,93 @@ export default function HomePage() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: index * 0.05 }}
-                    className="group flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-background via-background to-muted/20 border border-border/50 hover:border-border hover:shadow-md transition-all duration-200"
+                    className={cn(
+                      "group flex items-center justify-between p-3 rounded-xl border border-border/50 hover:border-border hover:shadow-md transition-all duration-200",
+                      sub.subscription_status === 'paused' 
+                        ? "bg-muted/30 opacity-75" 
+                        : "bg-gradient-to-r from-background via-background to-muted/20"
+                    )}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <CalendarDays className="h-4 w-4 text-primary" />
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={cn(
+                        "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
+                        sub.subscription_status === 'paused' ? "bg-muted" : "bg-primary/10"
+                      )}>
+                        <CalendarDays className={cn(
+                          "h-4 w-4",
+                          sub.subscription_status === 'paused' ? "text-muted-foreground" : "text-primary"
+                        )} />
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {formatSubscriptionDate(sub)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          נוצר ב-{format(new Date(sub.created_at), 'dd/MM HH:mm')}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-sm">
+                            {formatSubscriptionDate(sub)}
+                          </p>
+                          {sub.subscription_status === 'paused' && (
+                            <Badge variant="secondary" className="text-xs bg-muted-foreground/20">
+                              מושהה
+                            </Badge>
+                          )}
+                          {sub.preferred_time_ranges && sub.preferred_time_ranges.length > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {sub.preferred_time_ranges.length} טווחי זמן
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>נוצר ב-{format(new Date(sub.created_at), 'dd/MM HH:mm')}</span>
+                          {/* Notification Method Indicator */}
+                          {sub.notification_method && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                {sub.notification_method === 'email' && (
+                                  <Mail className="h-3 w-3" />
+                                )}
+                                {sub.notification_method === 'push' && (
+                                  <BellRing className="h-3 w-3" />
+                                )}
+                                {sub.notification_method === 'both' && (
+                                  <>
+                                    <Mail className="h-3 w-3" />
+                                    <BellRing className="h-3 w-3" />
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(sub.id)}
-                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    
+                    {/* Action Buttons - Always visible for mobile */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* Pause/Resume Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handlePauseResume(sub.id, sub.subscription_status || 'active')}
+                        className="h-9 w-9 p-0 hover:bg-primary/10 active:bg-primary/20 hover:text-primary touch-manipulation"
+                        title={sub.subscription_status === 'paused' ? 'חידוש' : 'השהיה'}
+                      >
+                        {sub.subscription_status === 'paused' ? (
+                          <Play className="h-4 w-4" />
+                        ) : (
+                          <Pause className="h-4 w-4" />
+                        )}
+                      </Button>
+                      
+                      {/* Delete Button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(sub.id)}
+                        className="h-9 w-9 p-0 hover:bg-destructive/10 active:bg-destructive/20 hover:text-destructive touch-manipulation"
+                        title="מחיקה"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </motion.div>
                 ))}
             </AnimatePresence>

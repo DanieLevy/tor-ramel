@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth-provider'
+import { NotificationCenter } from '@/components/notification-center'
 
 export function Header() {
   const { config } = useHeaderContext()
@@ -234,6 +235,9 @@ export function Header() {
               </Button>
             )}
             
+            {/* Notification Center - Only show for authenticated users */}
+            {user && <NotificationCenter />}
+            
             {/* User dropdown */}
             {user && (
               <DropdownMenu>
@@ -300,6 +304,12 @@ export function Header() {
                     <Link href="/subscribe">
                       <Bell className="h-4 w-4 opacity-60" />
                       <span className="flex-1">התראות</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                    <Link href="/notifications">
+                      <Trash2 className="h-4 w-4 opacity-60" />
+                      <span className="flex-1">זמנים שהתעלמתי</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-1" />

@@ -1112,6 +1112,30 @@ export async function processNotificationQueue(limit = 10) {
                 }
               }
             }
+            
+            // Save to in-app notifications (grouped)
+            const totalTimes = appointments.reduce((sum, apt) => sum + apt.newTimes.length, 0)
+            const datesSummary = appointments.map(apt => apt.date).join(', ')
+            await supabase
+              .from('in_app_notifications')
+              .insert({
+                user_id: subscription.user_id,
+                subscription_id: subscription.id,
+                title: `🎉 תורים פנויים - ${appointments.length} ימים`,
+                body: `נמצאו ${totalTimes} תורים זמינים ב-${appointments.length} ימים: ${datesSummary}`,
+                notification_type: 'appointment',
+                data: {
+                  appointments: appointments.map(apt => ({
+                    date: apt.date,
+                    times: apt.newTimes
+                  })),
+                  method: notificationMethod,
+                  email_sent: emailSent,
+                  push_sent: pushSent
+                }
+              })
+              .then(() => console.log(`📱 Saved grouped in-app notification for user ${subscription.user_id}`))
+              .catch(err => console.error(`Failed to save in-app notification:`, err))
           } else {
             // Single appointment
             const { error: notifyError } = await supabase
@@ -1131,6 +1155,26 @@ export async function processNotificationQueue(limit = 10) {
                 console.error('Error recording notification:', notifyError)
               }
             }
+            
+            // Save to in-app notifications (single)
+            await supabase
+              .from('in_app_notifications')
+              .insert({
+                user_id: subscription.user_id,
+                subscription_id: subscription.id,
+                title: `🎉 תורים פנויים - ${emailData.dayName}`,
+                body: `${emailData.date}: ${emailData.times.slice(0, 5).join(', ')}${emailData.times.length > 5 ? '...' : ''}`,
+                notification_type: 'appointment',
+                data: {
+                  appointment_date: appointment_date,
+                  times: new_times,
+                  method: notificationMethod,
+                  email_sent: emailSent,
+                  push_sent: pushSent
+                }
+              })
+              .then(() => console.log(`📱 Saved in-app notification for user ${subscription.user_id}`))
+              .catch(err => console.error(`Failed to save in-app notification:`, err))
           }
 
           // Update queue item
