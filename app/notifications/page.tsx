@@ -184,12 +184,21 @@ export default function NotificationsHistoryPage() {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Bell className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                  <p className="text-muted-foreground text-center mb-2">
+                  <p className="text-lg font-semibold text-center mb-2">
                     אין זמנים שהתעלמת מהם
                   </p>
-                  <p className="text-sm text-muted-foreground text-center">
-                    כאשר תבחר &quot;אף תור לא מתאים&quot;, הזמנים יופיעו כאן
+                  <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+                    כאשר תקבל התראת אימייל על תורים פנויים ותבחר &quot;אף תור לא מתאים&quot;, הזמנים יופיעו כאן
                   </p>
+                  <div className="bg-muted/50 p-4 rounded-lg max-w-md">
+                    <p className="text-xs text-muted-foreground text-center">
+                      💡 <strong>איך זה עובד?</strong>
+                      <br />
+                      המערכת לא תשלח לך התראות על זמנים שהתעלמת מהם.
+                      <br />
+                      אבל אתה תמיד יכול להחזיר אותם כאן!
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             ) : (

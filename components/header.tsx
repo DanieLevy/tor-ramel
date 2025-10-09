@@ -278,7 +278,7 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="md:hidden hover:bg-accent/50 transition-colors"
+                    className="hover:bg-accent/50 transition-colors"
                     aria-label="פתח תפריט"
                   >
                     <Menu className="h-5 w-5" />
@@ -313,9 +313,11 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5">
-                    <Info className="h-4 w-4 opacity-60" />
-                    <span className="flex-1">אודות</span>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                    <Link href="/about">
+                      <Info className="h-4 w-4 opacity-60" />
+                      <span className="flex-1">אודות</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuItem 

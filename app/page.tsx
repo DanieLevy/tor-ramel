@@ -369,48 +369,91 @@ export default function HomePage() {
         </div>
       </motion.div>
 
-      {/* Ignored Times Card */}
-      {ignoredTimesCount && ignoredTimesCount.count > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-        >
-          <Link href="/notifications">
-            <Card className="border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-r from-amber-50/50 via-orange-50/30 to-amber-50/50 dark:from-amber-950/10 dark:via-orange-950/5 dark:to-amber-950/10 hover:shadow-lg transition-all duration-300 cursor-pointer group">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg group-hover:scale-110 transition-transform">
-                      <Undo2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-0.5">
-                        זמנים שהתעלמת מהם
-                      </h3>
-                      <p className="text-sm text-amber-700 dark:text-amber-300">
-                        {ignoredTimesCount.count} {ignoredTimesCount.count === 1 ? 'זמן' : 'זמנים'} ב-{ignoredTimesCount.dates} {ignoredTimesCount.dates === 1 ? 'תאריך' : 'תאריכים'}
-                      </p>
-                    </div>
+      {/* Ignored Times Card - ALWAYS VISIBLE */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+      >
+        <Link href="/notifications">
+          <Card className={cn(
+            "hover:shadow-lg transition-all duration-300 cursor-pointer group",
+            ignoredTimesCount && ignoredTimesCount.count > 0
+              ? "border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-r from-amber-50/50 via-orange-50/30 to-amber-50/50 dark:from-amber-950/10 dark:via-orange-950/5 dark:to-amber-950/10"
+              : "border-muted bg-muted/20"
+          )}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "p-2 rounded-lg group-hover:scale-110 transition-transform",
+                    ignoredTimesCount && ignoredTimesCount.count > 0
+                      ? "bg-amber-100 dark:bg-amber-900/30"
+                      : "bg-muted"
+                  )}>
+                    <Undo2 className={cn(
+                      "h-5 w-5",
+                      ignoredTimesCount && ignoredTimesCount.count > 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"
+                    )} />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                      {ignoredTimesCount.count}
-                    </Badge>
-                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform" />
+                  <div>
+                    <h3 className={cn(
+                      "font-semibold mb-0.5",
+                      ignoredTimesCount && ignoredTimesCount.count > 0
+                        ? "text-amber-900 dark:text-amber-100"
+                        : "text-foreground"
+                    )}>
+                      זמנים שהתעלמת מהם
+                    </h3>
+                    <p className={cn(
+                      "text-sm",
+                      ignoredTimesCount && ignoredTimesCount.count > 0
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-muted-foreground"
+                    )}>
+                      {ignoredTimesCount && ignoredTimesCount.count > 0 
+                        ? `${ignoredTimesCount.count} ${ignoredTimesCount.count === 1 ? 'זמן' : 'זמנים'} ב-${ignoredTimesCount.dates} ${ignoredTimesCount.dates === 1 ? 'תאריך' : 'תאריכים'}`
+                        : 'כשתבחר "אף תור לא מתאים" באימייל, הזמנים יופיעו כאן'}
+                    </p>
                   </div>
                 </div>
-                <div className="mt-3 pt-3 border-t border-amber-200/50 dark:border-amber-800/30">
-                  <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    לחץ כדי לנהל ולהחזיר זמנים
-                  </p>
+                <div className="flex items-center gap-2">
+                  {ignoredTimesCount && ignoredTimesCount.count > 0 ? (
+                    <>
+                      <Badge className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                        {ignoredTimesCount.count}
+                      </Badge>
+                      <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  ) : (
+                    <CheckCircle className="h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </motion.div>
-      )}
+              </div>
+              <div className={cn(
+                "mt-3 pt-3 border-t",
+                ignoredTimesCount && ignoredTimesCount.count > 0
+                  ? "border-amber-200/50 dark:border-amber-800/30"
+                  : "border-muted"
+              )}>
+                <p className={cn(
+                  "text-xs flex items-center gap-1",
+                  ignoredTimesCount && ignoredTimesCount.count > 0
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-muted-foreground"
+                )}>
+                  <Sparkles className="h-3 w-3" />
+                  {ignoredTimesCount && ignoredTimesCount.count > 0 
+                    ? 'לחץ כדי לנהל ולהחזיר זמנים'
+                    : 'זמנים שהתעלמת מהם באימייל מופיעים כאן'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      </motion.div>
 
               {/* Active Subscriptions - Improved Design */}
         <motion.div 
@@ -461,10 +504,10 @@ export default function HomePage() {
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: index * 0.05 }}
                     className={cn(
-                      "group flex items-center justify-between p-3 rounded-xl border border-border/50 hover:border-border hover:shadow-md transition-all duration-200",
+                      "group flex items-center justify-between p-3 rounded-xl border transition-all duration-200",
                       sub.subscription_status === 'paused' 
-                        ? "bg-muted/30 opacity-75" 
-                        : "bg-gradient-to-r from-background via-background to-muted/20"
+                        ? "bg-orange-50/80 dark:bg-orange-950/20 border-orange-200/50 dark:border-orange-800/30 hover:bg-orange-50 dark:hover:bg-orange-950/30 hover:shadow-md" 
+                        : "bg-gradient-to-r from-background via-background to-muted/20 border-border/50 hover:border-border hover:shadow-md"
                     )}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">

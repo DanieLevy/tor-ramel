@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { FontLoader } from "@/components/font-loader";
 import { SwUpdateBanner } from '@/components/sw-update-banner';
 import { PushNotificationBanner } from '@/components/push-notification-banner';
+import { Footer } from '@/components/footer';
 
 export const metadata: Metadata = {
   title: "תור רם-אל - זימון תורים",
@@ -107,6 +108,7 @@ export default function RootLayout({
                   <Header />
                   <main className="flex-1">{children}</main>
                   <BottomNav />
+                  <Footer />
                   <SwUpdateBanner />
                   <PushNotificationBanner />
                 </div>

@@ -1,7 +1,8 @@
 // Service Worker for Tor-Ramel PWA
 // AUTO-GENERATED VERSION - DO NOT EDIT
-const SW_VERSION = 'v1760013760483'
-const BUILD_TIME = '2025-10-09T12:42:40.483Z'
+const VERSION = 'v0.3';
+const BUILD_TIME = '2025-10-09T14:45:01.290Z';
+const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
 const DYNAMIC_CACHE = `tor-ramel-dynamic-${SW_VERSION}`;
 const API_CACHE = `tor-ramel-api-${SW_VERSION}`;
@@ -383,10 +384,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   // Send version info on request
   if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({
-      version: SW_VERSION,
+    event.source.postMessage({
+      type: 'VERSION_INFO',
+      version: VERSION,
       buildTime: BUILD_TIME
     });
+    return;
   }
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
