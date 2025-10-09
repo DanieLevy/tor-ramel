@@ -122,15 +122,15 @@ function SearchPage() {
     }
   }
 
-  const isClosedDay = (date: Date) => {
+  const isClosedDay = useCallback((date: Date) => {
     // Get day of week in Israeli timezone
     const israeliDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
     const dayOfWeek = israeliDate.getDay()
     return dayOfWeek === 1 || dayOfWeek === 6 // Monday (1) or Saturday (6)
-  }
+  }, [])
 
   // Helper function to create dates in Israeli timezone
-  const createIsraeliDate = (daysFromToday: number) => {
+  const createIsraeliDate = useCallback((daysFromToday: number) => {
     try {
     const now = new Date()
       const targetDate = new Date(now)
@@ -141,9 +141,9 @@ function SearchPage() {
       console.error('Error creating Israeli date:', error)
       return new Date() // Return current date as fallback
     }
-  }
+  }, [])
 
-  const getOpenDays = (type: string): Date[] => {
+  const getOpenDays = useCallback((type: string): Date[] => {
     const dates: Date[] = []
     const totalDays = type === 'week' ? 7 : type === 'two-weeks' ? 14 : 30
     let closedDaysCount = 0
@@ -169,7 +169,7 @@ function SearchPage() {
     })
 
     return dates
-  }
+  }, [createIsraeliDate, isClosedDay])
 
   const cancelSearch = useCallback(() => {
     if (cancelTokenRef.current) {
