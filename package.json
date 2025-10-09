@@ -80,6 +80,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "eslint": "^9.37.0",
+    "eslint-config-next": "^15.5.4",
     "netlify-cli": "^22.2.1",
     "pwa-asset-generator": "^8.0.5",
     "tailwindcss": "^4",

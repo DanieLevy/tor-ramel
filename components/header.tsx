@@ -4,6 +4,7 @@ import React from 'react'
 import { Menu, Sun, Moon, Search, Bell, Info, Home, Trash2, LogOut, User } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { usePathname } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -201,10 +202,12 @@ export function Header() {
         <div className="flex items-center justify-between">
           {/* Right section (RTL) - App Icon & Title */}
           <div className="flex items-center gap-2 mr-2">
-            <img 
+            <Image 
               src="/icons/icon-96x96.png" 
               alt="תור רם-אל" 
-              className="w-8 h-8 rounded-lg shadow-sm"
+              width={32}
+              height={32}
+              className="rounded-lg shadow-sm"
             />
             <h1 className="text-lg font-semibold">{config.title}</h1>
           </div>

@@ -51,7 +51,7 @@ export function InstallPWAButton() {
                 2
               </div>
               <div className="flex-1">
-                <p className="text-sm">גלול למטה ובחר "הוסף למסך הבית"</p>
+                <p className="text-sm">גלול למטה ובחר &quot;הוסף למסך הבית&quot;</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -59,7 +59,7 @@ export function InstallPWAButton() {
                 3
               </div>
               <div className="flex-1">
-                <p className="text-sm">לחץ על "הוסף" בפינה הימנית העליונה</p>
+                <p className="text-sm">לחץ על &quot;הוסף&quot; בפינה הימנית העליונה</p>
               </div>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth-provider'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -59,10 +60,12 @@ export default function RegisterPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="relative inline-block mb-6">
-            <img 
+            <Image 
               src="/icons/icon-96x96.png" 
               alt="תור רם-אל" 
-              className="w-20 h-20 rounded-3xl mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg"
+              width={80}
+              height={80}
+              className="rounded-3xl mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg"
             />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">

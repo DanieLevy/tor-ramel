@@ -1,7 +1,7 @@
 "use client"
 
 import { Suspense } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,23 +31,22 @@ function NotificationActionContent() {
   const date = searchParams.get('date')
   const appointmentsParam = searchParams.get('appointments')
   
-  // Parse appointments data if available
-  let appointments: Array<{ date: string; times: string[] }> = []
-  if (appointmentsParam) {
-    try {
-      appointments = JSON.parse(decodeURIComponent(appointmentsParam))
-    } catch (e) {
-      console.error('Failed to parse appointments:', e)
+  // Parse appointments data if available - wrapped in useMemo to prevent dependency changes
+  const appointments = useMemo(() => {
+    let parsed: Array<{ date: string; times: string[] }> = []
+    if (appointmentsParam) {
+      try {
+        parsed = JSON.parse(decodeURIComponent(appointmentsParam))
+      } catch (e) {
+        console.error('Failed to parse appointments:', e)
+      }
     }
-  }
+    return parsed
+  }, [appointmentsParam])
   
   const timesList = times ? times.split(',') : []
 
-  useEffect(() => {
-    handleAction()
-  }, [])
-
-  const handleAction = async () => {
+  const handleAction = useCallback(async () => {
     const action = searchParams.get('action')
     const subscriptionId = searchParams.get('subscription')
 
@@ -172,7 +171,11 @@ function NotificationActionContent() {
       setProcessing(false)
       setShowDialog(true)
     }
-  }
+  }, [searchParams, times, date, appointments])
+
+  useEffect(() => {
+    handleAction()
+  }, [handleAction])
 
   const getDialogContent = () => {
     if (!result) return null

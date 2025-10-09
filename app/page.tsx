@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useHeader } from '@/components/header-context'
 import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
@@ -57,11 +57,38 @@ export default function HomePage() {
     }
   }, [user])
 
+  const calculateDashboardStats = useCallback(() => {
+    const total = subscriptions.length
+    const active = subscriptions.filter(sub => sub.is_active).length
+    const completed = subscriptions.filter(sub => !sub.is_active).length
+    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0
+    
+    // Simulate some stats based on subscriptions
+    const notificationsSent = completed * 3 + active * 2 // Rough estimate
+    const appointmentsFound = Math.floor(completed * 0.8) // 80% success rate
+    const avgResponseTime = 45 // seconds
+    
+    const lastActivity = subscriptions.length > 0 
+      ? subscriptions[0].created_at 
+      : null
+
+    setDashboardStats({
+      totalSubscriptions: total,
+      activeSubscriptions: active,
+      completedSubscriptions: completed,
+      successRate,
+      totalNotificationsSent: notificationsSent,
+      appointmentsFound,
+      averageResponseTime: avgResponseTime,
+      lastActivity
+    })
+  }, [subscriptions])
+
   useEffect(() => {
     if (subscriptions.length > 0) {
       calculateDashboardStats()
     }
-  }, [subscriptions])
+  }, [subscriptions, calculateDashboardStats])
 
   useEffect(() => {
     // Calculate time until next 5-minute interval
@@ -131,33 +158,6 @@ export default function HomePage() {
       console.error('Delete error:', error)
       toast.error('שגיאה בביטול המנוי')
     }
-  }
-
-  const calculateDashboardStats = () => {
-    const total = subscriptions.length
-    const active = subscriptions.filter(sub => sub.is_active).length
-    const completed = subscriptions.filter(sub => !sub.is_active).length
-    const successRate = total > 0 ? Math.round((completed / total) * 100) : 0
-    
-    // Simulate some stats based on subscriptions
-    const notificationsSent = completed * 3 + active * 2 // Rough estimate
-    const appointmentsFound = Math.floor(completed * 0.8) // 80% success rate
-    const avgResponseTime = 45 // seconds
-    
-    const lastActivity = subscriptions.length > 0 
-      ? subscriptions[0].created_at 
-      : null
-
-    setDashboardStats({
-      totalSubscriptions: total,
-      activeSubscriptions: active,
-      completedSubscriptions: completed,
-      successRate,
-      totalNotificationsSent: notificationsSent,
-      appointmentsFound,
-      averageResponseTime: avgResponseTime,
-      lastActivity
-    })
   }
 
   const formatSubscriptionDate = (sub: Subscription) => {

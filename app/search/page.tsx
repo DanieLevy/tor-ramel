@@ -318,7 +318,7 @@ function SearchPage() {
         }
       }, 1000)
     }
-  }, [searchType, cache])
+  }, [searchType, cache, getOpenDays, isSearching])
 
   const generateBookingUrl = (dateStr: string) => {
     return `https://mytor.co.il/home.php?i=cmFtZWwzMw==&s=MjY1&mm=y&lang=he&datef=${dateStr}&signup=הצג`
