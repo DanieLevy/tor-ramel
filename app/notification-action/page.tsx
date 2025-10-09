@@ -50,7 +50,24 @@ function NotificationActionContent() {
     const action = searchParams.get('action')
     const subscriptionId = searchParams.get('subscription')
 
-    if (!action || !subscriptionId) {
+    // If no action, just show appointments (view mode from push notification)
+    if (!action) {
+      if (!subscriptionId) {
+        setResult({
+          success: false,
+          message: 'פרמטרים חסרים בקישור'
+        })
+        setProcessing(false)
+        setShowDialog(true)
+        return
+      }
+      
+      // View mode - show appointments without processing any action
+      setProcessing(false)
+      return
+    }
+
+    if (!subscriptionId) {
       setResult({
         success: false,
         message: 'פרמטרים חסרים בקישור'
@@ -298,6 +315,93 @@ function NotificationActionContent() {
     )
   }
 
+  const handleApprove = async () => {
+    const subscriptionId = searchParams.get('subscription')
+    setProcessing(true)
+    
+    try {
+      const response = await fetch('/api/notifications/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'approve',
+          subscriptionId
+        })
+      })
+
+      if (response.ok) {
+        setResult({
+          success: true,
+          message: 'מצוין! המנוי שלך סומן כהושלם.',
+          action: 'approve'
+        })
+      } else {
+        const error = await response.json()
+        setResult({
+          success: false,
+          message: error.message || 'אירעה שגיאה בעדכון המנוי'
+        })
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        message: 'אירעה שגיאה בתקשורת עם השרת'
+      })
+    } finally {
+      setProcessing(false)
+      setShowDialog(true)
+    }
+  }
+
+  const handleDecline = async () => {
+    const subscriptionId = searchParams.get('subscription')
+    setProcessing(true)
+    
+    try {
+      let bodyData: any = {
+        action: 'decline',
+        subscriptionId
+      }
+      
+      if (appointments.length > 0) {
+        bodyData.appointments = appointments
+      } else if (times && date) {
+        bodyData.date = date
+        bodyData.times = timesList
+      }
+
+      const response = await fetch('/api/notifications/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(bodyData)
+      })
+
+      if (response.ok) {
+        setResult({
+          success: true,
+          message: 'הבנו! נמשיך לחפש ונודיע לך על שעות חדשות.',
+          action: 'decline'
+        })
+      } else {
+        const error = await response.json()
+        setResult({
+          success: false,
+          message: error.message || 'אירעה שגיאה'
+        })
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        message: 'אירעה שגיאה בתקשורת עם השרת'
+      })
+    } finally {
+      setProcessing(false)
+      setShowDialog(true)
+    }
+  }
+
   return (
     <div className="container py-8 px-4 max-w-xl mx-auto">
       <div className="space-y-6">
@@ -308,6 +412,104 @@ function NotificationActionContent() {
               <div className="flex flex-col items-center justify-center space-y-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
                 <p className="text-muted-foreground">מעבד את הבקשה שלך...</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* View Mode - Show Appointments */}
+        {!processing && !showDialog && (appointments.length > 0 || (date && timesList.length > 0)) && (
+          <Card>
+            <CardHeader className="text-center pb-4">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-2xl">🎉 תורים פנויים!</CardTitle>
+              <CardDescription className="text-base">
+                נמצאו תורים זמינים עבורך
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Show Multiple Dates */}
+              {appointments.length > 0 ? (
+                <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                  {appointments.map((apt, index) => (
+                    <div key={index} className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-50/50 dark:from-gray-950/20 dark:to-gray-950/10 border border-gray-200/50 dark:border-gray-800/30 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-sm px-3 py-1.5 font-semibold">
+                          {apt.date}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {apt.times.length} שעות
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {apt.times.slice(0, 9).map((time, timeIndex) => (
+                          <div 
+                            key={timeIndex}
+                            className="text-center p-2 rounded-lg bg-white dark:bg-gray-900 border-2 border-black dark:border-white"
+                          >
+                            <span className="text-sm font-bold">{time}</span>
+                          </div>
+                        ))}
+                        {apt.times.length > 9 && (
+                          <div className="text-center p-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
+                            <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                              +{apt.times.length - 9}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : date && timesList.length > 0 ? (
+                /* Show Single Date */
+                <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/10 border border-green-200/50 dark:border-green-800/30 space-y-3">
+                  <div className="text-center">
+                    <Badge variant="outline" className="text-base px-4 py-2 font-semibold">
+                      {date}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {timesList.map((time, index) => (
+                      <div 
+                        key={index}
+                        className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 border-2 border-black dark:border-white"
+                      >
+                        <Clock className="h-4 w-4 mx-auto mb-1 text-gray-600 dark:text-gray-400" />
+                        <span className="font-bold text-sm">{time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Action Buttons */}
+              <div className="space-y-3 pt-4">
+                <Button
+                  onClick={handleApprove}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold"
+                >
+                  <CheckCircle className="ml-2 h-5 w-5" />
+                  מצאתי תור מתאים
+                </Button>
+                <Button
+                  onClick={handleDecline}
+                  variant="outline"
+                  size="lg"
+                  className="w-full border-2"
+                >
+                  <XCircle className="ml-2 h-5 w-5" />
+                  אף תור לא מתאים
+                </Button>
+              </div>
+
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-700 dark:text-blue-300 text-center">
+                  <span className="font-semibold">לתשומת לבך:</span> בחירת &quot;אף תור לא מתאים&quot; תמנע התראות עתידיות על השעות הללו בלבד
+                </p>
               </div>
             </CardContent>
           </Card>

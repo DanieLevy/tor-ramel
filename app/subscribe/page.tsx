@@ -513,7 +513,7 @@ function SubscribePage() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-end text-right h-10 text-sm font-normal",
+                          "w-full justify-start text-center h-10 text-sm font-normal align-middle",
                           selectedDate && "border-black dark:border-white"
                         )}
                       >
@@ -549,7 +549,7 @@ function SubscribePage() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-end text-right h-10 text-sm font-normal",
+                          "w-full justify-start text-center h-10 text-sm font-normal align-middle",
                           dateRange.from && "border-black dark:border-white"
                         )}
                       >

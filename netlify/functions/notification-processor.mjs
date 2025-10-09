@@ -1028,13 +1028,24 @@ export async function processNotificationQueue(limit = 10) {
           let pushTitle, pushBody, pushUrl
           
           if (isGrouped && appointments.length > 0) {
-            pushTitle = `תורים פנויים - ${appointments.length} ימים`
-            pushBody = `נמצאו תורים זמינים ב-${appointments.length} תאריכים שונים`
-            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscription.id}&appointments=${encodeURIComponent(JSON.stringify(appointments.map(a => ({ date: a.date, times: a.newTimes }))))}`
+            // Multiple dates - show summary with first few times
+            const firstAppointment = appointments[0]
+            const totalTimes = appointments.reduce((sum, apt) => sum + apt.newTimes.length, 0)
+            const sampleTimes = firstAppointment.newTimes.slice(0, 3).join(', ')
+            
+            pushTitle = `🎉 תורים פנויים - ${appointments.length} ימים`
+            pushBody = `נמצאו ${totalTimes} תורים! ${firstAppointment.dayName} ${firstAppointment.date}: ${sampleTimes}${firstAppointment.newTimes.length > 3 ? '...' : ''}`
+            // Remove action=approve - just show appointments
+            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?subscription=${subscription.id}&appointments=${encodeURIComponent(JSON.stringify(appointments.map(a => ({ date: a.date, times: a.newTimes }))))}`
           } else {
-            pushTitle = `תורים פנויים - ${emailData.dayName}`
-            pushBody = `נמצאו ${emailData.times.length} תורים זמינים ב-${emailData.date}`
-            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscription.id}&times=${encodeURIComponent(emailData.times.join(','))}&date=${emailData.date}`
+            // Single date - show day, date, and times
+            const sampleTimes = emailData.times.slice(0, 4).join(', ')
+            const remainingCount = emailData.times.length > 4 ? ` +${emailData.times.length - 4}` : ''
+            
+            pushTitle = `🎉 תורים פנויים - ${emailData.dayName}`
+            pushBody = `${emailData.date}: ${sampleTimes}${remainingCount}`
+            // Remove action=approve - just show appointments
+            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?subscription=${subscription.id}&times=${encodeURIComponent(emailData.times.join(','))}&date=${emailData.date}`
           }
           
           try {
