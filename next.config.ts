@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   
+  // Image optimization - disable for Netlify compatibility
+  images: {
+    unoptimized: true,
+  },
+  
   // Suppress punycode deprecation warning in development
   ...(process.env.NODE_ENV === 'development' && {
     webpack: (config: any) => {
