@@ -1,21 +1,20 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, Sparkles, Edit, TrendingUp, Zap, BarChart3, Target, Shield } from 'lucide-react'
+import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, Sparkles, Edit, Mail, Smartphone, CheckCircle2, BellRing } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { format, addDays } from 'date-fns'
+import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { cn, pwaFetch, isRunningAsPWA } from '@/lib/utils'
+import { cn, pwaFetch } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth-provider'
 import { motion, AnimatePresence } from 'framer-motion'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
 
 interface Subscription {
   id: string
@@ -23,9 +22,12 @@ interface Subscription {
   date_range_start: string | null
   date_range_end: string | null
   is_active: boolean
+  notification_method: 'email' | 'push' | 'both'
   created_at: string
   completed_at: string | null
 }
+
+type NotificationMethod = 'email' | 'push' | 'both'
 
 function SubscribePage() {
   const { user } = useAuth()
@@ -35,21 +37,39 @@ function SubscribePage() {
     from: undefined,
     to: undefined
   })
+  const [dateMode, setDateMode] = useState<'single' | 'range'>('single')
+  const [notificationMethod, setNotificationMethod] = useState<NotificationMethod>('email')
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(false)
   const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
-  const [tab, setTab] = useState<'single' | 'range'>('single')
   const [subscriptionProgress, setSubscriptionProgress] = useState(0)
   
   // Edit modal state
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null)
-  const [editTab, setEditTab] = useState<'single' | 'range'>('single')
+  const [editDateMode, setEditDateMode] = useState<'single' | 'range'>('single')
   const [editSelectedDate, setEditSelectedDate] = useState<Date>()
   const [editDateRange, setEditDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
     from: undefined,
     to: undefined
   })
   const [editLoading, setEditLoading] = useState(false)
+
+  // Push notifications hook
+  const { 
+    isSupported: pushSupported, 
+    permission: pushPermission, 
+    isSubscribed: isPushSubscribed, 
+    isLoading: pushLoading, 
+    subscribe: subscribeToPush,
+    showIOSInstallPrompt
+  } = usePushNotifications()
+
+  // Check if iOS and PWA
+  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const isPWA = typeof window !== 'undefined' && (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true
+  )
 
   useEffect(() => {
     setMounted(true)
@@ -64,11 +84,11 @@ function SubscribePage() {
   useEffect(() => {
     if (editingSubscription) {
       if (editingSubscription.subscription_date) {
-        setEditTab('single')
+        setEditDateMode('single')
         setEditSelectedDate(new Date(editingSubscription.subscription_date + 'T00:00:00'))
         setEditDateRange({ from: undefined, to: undefined })
       } else if (editingSubscription.date_range_start && editingSubscription.date_range_end) {
-        setEditTab('range')
+        setEditDateMode('range')
         setEditDateRange({
           from: new Date(editingSubscription.date_range_start + 'T00:00:00'),
           to: new Date(editingSubscription.date_range_end + 'T00:00:00')
@@ -88,43 +108,58 @@ function SubscribePage() {
       if (response.ok) {
         const data = await response.json()
         setSubscriptions(data)
-      } else {
-        const error = await response.json()
-        console.error('🔍 Failed to fetch subscriptions:', error)
-        toast.error('שגיאה בטעינת המנויים')
+        
+        // Set notification method from first active subscription
+        const activeSubscription = data.find((s: Subscription) => s.is_active)
+        if (activeSubscription?.notification_method) {
+          setNotificationMethod(activeSubscription.notification_method)
+        }
       }
     } catch (error) {
-      console.error('🔍 Failed to fetch subscriptions:', error)
-      toast.error('שגיאה בטעינת המנויים')
+      console.error('Failed to fetch subscriptions:', error)
     } finally {
       setFetchingSubscriptions(false)
     }
   }
 
   const isDateDisabled = (date: Date) => {
-    // Get day of week in Israeli timezone
     const israeliDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
     const day = israeliDate.getDay()
     
-    // Get today in Israeli timezone
     const now = new Date()
     const israeliToday = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
     israeliToday.setHours(0, 0, 0, 0)
     
-    // Get 30 days from today
     const maxDate = new Date(israeliToday)
     maxDate.setDate(maxDate.getDate() + 30)
     
-    // Normalize input date to Israeli timezone for comparison
     const israeliInputDate = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }))
     israeliInputDate.setHours(0, 0, 0, 0)
     
-    // Disable past dates, dates more than 30 days from today, Mondays (1) and Saturdays (6)
     return israeliInputDate < israeliToday || israeliInputDate > maxDate || day === 1 || day === 6
   }
 
+  const handleNotificationMethodChange = async (method: NotificationMethod) => {
+    // If switching to push or both, need to subscribe first
+    if ((method === 'push' || method === 'both') && !isPushSubscribed) {
+      if (isIOS && !isPWA) {
+        showIOSInstallPrompt()
+        return
+      }
+      
+      try {
+        await subscribeToPush()
+        setNotificationMethod(method)
+      } catch (error) {
+        console.error('Failed to subscribe to push:', error)
+        return
+      }
+    } else {
+      setNotificationMethod(method)
+    }
+  }
+
   const handleSubscribe = async () => {
-    // Haptic feedback for mobile
     if ('vibrate' in navigator) {
       navigator.vibrate(10)
     }
@@ -133,16 +168,19 @@ function SubscribePage() {
     setSubscriptionProgress(0)
     
     try {
-      // Simulate progress for better UX
       const progressInterval = setInterval(() => {
         setSubscriptionProgress(prev => Math.min(prev + 15, 80))
       }, 100)
 
-      const payload = tab === 'single' 
-        ? { subscription_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null }
+      const payload = dateMode === 'single' 
+        ? { 
+            subscription_date: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null,
+            notification_method: notificationMethod
+          }
         : { 
             date_range_start: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : null,
-            date_range_end: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null
+            date_range_end: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : null,
+            notification_method: notificationMethod
           }
 
       const response = await pwaFetch('/api/notifications/subscribe', {
@@ -158,7 +196,6 @@ function SubscribePage() {
           icon: <Sparkles className="h-4 w-4" />,
           duration: 3000
         })
-        // Reset form
         setSelectedDate(undefined)
         setDateRange({ from: undefined, to: undefined })
         fetchSubscriptions()
@@ -167,7 +204,7 @@ function SubscribePage() {
         toast.error(error.message || 'שגיאה בהרשמה')
       }
     } catch (error) {
-      console.error('🔍 Subscribe error:', error)
+      console.error('Subscribe error:', error)
       toast.error('שגיאה בהרשמה להתראות')
     } finally {
       setTimeout(() => {
@@ -212,7 +249,7 @@ function SubscribePage() {
         toast.error('שגיאה בביטול המנוי')
       }
     } catch (error) {
-      console.error('🔍 Delete error:', error)
+      console.error('Delete error:', error)
       toast.error('שגיאה בביטול המנוי')
     }
   }
@@ -223,7 +260,7 @@ function SubscribePage() {
     setEditLoading(true)
     
     try {
-      const payload = editTab === 'single' 
+      const payload = editDateMode === 'single' 
         ? { 
             subscription_date: editSelectedDate ? format(editSelectedDate, 'yyyy-MM-dd') : null,
             date_range_start: null,
@@ -249,7 +286,7 @@ function SubscribePage() {
         toast.error(error.message || 'שגיאה בעדכון המנוי')
       }
     } catch (error) {
-      console.error('🔍 Update error:', error)
+      console.error('Update error:', error)
       toast.error('שגיאה בעדכון המנוי')
     } finally {
       setEditLoading(false)
@@ -266,436 +303,530 @@ function SubscribePage() {
     return ''
   }
 
-  const getSubscriptionStats = () => {
-    const activeCount = subscriptions.filter(s => s.is_active).length
-    const completedCount = subscriptions.filter(s => !s.is_active).length
-    const totalCount = subscriptions.length
-    const successRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-    
-    return {
-      active: activeCount,
-      completed: completedCount,
-      total: totalCount,
-      successRate
+  const getNotificationMethodIcon = (method: NotificationMethod) => {
+    switch (method) {
+      case 'email': return Mail
+      case 'push': return Smartphone
+      case 'both': return Bell
+      default: return Bell
     }
   }
 
+  const getNotificationMethodLabel = (method: NotificationMethod) => {
+    switch (method) {
+      case 'email': return 'מייל'
+      case 'push': return 'Push'
+      case 'both': return 'מייל + Push'
+      default: return 'לא ידוע'
+    }
+  }
+
+  const activeSubscriptions = subscriptions.filter(s => s.is_active)
+  const completedSubscriptions = subscriptions.filter(s => !s.is_active)
+
   return (
-    <div className="container py-8 px-4 pb-24">
-      <div className="mx-auto max-w-4xl space-y-8">
-        {/* Header with animation */}
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-950 dark:to-gray-900 pb-24">
+      <div className="container max-w-2xl mx-auto px-4 py-6 space-y-6">
+        
+        {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-6"
+          className="text-center space-y-3 pt-2"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4">
-            <Bell className="h-10 w-10 text-foreground" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+            <BellRing className="h-8 w-8 text-white" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">
-              התראות חכמות
-            </h1>
-            <p className="text-muted-foreground max-w-lg mx-auto text-base">
-              קבל התראה מיידית במייל כשיש תורים פנויים בתאריכים שחשובים לך
-            </p>
-          </div>
-
-          {/* Quick Stats */}
-          {!fetchingSubscriptions && subscriptions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="flex flex-wrap justify-center gap-3 mt-6"
-            >
-              {[
-                { 
-                  icon: Target, 
-                  label: 'פעילות', 
-                  value: getSubscriptionStats().active, 
-                  color: 'from-green-500 to-green-600',
-                  bgColor: 'bg-green-50 dark:bg-green-950/20',
-                  textColor: 'text-green-700 dark:text-green-300'
-                },
-                { 
-                  icon: CheckCircle, 
-                  label: 'הושלמו', 
-                  value: getSubscriptionStats().completed, 
-                  color: 'from-blue-500 to-blue-600',
-                  bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-                  textColor: 'text-blue-700 dark:text-blue-300'
-                },
-                { 
-                  icon: BarChart3, 
-                  label: 'הצלחה', 
-                  value: `${getSubscriptionStats().successRate}%`, 
-                  color: 'from-purple-500 to-purple-600',
-                  bgColor: 'bg-purple-50 dark:bg-purple-950/20',
-                  textColor: 'text-purple-700 dark:text-purple-300'
-                }
-              ].map((stat, index) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.3 + index * 0.1 }}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-lg border shadow-sm",
-                    stat.bgColor
-                  )}
-                >
-                  <div className={cn(
-                    "flex items-center justify-center w-6 h-6 rounded-md bg-gradient-to-br",
-                    stat.color
-                  )}>
-                    <stat.icon className="h-3 w-3 text-white" />
-                  </div>
-                  <div className="text-xs">
-                    <div className={cn("font-bold", stat.textColor)}>{stat.value}</div>
-                    <div className="text-muted-foreground text-[10px]">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            התראות חכמות
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            קבל עדכונים מיידיים כשיש תורים פנויים בתאריכים שחשובים לך
+          </p>
         </motion.div>
 
-        {/* Subscription Form - Flat Design */}
+        {/* Main Subscription Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-6"
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
         >
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-xl font-bold">צור התראה חדשה</h2>
+          {/* Notification Method Selection */}
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-lg font-semibold">איך תרצה לקבל התראות?</h2>
             </div>
-            <p className="text-muted-foreground">
-              בחר תאריך או טווח תאריכים ונודיע לך מיד כשיתפנה תור
-            </p>
+            
+            <div className="grid gap-3">
+              {[
+                { 
+                  value: 'email' as NotificationMethod, 
+                  icon: Mail, 
+                  title: 'מייל בלבד', 
+                  description: 'התראה במייל',
+                  gradient: 'from-blue-500 to-blue-600',
+                  available: true
+                },
+                { 
+                  value: 'push' as NotificationMethod, 
+                  icon: Smartphone, 
+                  title: 'התראות Push בלבד', 
+                  description: 'התראה במכשיר',
+                  gradient: 'from-purple-500 to-purple-600',
+                  available: pushSupported && (isPWA || !isIOS)
+                },
+                { 
+                  value: 'both' as NotificationMethod, 
+                  icon: Bell, 
+                  title: 'מייל + Push', 
+                  description: 'שני הערוצים',
+                  gradient: 'from-green-500 to-green-600',
+                  available: pushSupported && (isPWA || !isIOS)
+                }
+              ].map((method) => (
+                <motion.button
+                  key={method.value}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => method.available && handleNotificationMethodChange(method.value)}
+                  disabled={!method.available || pushLoading}
+                  className={cn(
+                    "relative p-4 rounded-2xl transition-all text-right",
+                    "border-2",
+                    notificationMethod === method.value
+                      ? "border-transparent shadow-lg"
+                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800",
+                    !method.available && "opacity-50 cursor-not-allowed"
+                  )}
+                >
+                  {notificationMethod === method.value && (
+                    <motion.div
+                      layoutId="selectedMethod"
+                      className={cn(
+                        "absolute inset-0 rounded-2xl bg-gradient-to-r",
+                        method.gradient
+                      )}
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  
+                  <div className="relative flex items-center gap-3">
+                    <div className={cn(
+                      "flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center",
+                      notificationMethod === method.value
+                        ? "bg-white/20 backdrop-blur-sm"
+                        : "bg-gray-100 dark:bg-gray-700"
+                    )}>
+                      <method.icon className={cn(
+                        "h-6 w-6",
+                        notificationMethod === method.value
+                          ? "text-white"
+                          : "text-gray-600 dark:text-gray-400"
+                      )} />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className={cn(
+                          "font-semibold",
+                          notificationMethod === method.value
+                            ? "text-white"
+                            : "text-gray-900 dark:text-gray-100"
+                        )}>
+                          {method.title}
+                        </h3>
+                        {notificationMethod === method.value && (
+                          <CheckCircle2 className="h-5 w-5 text-white" />
+                        )}
+                      </div>
+                      <p className={cn(
+                        "text-sm",
+                        notificationMethod === method.value
+                          ? "text-white/80"
+                          : "text-gray-500 dark:text-gray-400"
+                      )}>
+                        {method.description}
+                      </p>
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* iOS PWA Notice */}
+            {isIOS && !isPWA && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl"
+              >
+                <p className="text-xs text-yellow-800 dark:text-yellow-300">
+                  💡 <strong>התקן את האפליקציה</strong> כדי לקבל התראות Push (Share ⬆️ → Add to Home Screen)
+                </p>
+              </motion.div>
+            )}
           </div>
-          
-          <div className="space-y-6">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as 'single' | 'range')}>
-              <div className="grid grid-cols-2 gap-6 mb-6">
+
+          {/* Date Selection */}
+          <div className="p-6 space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold mb-4">בחר תאריכים</h2>
+              
+              {/* Date Mode Tabs */}
+              <div className="grid grid-cols-2 gap-3 mb-6">
                 {[
-                  { value: 'range', label: 'טווח תאריכים', icon: CalendarDays, color: 'from-purple-500 to-purple-600' },
-                  { value: 'single', label: 'תאריך בודד', icon: Calendar, color: 'from-blue-500 to-blue-600' }
-                ].map((option) => (
+                  { value: 'single' as const, label: 'תאריך בודד', icon: Calendar },
+                  { value: 'range' as const, label: 'טווח תאריכים', icon: CalendarDays }
+                ].map((mode) => (
                   <motion.button
-                    key={option.value}
-                    whileHover={{ scale: 1.02 }}
+                    key={mode.value}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setTab(option.value as any)}
-                    className="relative py-3 px-4 rounded-lg text-sm font-medium transition-all duration-200 data-[active=true]:text-white data-[active=false]:text-muted-foreground data-[active=false]:hover:text-foreground"
-                    data-active={mounted ? (tab === option.value).toString() : "false"}
-                  >
-                    {mounted && tab === option.value && (
-                      <motion.div 
-                        layoutId="activeSubscriptionTab"
-                        className={cn("absolute inset-0 rounded-lg bg-gradient-to-r", option.color)}
-                        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                      />
+                    onClick={() => {
+                      setDateMode(mode.value)
+                      if (mode.value === 'single') {
+                        setDateRange({ from: undefined, to: undefined })
+                      } else {
+                        setSelectedDate(undefined)
+                      }
+                    }}
+                    className={cn(
+                      "relative p-3 rounded-xl transition-all font-medium text-sm",
+                      "border-2 flex items-center justify-center gap-2",
+                      dateMode === mode.value
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                     )}
-                    <span className="relative flex items-center gap-2 justify-center">
-                      <option.icon className="h-4 w-4" />
-                      {option.label}
-                    </span>
+                  >
+                    <mode.icon className="h-4 w-4" />
+                    {mode.label}
                   </motion.button>
                 ))}
               </div>
 
-              <TabsContent value="single" className="space-y-4">
-                <div className="flex flex-col gap-4">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-end text-right h-12 border-2 flex-row-reverse data-[state=selected]:border-primary data-[state=empty]:text-muted-foreground"
-                        data-state={mounted && selectedDate ? "selected" : "empty"}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {mounted && selectedDate ? (
-                          format(selectedDate, "EEEE, dd בMMMM yyyy", { locale: he })
-                        ) : (
-                          "לחץ לבחירת תאריך"
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        disabled={isDateDisabled}
-                        locale={he}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  
-                  {mounted && selectedDate && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="py-2"
-                    >
-                      <p className="text-sm text-foreground font-medium text-right">
-                        תקבל התראה כשיתפנו תורים ב-{format(selectedDate, "dd/MM/yyyy")}
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="range" className="space-y-4">
-                <div className="flex flex-col gap-4">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between text-right h-12 border-2 flex-row-reverse data-[state=selected]:border-primary data-[state=empty]:text-muted-foreground"
-                        data-state={mounted && dateRange.from ? "selected" : "empty"}
-                      >
-                        <CalendarDays className="mr-2 h-4 w-4" />
-                        {mounted && dateRange.from ? (
-                          dateRange.to ? (
-                            <>
-                              {format(dateRange.from, "dd/MM/yyyy")} -{" "}
-                              {format(dateRange.to, "dd/MM/yyyy")}
-                            </>
+              {/* Date Picker */}
+              <AnimatePresence mode="wait">
+                {dateMode === 'single' ? (
+                  <motion.div
+                    key="single"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                  >
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-end text-right h-14 rounded-xl border-2 text-base",
+                            selectedDate && "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-5 w-5" />
+                          {mounted && selectedDate ? (
+                            <span className="font-semibold">
+                              {format(selectedDate, "EEEE, dd בMMMM yyyy", { locale: he })}
+                            </span>
                           ) : (
-                            format(dateRange.from, "dd/MM/yyyy")
-                          )
-                        ) : (
-                          "לחץ לבחירת טווח תאריכים"
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="range"
-                        selected={dateRange}
-                        onSelect={handleDateRangeSelect}
-                        disabled={isDateDisabled}
-                        locale={he}
-                        initialFocus
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  
-                  {mounted && dateRange.from && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="py-2"
-                    >
-                      <p className="text-sm text-foreground font-medium text-right">
-                        תקבל התראה כשיתפנו תורים בין {format(dateRange.from, "dd/MM")} 
-                        {dateRange.to ? ` ל-${format(dateRange.to, "dd/MM/yyyy")}` : '...'}
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Submit button */}
-            <div className="pt-4">
-              <motion.div
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-              >
-                <Button
-                  onClick={handleSubscribe}
-                  disabled={loading || (tab === 'single' ? !selectedDate : !dateRange.from || !dateRange.to)}
-                  className="w-full h-14 text-lg font-semibold relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 bg-black hover:bg-black/90"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-1000" />
-                  
-                  {loading ? (
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>נרשם להתראות...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <motion.div
-                        animate={{ rotate: loading ? 360 : 0 }}
-                        transition={{ duration: 0.5 }}
-                      >
-                        <Sparkles className="h-5 w-5" />
-                      </motion.div>
-                      <span>הירשם להתראות</span>
-                    </div>
-                  )}
-                </Button>
-              </motion.div>
-              
-              {loading && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="mt-3"
-                >
-                  <Progress value={subscriptionProgress} className="h-1" />
-                </motion.div>
-              )}
+                            <span className="text-muted-foreground">בחר תאריך</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={setSelectedDate}
+                          disabled={isDateDisabled}
+                          locale={he}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="range"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-end text-right h-14 rounded-xl border-2 text-base",
+                            dateRange.from && "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-5 w-5" />
+                          {mounted && dateRange.from ? (
+                            dateRange.to ? (
+                              <span className="font-semibold">
+                                {format(dateRange.from, "dd/MM")} - {format(dateRange.to, "dd/MM/yyyy")}
+                              </span>
+                            ) : (
+                              <span className="font-semibold">
+                                {format(dateRange.from, "dd/MM/yyyy")}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">בחר טווח תאריכים</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={handleDateRangeSelect}
+                          disabled={isDateDisabled}
+                          locale={he}
+                          initialFocus
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+
+            {/* Submit Button */}
+            <motion.div whileTap={{ scale: 0.98 }}>
+              <Button
+                onClick={handleSubscribe}
+                disabled={loading || (dateMode === 'single' ? !selectedDate : !dateRange.from || !dateRange.to)}
+                className={cn(
+                  "w-full h-14 text-lg font-semibold rounded-xl",
+                  "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700",
+                  "shadow-lg hover:shadow-xl transition-all"
+                )}
+              >
+                {loading ? (
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>נרשם להתראות...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="h-5 w-5" />
+                    <span>צור התראה חדשה</span>
+                  </div>
+                )}
+              </Button>
+            </motion.div>
+            
+            {loading && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <Progress value={subscriptionProgress} className="h-1" />
+              </motion.div>
+            )}
           </div>
         </motion.div>
 
-        {/* Subscriptions List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-4"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h3 className="text-xl font-bold">המנויים שלך</h3>
-              {subscriptions.length > 0 && (
-                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                  {getSubscriptionStats().active} פעילים
-                </Badge>
-              )}
+        {/* Active Subscriptions */}
+        {!fetchingSubscriptions && activeSubscriptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-3"
+          >
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                מנויים פעילים
+              </h3>
+              <Badge className="bg-green-600 text-white">
+                {activeSubscriptions.length}
+              </Badge>
             </div>
-          </div>
-
-          <div className="space-y-3">
-            {fetchingSubscriptions ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 bg-muted/30 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : subscriptions.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-12 space-y-4"
-              >
-                <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto">
-                  <Bell className="h-8 w-8 text-muted-foreground/60" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground font-medium">עדיין אין לך התראות</p>
-                  <p className="text-sm text-muted-foreground/80">
-                    צור את ההתראה הראשונה שלך כדי להתחיל לקבל עדכונים
-                  </p>
-                </div>
-              </motion.div>
-            ) : (
-              <div className="space-y-2">
-                <AnimatePresence>
-                  {subscriptions.map((sub, index) => (
+            
+            <div className="space-y-2">
+              <AnimatePresence>
+                {activeSubscriptions.map((sub) => {
+                  const MethodIcon = getNotificationMethodIcon(sub.notification_method)
+                  return (
                     <motion.div
                       key={sub.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
-                      className={cn(
-                        "group flex items-center justify-between p-3 rounded-lg border transition-all hover:shadow-sm hover:scale-[1.01]",
-                        sub.is_active 
-                          ? "bg-gradient-to-r from-green-50/30 to-green-50/10 border-green-200/60 hover:border-green-300/80 dark:from-green-950/10 dark:to-green-950/5 dark:border-green-800/40" 
-                          : "bg-gradient-to-r from-gray-50/30 to-gray-50/10 border-gray-200/60 dark:from-gray-950/10 dark:to-gray-950/5 dark:border-gray-700/40"
-                      )}
+                      className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-md border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-shadow"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center",
-                          sub.is_active 
-                            ? "bg-green-100/80 dark:bg-green-900/30" 
-                            : "bg-gray-100/80 dark:bg-gray-800/30"
-                        )}>
-                          {sub.is_active ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                             <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 text-gray-500" />
-                          )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">
+                              {formatSubscriptionDate(sub)}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <MethodIcon className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {getNotificationMethodLabel(sub.notification_method)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate">
-                            {formatSubscriptionDate(sub)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {sub.is_active ? (
-                              "פעיל"
-                            ) : (
-                              `הושלם ${format(new Date(sub.completed_at!), 'dd/MM')}`
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {sub.is_active && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setEditingSubscription(sub)}
-                            className="h-7 w-7 hover:bg-primary/10"
+                            className="h-8 w-8 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(sub.id)}
-                          className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(sub.id)}
+                            className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
-          </div>
-        </motion.div>
+                  )
+                })}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
 
-        {/* Edit Dialog */}
-        <Dialog open={!!editingSubscription} onOpenChange={(open) => !open && setEditingSubscription(null)}>
-          <DialogContent className="max-w-md border-2 shadow-xl">
-            <DialogHeader className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex items-center justify-center">
-                  <Edit className="h-5 w-5 text-primary" />
+        {/* Completed Subscriptions */}
+        {!fetchingSubscriptions && completedSubscriptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-3"
+          >
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                הושלמו
+              </h3>
+              <Badge variant="secondary">
+                {completedSubscriptions.length}
+              </Badge>
+            </div>
+            
+            <div className="space-y-2">
+              {completedSubscriptions.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-3 border border-gray-200 dark:border-gray-800"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-1">
+                      <CheckCircle className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-muted-foreground">
+                        {formatSubscriptionDate(sub)}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(sub.id)}
+                      className="h-7 w-7"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <DialogTitle className="text-xl">עריכת התראה</DialogTitle>
-                  <DialogDescription className="text-base">
-                    שנה את התאריכים להתראה זו
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <Tabs value={editTab} onValueChange={(v) => setEditTab(v as 'single' | 'range')}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="single" className="gap-2">
-                    <Calendar className="h-4 w-4" />
-                    תאריך בודד
-                  </TabsTrigger>
-                  <TabsTrigger value="range" className="gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    טווח תאריכים
-                  </TabsTrigger>
-                </TabsList>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
-                <TabsContent value="single" className="space-y-4 mt-4">
+        {/* Empty State */}
+        {!fetchingSubscriptions && subscriptions.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-12 space-y-4"
+          >
+            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto">
+              <BellRing className="h-10 w-10 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <p className="font-semibold text-gray-900 dark:text-gray-100">
+                עדיין אין לך התראות
+              </p>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                צור את ההתראה הראשונה שלך ותקבל עדכונים מיידיים על תורים פנויים
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingSubscription} onOpenChange={(open) => !open && setEditingSubscription(null)}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              עריכת התראה
+            </DialogTitle>
+            <DialogDescription>
+              שנה את התאריכים להתראה זו
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            {/* Edit Date Mode Tabs */}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'single' as const, label: 'תאריך בודד', icon: Calendar },
+                { value: 'range' as const, label: 'טווח תאריכים', icon: CalendarDays }
+              ].map((mode) => (
+                <button
+                  key={mode.value}
+                  onClick={() => {
+                    setEditDateMode(mode.value)
+                    if (mode.value === 'single') {
+                      setEditDateRange({ from: undefined, to: undefined })
+                    } else {
+                      setEditSelectedDate(undefined)
+                    }
+                  }}
+                  className={cn(
+                    "p-2.5 rounded-xl transition-all font-medium text-sm",
+                    "border-2 flex items-center justify-center gap-2",
+                    editDateMode === mode.value
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20 text-blue-600"
+                      : "border-gray-200 dark:border-gray-700"
+                  )}
+                >
+                  <mode.icon className="h-4 w-4" />
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Edit Date Picker */}
+            <AnimatePresence mode="wait">
+              {editDateMode === 'single' ? (
+                <motion.div
+                  key="edit-single"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-right data-[state=empty]:text-muted-foreground"
-                        data-state={mounted && editSelectedDate ? "selected" : "empty"}
+                        className="w-full justify-start text-right rounded-xl h-12"
                       >
                         <Calendar className="ml-2 h-4 w-4" />
                         {mounted && editSelectedDate ? (
@@ -716,15 +847,19 @@ function SubscribePage() {
                       />
                     </PopoverContent>
                   </Popover>
-                </TabsContent>
-
-                <TabsContent value="range" className="space-y-4 mt-4">
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="edit-range"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-right data-[state=empty]:text-muted-foreground"
-                        data-state={mounted && editDateRange.from ? "selected" : "empty"}
+                        className="w-full justify-start text-right rounded-xl h-12"
                       >
                         <CalendarDays className="ml-2 h-4 w-4" />
                         {mounted && editDateRange.from ? (
@@ -753,40 +888,40 @@ function SubscribePage() {
                       />
                     </PopoverContent>
                   </Popover>
-                </TabsContent>
-              </Tabs>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-              <div className="flex gap-2 pt-4">
-                <Button 
-                  onClick={handleUpdate}
-                  disabled={editLoading || (editTab === 'single' ? !editSelectedDate : !editDateRange.from || !editDateRange.to)}
-                  className="flex-1 h-11 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                >
-                  {editLoading ? (
-                    <>
-                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                      מעדכן...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="ml-2 h-4 w-4" />
-                      עדכן התראה
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setEditingSubscription(null)}
-                  disabled={editLoading}
-                  className="h-11 border-2"
-                >
-                  ביטול
-                </Button>
-              </div>
+            <div className="flex gap-2 pt-4">
+              <Button 
+                onClick={handleUpdate}
+                disabled={editLoading || (editDateMode === 'single' ? !editSelectedDate : !editDateRange.from || !editDateRange.to)}
+                className="flex-1 h-11 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600"
+              >
+                {editLoading ? (
+                  <>
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    מעדכן...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="ml-2 h-4 w-4" />
+                    עדכן
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setEditingSubscription(null)}
+                disabled={editLoading}
+                className="h-11 rounded-xl"
+              >
+                ביטול
+              </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

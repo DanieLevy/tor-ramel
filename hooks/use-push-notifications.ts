@@ -1,0 +1,276 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+
+interface PushManagerState {
+  isSupported: boolean;
+  permission: NotificationPermission;
+  isSubscribed: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export const usePushNotifications = () => {
+  const [state, setState] = useState<PushManagerState>({
+    isSupported: false,
+    permission: 'default',
+    isSubscribed: false,
+    isLoading: true,
+    error: null
+  });
+
+  // Check if push notifications are supported
+  useEffect(() => {
+    const checkSupport = async () => {
+      try {
+        const isSupported = 
+          'serviceWorker' in navigator &&
+          'PushManager' in window &&
+          'Notification' in window;
+
+        if (!isSupported) {
+          setState(prev => ({
+            ...prev,
+            isSupported: false,
+            isLoading: false,
+            error: 'Push notifications are not supported in this browser'
+          }));
+          return;
+        }
+
+        // Check current permission
+        const permission = Notification.permission;
+
+        // Check if already subscribed
+        if ('serviceWorker' in navigator && permission === 'granted') {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          
+          setState(prev => ({
+            ...prev,
+            isSupported: true,
+            permission,
+            isSubscribed: !!subscription,
+            isLoading: false
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            isSupported: true,
+            permission,
+            isSubscribed: false,
+            isLoading: false
+          }));
+        }
+      } catch (error) {
+        console.error('❌ [Push Hook] Error checking push support:', error);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: 'Error checking push notification support'
+        }));
+      }
+    };
+
+    checkSupport();
+  }, []);
+
+  // Request permission and subscribe
+  const subscribe = useCallback(async () => {
+    if (state.isLoading || state.isSubscribed) return;
+
+    console.log('📱 [Push Hook] Starting subscription process...');
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      // Check for service worker support
+      if (!('serviceWorker' in navigator)) {
+        throw new Error('Service Worker not supported');
+      }
+
+      // Check for push API support
+      if (!('PushManager' in window)) {
+        throw new Error('Push API not supported');
+      }
+
+      // iOS/Safari specific checks
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      console.log(`📱 [Push Hook] Device: iOS=${isIOS}, Safari=${isSafari}`);
+
+      // Request notification permission
+      console.log('🔔 [Push Hook] Requesting permission...');
+      const permission = await Notification.requestPermission();
+      console.log(`📝 [Push Hook] Permission result: ${permission}`);
+      
+      if (permission !== 'granted') {
+        toast.error('התראות נדחו. אנא אפשר התראות בהגדרות הדפדפן.');
+        setState(prev => ({ ...prev, isLoading: false, permission }));
+        return;
+      }
+
+      setState(prev => ({ ...prev, permission }));
+
+      // Register service worker
+      console.log('⚙️ [Push Hook] Registering service worker...');
+      const registration = await navigator.serviceWorker.ready;
+      console.log('✅ [Push Hook] Service worker ready');
+
+      // Get VAPID key
+      console.log('🔑 [Push Hook] Fetching VAPID key...');
+      const vapidResponse = await fetch('/api/push/vapid-key');
+      if (!vapidResponse.ok) {
+        throw new Error('Failed to fetch VAPID key');
+      }
+      const { publicKey } = await vapidResponse.json();
+      console.log('✅ [Push Hook] VAPID key received');
+
+      // Convert VAPID key
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
+
+      // Subscribe to push
+      console.log('📤 [Push Hook] Creating push subscription...');
+      const pushSubscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey
+      });
+      console.log('✅ [Push Hook] Push subscription created');
+
+      // Get token (optional)
+      const token = localStorage.getItem('token');
+      
+      // Save subscription to server
+      console.log('💾 [Push Hook] Saving subscription to server...');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          subscription: pushSubscription.toJSON()
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Failed to save subscription: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ [Push Hook] Subscription saved successfully:', result);
+
+      setState(prev => ({
+        ...prev,
+        isSubscribed: true,
+        isLoading: false
+      }));
+
+      toast.success('🔔 התראות הופעלו בהצלחה!');
+    } catch (error) {
+      console.error('❌ [Push Hook] Subscription error:', error);
+      toast.error('שגיאה בהפעלת התראות: ' + (error as Error).message);
+      setState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [state.isLoading, state.isSubscribed]);
+
+  // Unsubscribe
+  const unsubscribe = useCallback(async () => {
+    if (state.isLoading || !state.isSubscribed) return;
+
+    console.log('🗑️ [Push Hook] Starting unsubscribe process...');
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      
+      if (subscription) {
+        await subscription.unsubscribe();
+        
+        // Remove from server
+        const token = localStorage.getItem('token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        await fetch('/api/push/subscribe', {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({
+            endpoint: subscription.endpoint
+          })
+        });
+      }
+      
+      setState(prev => ({
+        ...prev,
+        isSubscribed: false,
+        isLoading: false
+      }));
+      
+      toast.success('התראות כובו');
+      console.log('✅ [Push Hook] Unsubscribed successfully');
+    } catch (error) {
+      console.error('❌ [Push Hook] Unsubscribe error:', error);
+      toast.error('שגיאה בכיבוי התראות');
+      setState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, [state.isLoading, state.isSubscribed]);
+
+  // Show iOS install prompt
+  const showIOSInstallPrompt = useCallback(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
+                               ((window.navigator as any).standalone) === true;
+    
+    if (isIOS && !isInStandaloneMode) {
+      toast('התקן את האפליקציה כדי לקבל התראות:\n1. הקש על שתף ⬆️\n2. בחר "הוסף למסך הבית"\n3. הקש על "הוסף"', {
+        duration: 10000,
+      });
+      return true;
+    }
+    return false;
+  }, []);
+
+  return {
+    isSupported: state.isSupported,
+    permission: state.permission,
+    isSubscribed: state.isSubscribed,
+    isLoading: state.isLoading,
+    error: state.error,
+    subscribe,
+    unsubscribe,
+    showIOSInstallPrompt
+  };
+};
+
+// VAPID key conversion (iOS-compatible)
+const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  base64String = base64String.trim();
+  
+  // Handle URL-safe base64
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  // Decode base64
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+};
+

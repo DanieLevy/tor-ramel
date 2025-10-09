@@ -1,11 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
+import webpush from 'web-push'
 
 // Initialize Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
+
+// Initialize web-push with VAPID keys
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ''
+const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@example.com'
+
+if (vapidPublicKey && vapidPrivateKey) {
+  try {
+    webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey)
+    console.log('✅ [Push] VAPID keys configured successfully')
+  } catch (error) {
+    console.error('❌ [Push] Failed to configure VAPID keys:', error)
+  }
+} else {
+  console.warn('⚠️ [Push] VAPID keys missing - push notifications will not work')
+}
 
 // Create email transporter
 const transporter = nodemailer.createTransport({
@@ -721,6 +738,101 @@ ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notificat
   }
 }
 
+// Helper function to send push notification
+async function sendPushNotification(data) {
+  try {
+    const { userId, title, body, url, appointments } = data
+    
+    // Get active push subscriptions for this user
+    const { data: pushSubscriptions, error: pushError } = await supabase
+      .from('push_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+
+    if (pushError) {
+      console.error('❌ [Push] Error fetching subscriptions:', pushError)
+      return false
+    }
+
+    if (!pushSubscriptions || pushSubscriptions.length === 0) {
+      console.log(`⚠️ [Push] No active push subscriptions for user ${userId}`)
+      return true // Not an error, just no subscriptions
+    }
+
+    console.log(`📱 [Push] Found ${pushSubscriptions.length} active push subscriptions`)
+
+    // Prepare notification payload
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+    const notificationPayload = JSON.stringify({
+      notification: {
+        title,
+        body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: 'appointment-notification',
+        requireInteraction: true,
+        actions: [
+          { action: 'view', title: 'צפה בתור' },
+          { action: 'dismiss', title: 'בטל' }
+        ],
+        data: {
+          url: url || baseUrl,
+          appointments: appointments || [],
+          timestamp: Date.now()
+        }
+      }
+    })
+
+    // Send to each subscription
+    let sent = 0
+    let failed = 0
+
+    for (const sub of pushSubscriptions) {
+      try {
+        const pushSubscription = {
+          endpoint: sub.endpoint,
+          keys: {
+            p256dh: sub.p256dh,
+            auth: sub.auth
+          }
+        }
+
+        await webpush.sendNotification(pushSubscription, notificationPayload)
+        sent++
+        console.log(`✅ [Push] Push sent to ${sub.username} (${sub.device_type})`)
+
+        // Update last_used timestamp
+        await supabase
+          .from('push_subscriptions')
+          .update({ last_used: new Date().toISOString() })
+          .eq('id', sub.id)
+
+      } catch (error) {
+        failed++
+        console.error(`❌ [Push] Failed to send to ${sub.username}:`, error.message)
+
+        // Handle subscription errors
+        if (error.statusCode === 410 || error.statusCode === 404) {
+          // Subscription expired or gone - remove it
+          console.log(`🗑️ [Push] Removing expired subscription for ${sub.username}`)
+          await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('endpoint', sub.endpoint)
+        }
+      }
+    }
+
+    console.log(`📊 [Push] Results: ${sent} sent, ${failed} failed`)
+    return sent > 0
+
+  } catch (error) {
+    console.error('❌ [Push] Error sending push notification:', error)
+    return false
+  }
+}
+
 // Process notification queue
 export async function processNotificationQueue(limit = 10) {
   const startTime = Date.now()
@@ -740,6 +852,7 @@ export async function processNotificationQueue(limit = 10) {
           date_range_start,
           date_range_end,
           is_active,
+          notification_method,
           users!inner(email)
         )
       `)
@@ -872,16 +985,66 @@ export async function processNotificationQueue(limit = 10) {
           }
         }
 
-        // Send email with timeout
-        const emailTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Email timeout')), 8000)
-        )
-        
-        const emailPromise = sendNotificationEmail(emailData)
+        // Get notification method preference (default to 'email' for backward compatibility)
+        const notificationMethod = subscription.notification_method || 'email'
+        console.log(`📬 [Queue] Notification method for subscription ${subscription.id}: ${notificationMethod}`)
 
-        const emailSent = await Promise.race([emailPromise, emailTimeout])
+        // Send notifications based on preference
+        let emailSent = false
+        let pushSent = false
 
-        if (emailSent) {
+        // Send email if method is 'email' or 'both'
+        if (notificationMethod === 'email' || notificationMethod === 'both') {
+          const emailTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email timeout')), 8000)
+          )
+          
+          const emailPromise = sendNotificationEmail(emailData)
+          emailSent = await Promise.race([emailPromise, emailTimeout])
+          
+          if (emailSent) {
+            console.log(`✅ [Queue] Email sent successfully`)
+          } else {
+            console.error(`❌ [Queue] Email failed to send`)
+          }
+        }
+
+        // Send push notification if method is 'push' or 'both'
+        if (notificationMethod === 'push' || notificationMethod === 'both') {
+          // Prepare push notification data
+          let pushTitle, pushBody, pushUrl
+          
+          if (isGrouped && appointments.length > 0) {
+            pushTitle = `תורים פנויים - ${appointments.length} ימים`
+            pushBody = `נמצאו תורים זמינים ב-${appointments.length} תאריכים שונים`
+            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscription.id}&appointments=${encodeURIComponent(JSON.stringify(appointments.map(a => ({ date: a.date, times: a.newTimes }))))}`
+          } else {
+            pushTitle = `תורים פנויים - ${emailData.dayName}`
+            pushBody = `נמצאו ${emailData.times.length} תורים זמינים ב-${emailData.date}`
+            pushUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notification-action?action=approve&subscription=${subscription.id}&times=${encodeURIComponent(emailData.times.join(','))}&date=${emailData.date}`
+          }
+          
+          pushSent = await sendPushNotification({
+            userId: subscription.user_id,
+            title: pushTitle,
+            body: pushBody,
+            url: pushUrl,
+            appointments: isGrouped ? appointments : null
+          })
+          
+          if (pushSent) {
+            console.log(`✅ [Queue] Push notification sent successfully`)
+          } else {
+            console.error(`❌ [Queue] Push notification failed to send`)
+          }
+        }
+
+        // Check if at least one notification method succeeded
+        const notificationSent = (notificationMethod === 'email' && emailSent) || 
+                                  (notificationMethod === 'push' && pushSent) || 
+                                  (notificationMethod === 'both' && (emailSent || pushSent))
+
+        if (notificationSent) {
           // Record successful notifications
           if (isGrouped && appointments.length > 0) {
             // Record each appointment in the group

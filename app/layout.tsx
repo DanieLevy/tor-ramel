@@ -9,7 +9,8 @@ import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
 import { FontLoader } from "@/components/font-loader";
-import { SWUpdateNotification } from '@/components/sw-update-notification'
+import { SWUpdateNotification } from '@/components/sw-update-notification';
+import { PushNotificationBanner } from '@/components/push-notification-banner';
 
 export const metadata: Metadata = {
   title: "תור רם-אל - זימון תורים",
@@ -107,6 +108,7 @@ export default function RootLayout({
                   <main className="flex-1">{children}</main>
                   <BottomNav />
                   <SWUpdateNotification />
+                  <PushNotificationBanner />
                 </div>
               </HeaderProvider>
               <Toaster 

@@ -265,40 +265,99 @@ async function syncAppointments() {
   console.log('[SW] Syncing appointments...');
 }
 
-// Push notifications
+// Push notifications - Enhanced with structured payload
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push notification received');
+  console.log('[SW] 📬 Push notification received');
   
-  const options = {
-    body: event.data ? event.data.text() : 'תור חדש זמין!',
+  let notificationData = {
+    title: 'תור רם-אל',
+    body: 'תור חדש זמין!',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
+    data: { url: '/' }
+  };
+
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      console.log('[SW] 📦 Push payload:', payload);
+      
+      if (payload.notification) {
+        notificationData = {
+          ...notificationData,
+          ...payload.notification
+        };
+      }
+    } catch (err) {
+      console.error('[SW] ❌ Error parsing push data:', err);
+      // Fallback to text if JSON parsing fails
+      if (event.data.text()) {
+        notificationData.body = event.data.text();
+      }
+    }
+  }
+
+  const options = {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    badge: notificationData.badge,
+    image: notificationData.image,
     vibrate: [200, 100, 200],
-    tag: 'appointment-notification',
-    requireInteraction: true,
-    actions: [
+    tag: notificationData.tag || 'appointment-notification',
+    requireInteraction: notificationData.requireInteraction || true,
+    actions: notificationData.actions || [
       { action: 'view', title: 'צפה בתור' },
       { action: 'dismiss', title: 'בטל' }
     ],
+    data: notificationData.data || { url: '/' },
     dir: 'rtl',
     lang: 'he'
   };
+
+  console.log('[SW] 🔔 Showing notification:', notificationData.title);
   
   event.waitUntil(
-    self.registration.showNotification('תור רם-אל', options)
+    self.registration.showNotification(notificationData.title, options)
   );
 });
 
-// Notification click handling
+// Notification click handling - Enhanced with smart URL navigation
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked:', event.action);
+  console.log('[SW] 🖱️ Notification clicked:', event.action);
   event.notification.close();
   
-  if (event.action === 'view') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
+  const urlToOpen = event.notification.data?.url || '/';
+  
+  // Handle different actions
+  if (event.action === 'dismiss') {
+    // Just close, no navigation
+    console.log('[SW] ❌ Notification dismissed');
+    return;
   }
+  
+  // For 'view' action or general click, open/focus app
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(windowClients => {
+      // Check if there's already a window open with our app
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          console.log('[SW] ✅ Focusing existing window and navigating to:', urlToOpen);
+          // Navigate to the target URL and focus
+          client.navigate(urlToOpen);
+          return client.focus();
+        }
+      }
+      // No window open, open a new one
+      if (clients.openWindow) {
+        console.log('[SW] 🆕 Opening new window:', urlToOpen);
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
 
 // Message handling for skip waiting and cache clearing
@@ -358,36 +417,6 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Handle notification clicks
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  
-  const urlToOpen = event.notification.data?.url || '/';
-  
-  event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then(windowClients => {
-      // Check if there's already a window/tab open with the target URL
-      const hadWindowToFocus = windowClients.some(windowClient => {
-        if (windowClient.url === urlToOpen && 'focus' in windowClient) {
-          windowClient.focus();
-          return true;
-        }
-      });
-      
-      // Otherwise, open a new window/tab with the target URL
-      if (!hadWindowToFocus) {
-        clients.openWindow(urlToOpen).then(windowClient => {
-          if (windowClient) {
-            windowClient.focus();
-          }
-        });
-      }
-    })
-  );
-});
 
 // Handle app badge
 self.addEventListener('message', event => {
