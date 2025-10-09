@@ -21,10 +21,21 @@ export async function GET(request: NextRequest) {
     const appointmentDate = searchParams.get('appointment_date')
     const countOnly = searchParams.get('count_only') === 'true'
     
+    // FIXED: Only fetch ignored times for ACTIVE subscriptions
+    // This prevents showing ignored times from deleted/inactive subscriptions
     let query = supabase
       .from('ignored_appointment_times')
-      .select('*')
+      .select(`
+        *,
+        notification_subscriptions!inner (
+          id,
+          is_active,
+          subscription_status
+        )
+      `)
       .eq('user_id', user.userId)
+      .eq('notification_subscriptions.is_active', true)
+      .in('notification_subscriptions.subscription_status', ['active', 'paused'])
     
     if (subscriptionId) {
       query = query.eq('subscription_id', subscriptionId)

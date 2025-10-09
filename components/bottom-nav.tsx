@@ -27,31 +27,42 @@ export function BottomNav() {
 
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
+    let ticking = false
 
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-      
-      // Clear any existing timeout
-      clearTimeout(timeoutId)
-      
-      // Show nav when at the top
-      if (currentScrollY < 50) {
-        setIsVisible(true)
-      } else {
-        // Hide when scrolling down, show when scrolling up
-        if (currentScrollY > lastScrollY && currentScrollY > 100) {
-          setIsVisible(false)
-        } else if (currentScrollY < lastScrollY) {
-          setIsVisible(true)
-        }
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY
+          const scrollDelta = currentScrollY - lastScrollY
+          
+          // Clear previous timeout
+          clearTimeout(timeoutId)
+          
+          // Always visible at top of page
+          if (currentScrollY < 50) {
+            setIsVisible(true)
+          } 
+          // Hide on scroll down (threshold: 5px)
+          else if (scrollDelta > 5 && currentScrollY > 100) {
+            setIsVisible(false)
+          } 
+          // Show on scroll up (threshold: 5px)
+          else if (scrollDelta < -5) {
+            setIsVisible(true)
+          }
+          
+          setLastScrollY(currentScrollY)
+          
+          // Auto-reveal after 1.5s of inactivity
+          timeoutId = setTimeout(() => {
+            setIsVisible(true)
+          }, 1500)
+          
+          ticking = false
+        })
+        
+        ticking = true
       }
-      
-      setLastScrollY(currentScrollY)
-      
-      // Auto-show after 2 seconds of no scrolling
-      timeoutId = setTimeout(() => {
-        setIsVisible(true)
-      }, 2000)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -76,10 +87,16 @@ export function BottomNav() {
         className="fixed bottom-0 left-0 right-0 z-50"
         initial={{ y: 0 }}
         animate={{ y: isVisible ? 0 : 100 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        transition={{ 
+          type: "spring", 
+          stiffness: 400, 
+          damping: 35,
+          mass: 0.8,
+          velocity: 2
+        }}
       >
         {/* Ultra-transparent blurred background for seamless flow */}
-        <div className="absolute inset-0 bg-background/5 backdrop-blur-xl" />
+        <div className="absolute inset-0" />
         
         {/* Container with safe area padding */}
         <div className="relative pb-[env(safe-area-inset-bottom)]">

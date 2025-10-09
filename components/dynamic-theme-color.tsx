@@ -42,13 +42,13 @@ export function DynamicThemeColor() {
         document.head.appendChild(defaultMeta)
       }
       
-      // Set colors - match background for seamless notch integration
-      const lightColor = 'hsl(0 0% 100%)' // white for light mode
-      const darkColor = 'hsl(0 0% 0%)' // black for dark mode
+      // Always use light color for notch - even when device is in dark mode
+      // This ensures the notch area stays light regardless of system theme
+      const lightColor = '#ffffff' // Always white for notch area
       
       lightMeta.setAttribute('content', lightColor)
-      darkMeta.setAttribute('content', darkColor)
-      defaultMeta.setAttribute('content', isDark ? darkColor : lightColor)
+      darkMeta.setAttribute('content', lightColor) // Force light even in dark mode
+      defaultMeta.setAttribute('content', lightColor) // Always light
       
       // Also update apple-mobile-web-app-status-bar-style for iOS
       let statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
