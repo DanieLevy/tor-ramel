@@ -78,14 +78,14 @@ export function BottomNav() {
         animate={{ y: isVisible ? 0 : 100 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        {/* Minimal background - NO border-top */}
-        <div className="absolute inset-0 bg-white/95 dark:bg-black/95 backdrop-blur-md" />
+        {/* Ultra-transparent blurred background for seamless flow */}
+        <div className="absolute inset-0 bg-background/5 backdrop-blur-xl" />
         
         {/* Container with safe area padding */}
         <div className="relative pb-[env(safe-area-inset-bottom)]">
           <div className="flex items-center justify-center h-16 px-8">
-            {/* Navigation container */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200/30 dark:border-gray-800/30">
+            {/* Navigation container with subtle background */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-background/40 backdrop-blur-md border border-border/10">
               {navItems.map((item, index) => {
                 const isActive = pathname === item.href
                 const isHovered = hoveredIndex === index

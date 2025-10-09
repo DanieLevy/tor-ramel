@@ -437,6 +437,42 @@ body.fonts-failed {
   }
 }
 
+/* Enhanced backdrop blur for seamless UI flow */
+@supports (backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px)) {
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+  
+  .backdrop-blur-md {
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    backdrop-filter: blur(12px) saturate(150%);
+  }
+}
+
+/* Fallback for browsers without backdrop-filter */
+@supports not ((backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px))) {
+  .backdrop-blur-xl,
+  .backdrop-blur-md {
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+  
+  .dark .backdrop-blur-xl,
+  .dark .backdrop-blur-md {
+    background-color: rgba(0, 0, 0, 0.9);
+  }
+}
+
+/* iOS-specific backdrop blur optimizations */
+@supports (-webkit-backdrop-filter: blur(10px)) {
+  /* Use hardware acceleration for better performance */
+  .backdrop-blur-xl,
+  .backdrop-blur-md {
+    transform: translateZ(0);
+    will-change: backdrop-filter;
+  }
+}
+
 /* Print styles */
 @media print {
 

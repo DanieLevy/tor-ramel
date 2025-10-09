@@ -12,6 +12,7 @@ import { FontLoader } from "@/components/font-loader";
 import { SwUpdateBanner } from '@/components/sw-update-banner';
 import { PushNotificationBanner } from '@/components/push-notification-banner';
 import { Footer } from '@/components/footer';
+import { DynamicThemeColor } from '@/components/dynamic-theme-color';
 
 export const metadata: Metadata = {
   title: "תור רם-אל - זימון תורים",
@@ -73,10 +74,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#6366f1" },
-    { media: "(prefers-color-scheme: dark)", color: "#6366f1" },
-  ],
+  // Theme color is set dynamically via DynamicThemeColor component
+  // to match the page background for seamless notch integration
 };
 
 export default function RootLayout({
@@ -103,6 +102,7 @@ export default function RootLayout({
           <AuthProvider>
             <PWAProvider>
               <FontLoader />
+              <DynamicThemeColor />
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
