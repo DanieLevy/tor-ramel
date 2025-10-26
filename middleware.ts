@@ -13,6 +13,10 @@ const publicRoutes = [
   '/offline',
   '/api/auth/login',
   '/api/auth/register',
+  '/api/auth/send-reset-otp',
+  '/api/auth/verify-reset-otp',
+  '/api/auth/reset-password',
+  '/api/auth/reset-password-with-token',
   '/api/push/vapid-key',  // Public VAPID key for push notifications
   '/sw.js',
   '/manifest.json',
