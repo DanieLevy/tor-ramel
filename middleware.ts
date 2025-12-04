@@ -32,12 +32,11 @@ function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => pathname.startsWith(route))
 }
 
-// Next.js 16: Renamed from middleware to proxy
-// This runs on Node.js runtime with full API access
-export async function proxy(request: NextRequest) {
+// Next.js Middleware - runs on every request
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
-  // Skip proxy for static assets and public routes
+  // Skip middleware for static assets and public routes
   if (isPublicRoute(pathname)) {
     return NextResponse.next()
   }
@@ -99,4 +98,6 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
+
+
 

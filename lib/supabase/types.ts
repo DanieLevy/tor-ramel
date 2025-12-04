@@ -448,3 +448,5 @@ export type NotificationQueue = Tables<'notification_queue'>
 export type IgnoredAppointmentTime = Tables<'ignored_appointment_times'>
 export type UserOtp = Tables<'user_otps'>
 
+
+

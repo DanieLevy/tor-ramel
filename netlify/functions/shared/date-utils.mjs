@@ -102,3 +102,5 @@ export const generateBookingUrl = (dateStr) => {
   return `${baseUrl}?${params.toString()}`
 }
 
+
+
