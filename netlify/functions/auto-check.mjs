@@ -12,6 +12,10 @@ import {
   getOpenDays,
   generateBookingUrl
 } from './shared/date-utils.mjs'
+import { 
+  processHotAlerts, 
+  processOpportunityDiscovery 
+} from './shared/proactive-notifications.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -431,6 +435,25 @@ async function findAppointments() {
         console.log(`📧 Notification processing completed in ${notificationTime}ms: ${result.processed} sent, ${result.failed} failed`)
       } catch (error) {
         console.error('❌ Error processing notifications:', error)
+      }
+    }
+    
+    // Process proactive notifications (hot alerts & opportunity discovery)
+    const availableWithTimes = successfulResults.filter(r => r.available && r.times && r.times.length > 0)
+    if (availableWithTimes.length > 0) {
+      console.log('🔔 Processing proactive notifications...')
+      
+      try {
+        // Hot alerts for urgent appointments (1-3 days)
+        const hotAlertResult = await processHotAlerts(availableWithTimes)
+        console.log(`🔥 Hot alerts: ${hotAlertResult.sent} sent, ${hotAlertResult.skipped} skipped`)
+        
+        // Opportunity discovery for users without subscriptions
+        const opportunityResult = await processOpportunityDiscovery(availableWithTimes)
+        console.log(`💡 Opportunity discovery: ${opportunityResult.sent} sent, ${opportunityResult.skipped} skipped`)
+        
+      } catch (error) {
+        console.error('❌ Error processing proactive notifications:', error)
       }
     }
   }

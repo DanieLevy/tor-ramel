@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Bell, Loader2, Trash2, CalendarDays, Pause, Play, Mail, BellRing, Search, History, AlertTriangle, Plus, ChevronLeft, Zap, CalendarClock, CheckCircle2, XCircle } from 'lucide-react'
 import { AppointmentBanner } from '@/components/appointment-banner'
 import { QuickActionCard, QuickActionGrid } from '@/components/quick-action-card'
+import { QuickSubscribe } from '@/components/quick-subscribe'
 import { useHaptics } from '@/hooks/use-haptics'
 import Link from 'next/link'
 import { format, isPast } from 'date-fns'
@@ -276,6 +277,16 @@ export default function HomePage() {
           delay={0.25}
         />
       </QuickActionGrid>
+
+      {/* Quick Subscribe - Show when no active subscriptions */}
+      {activeSubscriptions.length === 0 && (
+        <QuickSubscribe 
+          onSubscribed={() => {
+            fetchSubscriptions()
+            fetchHomeStats()
+          }}
+        />
+      )}
 
       {/* Active Subscriptions - Enhanced Design */}
       <motion.div
