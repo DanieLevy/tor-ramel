@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { ExternalLink, Calendar, Clock, AlertCircle, RefreshCw, Sparkles } from 'lucide-react'
+import { ExternalLink, AlertCircle, Sparkles, CalendarCheck, Flame, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useHaptics } from '@/hooks/use-haptics'
+import { motion } from 'framer-motion'
 
 interface Appointment {
   date: string
@@ -24,6 +26,7 @@ export function AppointmentBanner() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const haptics = useHaptics()
 
   useEffect(() => {
     fetchStats()
@@ -74,24 +77,32 @@ export function AppointmentBanner() {
     return `בעוד ${diffInDays} ימים`
   }
 
-  const formatLastCheckTime = (timeStr: string | null) => {
-    if (!timeStr) return 'לא זמין'
+  const getUrgencyLevel = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const diffInDays = Math.floor((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     
-    const date = new Date(timeStr)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    
-    if (diffMins < 1) return 'הרגע'
-    if (diffMins < 60) return `לפני ${diffMins} דקות`
-    return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+    if (diffInDays <= 2) return 'urgent' // Hot - within 2 days
+    if (diffInDays <= 7) return 'soon'   // Soon - within a week
+    return 'normal'
+  }
+
+  const handleBookingClick = () => {
+    haptics.medium()
   }
 
   if (loading) {
     return (
-      <div className="w-full p-4 bg-gradient-to-r from-muted/30 to-muted/10 rounded-2xl">
-        <Skeleton className="h-16 w-full rounded-xl" />
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full"
+      >
+        <div className="glass-elevated rounded-2xl p-4">
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      </motion.div>
     )
   }
 
@@ -99,73 +110,131 @@ export function AppointmentBanner() {
     return null
   }
 
+  const urgency = stats.nearestAppointment ? getUrgencyLevel(stats.nearestAppointment.date) : 'normal'
+
   return (
-    <div className="w-full space-y-3">
-      {/* Main appointment banner */}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full"
+    >
       {stats.nearestAppointment ? (
+        /* Available Appointment - Glass Hero Card */
         <div className={cn(
-          "relative overflow-hidden rounded-2xl",
-          "bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10",
-          "border border-green-500/20",
-          "p-4 transition-all duration-300",
-          "hover:shadow-lg hover:shadow-green-500/5"
+          "glass-elevated rounded-2xl overflow-hidden",
+          urgency === 'urgent' 
+            ? "bg-gradient-to-br from-orange-500/15 via-red-500/10 to-rose-500/15 dark:from-orange-500/20 dark:via-red-500/15 dark:to-rose-500/20 border-orange-500/25 dark:border-orange-400/25"
+            : "bg-gradient-to-br from-green-500/10 via-emerald-500/8 to-teal-500/10 dark:from-green-500/15 dark:via-emerald-500/10 dark:to-teal-500/15 border-green-500/20 dark:border-green-400/20",
+          "border shadow-lg",
+          urgency === 'urgent' ? "shadow-orange-500/10" : "shadow-green-500/5"
         )}>
-          {/* Sparkle decoration */}
-          <Sparkles className="absolute top-3 left-3 h-4 w-4 text-green-500/30 animate-pulse" />
+          {/* Glass shine overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent pointer-events-none" />
           
-          <div className="flex flex-col gap-3">
-            {/* Top section with icon and text */}
+          <div className="relative p-4 space-y-3">
+            {/* Nearest Opportunity Badge */}
+            <div className="flex items-center justify-between">
+              <div className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide",
+                urgency === 'urgent'
+                  ? "bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30"
+                  : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+              )}>
+                {urgency === 'urgent' ? (
+                  <>
+                    <Flame className="h-3 w-3 animate-pulse" />
+                    <span>תור קרוב!</span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="h-3 w-3" />
+                    <span>התור הקרוב ביותר</span>
+                  </>
+                )}
+              </div>
+              <Sparkles className={cn(
+                "h-4 w-4 animate-pulse",
+                urgency === 'urgent' ? "text-orange-500" : "text-amber-500"
+              )} />
+            </div>
+
+            {/* Header with icon and status */}
             <div className="flex items-start gap-3">
               <div className={cn(
-                "flex h-10 w-10 items-center justify-center rounded-xl",
-                "bg-gradient-to-br from-green-500/20 to-emerald-500/20",
-                "ring-1 ring-green-500/20"
+                "flex h-12 w-12 items-center justify-center rounded-xl",
+                "backdrop-blur-sm ring-1",
+                urgency === 'urgent'
+                  ? "bg-gradient-to-br from-orange-500/20 to-red-500/20 ring-orange-500/30 dark:ring-orange-400/30"
+                  : "bg-gradient-to-br from-green-500/20 to-emerald-500/20 ring-green-500/30 dark:ring-green-400/30"
               )}>
-                <Calendar className="h-5 w-5 text-green-600" />
+                <CalendarCheck className={cn(
+                  "h-6 w-6",
+                  urgency === 'urgent' ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"
+                )} />
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-semibold text-green-900 dark:text-green-100">
-                    תור זמין {getRelativeTime(stats.nearestAppointment.date)}
-                  </p>
-                  <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
-                    <Clock className="h-3 w-3" />
-                    {stats.nearestAppointment.times.length} זמנים
-                  </span>
-                </div>
-                <p className="text-sm text-green-700/80 dark:text-green-300/80 mt-0.5">
+                <h3 className={cn(
+                  "font-bold text-lg",
+                  urgency === 'urgent' ? "text-orange-900 dark:text-orange-100" : "text-green-900 dark:text-green-100"
+                )}>
+                  תור זמין {getRelativeTime(stats.nearestAppointment.date)}
+                </h3>
+                <p className={cn(
+                  "text-sm",
+                  urgency === 'urgent' ? "text-orange-700/80 dark:text-orange-300/80" : "text-green-700/80 dark:text-green-300/80"
+                )}>
                   {stats.nearestAppointment.dayName}, {formatDate(stats.nearestAppointment.date)}
                 </p>
               </div>
             </div>
 
-            {/* Available times preview */}
+            {/* Available times chips */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground">שעות זמינות:</span>
-              {stats.nearestAppointment.times.slice(0, 3).map((time, idx) => (
+              <span className={cn(
+                "text-xs font-medium",
+                urgency === 'urgent' ? "text-orange-700/70 dark:text-orange-300/70" : "text-green-700/70 dark:text-green-300/70"
+              )}>
+                שעות:
+              </span>
+              {stats.nearestAppointment.times.slice(0, 4).map((time, idx) => (
                 <span 
                   key={idx} 
-                  className="text-xs font-medium bg-background/60 backdrop-blur-sm px-2 py-1 rounded-lg border border-green-500/20"
+                  className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-lg",
+                    "bg-white/60 dark:bg-white/10",
+                    "backdrop-blur-sm",
+                    urgency === 'urgent'
+                      ? "border border-orange-500/20 dark:border-orange-400/20 text-orange-800 dark:text-orange-200"
+                      : "border border-green-500/20 dark:border-green-400/20 text-green-800 dark:text-green-200"
+                  )}
                 >
                   {time}
                 </span>
               ))}
-              {stats.nearestAppointment.times.length > 3 && (
-                <span className="text-xs text-muted-foreground">
-                  +{stats.nearestAppointment.times.length - 3} עוד
+              {stats.nearestAppointment.times.length > 4 && (
+                <span className={cn(
+                  "text-xs font-medium",
+                  urgency === 'urgent' ? "text-orange-600/70 dark:text-orange-400/70" : "text-green-600/70 dark:text-green-400/70"
+                )}>
+                  +{stats.nearestAppointment.times.length - 4}
                 </span>
               )}
             </div>
 
-            {/* Action button */}
+            {/* CTA Button */}
             <Button
-              size="sm"
+              size="lg"
               className={cn(
-                "w-full rounded-xl font-medium",
-                "bg-green-600 hover:bg-green-700 text-white",
-                "shadow-sm hover:shadow-md transition-all duration-200"
+                "w-full rounded-xl font-semibold text-base h-12",
+                "text-white shadow-lg",
+                "active:scale-[0.98] transition-all duration-200",
+                "touch-manipulation",
+                urgency === 'urgent'
+                  ? "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-orange-600/25"
+                  : "bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 shadow-green-600/25"
               )}
+              onClick={handleBookingClick}
               asChild
             >
               <a
@@ -173,22 +242,34 @@ export function AppointmentBanner() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <span>הזמן עכשיו</span>
-                <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                <span>{urgency === 'urgent' ? 'הזמן עכשיו!' : 'הזמן עכשיו'}</span>
+                <ExternalLink className="mr-2 h-4 w-4" />
               </a>
             </Button>
+
+            {/* Additional appointments indicator */}
+            {stats.availableAppointments > 1 && (
+              <p className={cn(
+                "text-center text-xs",
+                urgency === 'urgent' ? "text-orange-600/70 dark:text-orange-400/70" : "text-green-600/70 dark:text-green-400/70"
+              )}>
+                {stats.availableAppointments} תאריכים זמינים סה״כ
+              </p>
+            )}
           </div>
         </div>
       ) : (
+        /* No Appointments - Subtle Glass Card */
         <div className={cn(
-          "rounded-2xl border border-muted-foreground/10",
-          "bg-gradient-to-r from-muted/30 to-muted/10",
-          "p-4 transition-all duration-300"
+          "glass rounded-2xl p-4",
+          "bg-gray-50/60 dark:bg-gray-900/40",
+          "border border-gray-200/50 dark:border-gray-700/30"
         )}>
           <div className="flex items-center gap-3">
             <div className={cn(
               "flex h-10 w-10 items-center justify-center rounded-xl",
-              "bg-muted/50 ring-1 ring-border/50"
+              "bg-gray-100 dark:bg-gray-800/50",
+              "ring-1 ring-gray-200 dark:ring-gray-700"
             )}>
               <AlertCircle className="h-5 w-5 text-muted-foreground" />
             </div>
@@ -201,20 +282,6 @@ export function AppointmentBanner() {
           </div>
         </div>
       )}
-
-      {/* Status bar */}
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground px-2">
-        <div className="flex items-center gap-1.5">
-          <RefreshCw className="h-3 w-3" />
-          <span>{formatLastCheckTime(stats.lastCheckTime)}</span>
-        </div>
-        {stats.availableAppointments > 0 && (
-          <>
-            <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-            <span>{stats.availableAppointments} תורים זמינים</span>
-          </>
-        )}
-      </div>
-    </div>
+    </motion.div>
   )
-} 
+}

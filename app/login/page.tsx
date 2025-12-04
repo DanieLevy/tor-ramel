@@ -30,7 +30,7 @@ export default function LoginPage() {
   const [isResetting, setIsResetting] = useState(false)
 
   const validateEmail = (value: string) => {
-    const emailRegex = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i
+    const emailRegex = /^(([^<>()[\].,;:\s@"]+(\.[^<>()[\].,;:\s@"]+)*)|(".+"))@(([^<>()[\].,;:\s@"]+\.)+[^<>()[\].,;:\s@"]{2,})$/i
     
     if (!value) {
       setEmailValid(null)
@@ -206,17 +206,22 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              inputMode="email"
               value={email}
               onChange={handleEmailChange}
               className={cn(
                 "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
                 "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
-                "transition-all duration-200",
+                "transition-all duration-200 touch-manipulation text-base",
                 emailValid === false && "border-destructive focus:ring-destructive/50"
               )}
               placeholder="your@email.com"
               dir="ltr"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="next"
               required
             />
             {emailValid === false && (
@@ -246,9 +251,14 @@ export default function LoginPage() {
                 className={cn(
                   "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
                   "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
-                  "transition-all duration-200"
+                  "transition-all duration-200 touch-manipulation text-base"
                 )}
                 placeholder="הזן סיסמה"
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
                 required
                 minLength={6}
               />
@@ -312,12 +322,17 @@ export default function LoginPage() {
                       <input
                         id="reset-email"
                         type="email"
+                        inputMode="email"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
-                        className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                        className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 touch-manipulation text-base"
                         placeholder="your@email.com"
                         dir="ltr"
                         autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        enterKeyHint="send"
                         disabled={isResetting}
                       />
                     </div>
@@ -408,8 +423,13 @@ export default function LoginPage() {
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 touch-manipulation text-base"
                           placeholder="הזן סיסמה חדשה"
+                          autoComplete="new-password"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          enterKeyHint="next"
                           minLength={6}
                           disabled={isResetting}
                         />
@@ -427,8 +447,13 @@ export default function LoginPage() {
                           type="password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                          className="w-full px-10 py-3 rounded-xl border bg-background/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 touch-manipulation text-base"
                           placeholder="הזן סיסמה שוב"
+                          autoComplete="new-password"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          enterKeyHint="done"
                           minLength={6}
                           disabled={isResetting}
                         />

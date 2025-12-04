@@ -9,7 +9,69 @@ interface PushManagerState {
   isSubscribed: boolean;
   isLoading: boolean;
   error: string | null;
+  badgeCount: number;
 }
+
+// ============================================
+// iOS 26 App Badge API
+// ============================================
+
+/**
+ * Check if Badge API is supported
+ */
+export const isBadgeSupported = (): boolean => {
+  return typeof navigator !== 'undefined' && 'setAppBadge' in navigator;
+};
+
+/**
+ * Set the app badge count on the home screen icon
+ * Works on iOS 16.4+ and most modern browsers when installed as PWA
+ */
+export const setAppBadge = async (count: number): Promise<boolean> => {
+  if (!isBadgeSupported()) {
+    console.debug('[Badge API] Not supported in this environment');
+    return false;
+  }
+  
+  try {
+    if (count > 0) {
+      await (navigator as any).setAppBadge(count);
+      console.log(`[Badge API] Badge set to ${count}`);
+    } else {
+      await (navigator as any).clearAppBadge();
+      console.log('[Badge API] Badge cleared');
+    }
+    return true;
+  } catch (error) {
+    console.error('[Badge API] Error setting badge:', error);
+    return false;
+  }
+};
+
+/**
+ * Clear the app badge from the home screen icon
+ */
+export const clearAppBadge = async (): Promise<boolean> => {
+  if (!isBadgeSupported()) {
+    return false;
+  }
+  
+  try {
+    await (navigator as any).clearAppBadge();
+    console.log('[Badge API] Badge cleared');
+    return true;
+  } catch (error) {
+    console.error('[Badge API] Error clearing badge:', error);
+    return false;
+  }
+};
+
+/**
+ * Update badge count from unread notifications count
+ */
+export const updateBadgeFromNotifications = async (unreadCount: number): Promise<void> => {
+  await setAppBadge(unreadCount);
+};
 
 export const usePushNotifications = () => {
   const [state, setState] = useState<PushManagerState>({
@@ -17,7 +79,8 @@ export const usePushNotifications = () => {
     permission: 'default',
     isSubscribed: false,
     isLoading: true,
-    error: null
+    error: null,
+    badgeCount: 0
   });
 
   // Check if push notifications are supported
@@ -145,7 +208,7 @@ export const usePushNotifications = () => {
       console.log('📤 [Push Hook] Creating push subscription...');
       const pushSubscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKey
+        applicationServerKey: applicationServerKey as BufferSource
       });
       console.log('✅ [Push Hook] Push subscription created');
 
@@ -261,15 +324,41 @@ export const usePushNotifications = () => {
     return false;
   }, []);
 
+  // Badge management
+  const setBadge = useCallback(async (count: number) => {
+    const success = await setAppBadge(count);
+    if (success) {
+      setState(prev => ({ ...prev, badgeCount: count }));
+    }
+    return success;
+  }, []);
+
+  const clearBadge = useCallback(async () => {
+    const success = await clearAppBadge();
+    if (success) {
+      setState(prev => ({ ...prev, badgeCount: 0 }));
+    }
+    return success;
+  }, []);
+
   return {
+    // State
     isSupported: state.isSupported,
     permission: state.permission,
     isSubscribed: state.isSubscribed,
     isLoading: state.isLoading,
     error: state.error,
+    badgeCount: state.badgeCount,
+    
+    // Push subscription methods
     subscribe,
     unsubscribe,
-    showIOSInstallPrompt
+    showIOSInstallPrompt,
+    
+    // Badge API methods (iOS 26+)
+    setBadge,
+    clearBadge,
+    isBadgeSupported: isBadgeSupported(),
   };
 };
 

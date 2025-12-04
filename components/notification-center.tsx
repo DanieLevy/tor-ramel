@@ -1,22 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Bell, Check, CheckCheck, Trash2, X, Sparkles, BellOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { cn, pwaFetch } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useHaptics } from '@/hooks/use-haptics'
 
 interface InAppNotification {
   id: string
@@ -25,7 +19,7 @@ interface InAppNotification {
   notification_type: 'appointment' | 'system' | 'subscription'
   is_read: boolean
   created_at: string
-  data?: any
+  data?: Record<string, unknown>
 }
 
 interface NotificationCenterProps {
@@ -38,6 +32,44 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const haptics = useHaptics()
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.body.style.overflow = 'hidden' // Prevent background scroll
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.body.style.overflow = '' // Restore scroll
+    }
+  }, [open])
+
+  // Close on escape key
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    if (open) {
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
 
   // Fetch only unread count (lightweight) for badge
   const fetchUnreadCount = async () => {
@@ -79,6 +111,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   }
 
   const markAsRead = async (notificationIds: string[]) => {
+    haptics.light()
     try {
       const response = await pwaFetch('/api/notifications/in-app', {
         method: 'POST',
@@ -104,6 +137,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   }
 
   const markAllAsRead = async () => {
+    haptics.medium()
     try {
       const response = await pwaFetch('/api/notifications/in-app', {
         method: 'POST',
@@ -118,14 +152,17 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
       // Update local state
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       setUnreadCount(0)
+      haptics.success()
       toast.success('כל ההתראות סומנו כנקראו')
     } catch (error) {
       console.error('Error marking all as read:', error)
+      haptics.error()
       toast.error('שגיאה בעדכון ההתראות')
     }
   }
 
   const deleteNotification = async (notificationId: string) => {
+    haptics.medium()
     try {
       const response = await pwaFetch('/api/notifications/in-app', {
         method: 'DELETE',
@@ -143,14 +180,17 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
       if (notification && !notification.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1))
       }
+      haptics.success()
       toast.success('ההתראה נמחקה')
     } catch (error) {
       console.error('Error deleting notification:', error)
+      haptics.error()
       toast.error('שגיאה במחיקת ההתראה')
     }
   }
 
   const clearAllRead = async () => {
+    haptics.medium()
     try {
       const response = await pwaFetch('/api/notifications/in-app', {
         method: 'DELETE',
@@ -164,14 +204,17 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
 
       // Update local state
       setNotifications(prev => prev.filter(n => !n.is_read))
+      haptics.success()
       toast.success('ההתראות הנקראות נמחקו')
     } catch (error) {
       console.error('Error clearing read notifications:', error)
+      haptics.error()
       toast.error('שגיאה במחיקת ההתראות')
     }
   }
 
   const handleNotificationClick = (notification: InAppNotification) => {
+    haptics.light()
     // Mark as read if not already
     if (!notification.is_read) {
       markAsRead([notification.id])
@@ -191,6 +234,11 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     }
   }
 
+  const handleToggle = () => {
+    haptics.light()
+    setOpen(!open)
+  }
+
   // Initial fetch of unread count on mount
   useEffect(() => {
     fetchUnreadCount()
@@ -205,14 +253,14 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     return () => clearInterval(interval)
   }, [])
 
-  // Fetch full notifications when sheet opens
+  // Fetch full notifications when panel opens
   useEffect(() => {
     if (open) {
       fetchNotifications()
     }
   }, [open])
 
-  // Poll for full notifications every 30 seconds when sheet is open
+  // Poll for full notifications every 30 seconds when panel is open
   useEffect(() => {
     if (open) {
       const interval = setInterval(() => {
@@ -236,157 +284,256 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     }
   }
 
+  const getNotificationColor = (type: string, isRead: boolean) => {
+    if (isRead) return 'bg-white/50 dark:bg-white/5 border-white/20 dark:border-white/10'
+    
+    switch (type) {
+      case 'appointment':
+        return 'bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-200/50 dark:border-emerald-700/30'
+      case 'subscription':
+        return 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/50 dark:border-blue-700/30'
+      case 'system':
+        return 'bg-amber-50/80 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-700/30'
+      default:
+        return 'bg-violet-50/80 dark:bg-violet-900/20 border-violet-200/50 dark:border-violet-700/30'
+    }
+  }
+
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn('relative', className)}
-          aria-label="התראות"
-        >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-xs"
+    <>
+      {/* Trigger Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn('relative', className)}
+        aria-label="התראות"
+        onClick={handleToggle}
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <Badge
+            variant="destructive"
+            className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-xs animate-pulse"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Badge>
+        )}
+      </Button>
+
+      {/* Floating Modal Overlay + Panel */}
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+              onClick={() => setOpen(false)}
+            />
+            
+            {/* Floating Panel */}
+            <motion.div
+              ref={panelRef}
+              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+              className={cn(
+                'fixed z-50',
+                // Position: centered on mobile, anchored to top-right on desktop
+                'left-4 right-4 top-20',
+                'sm:left-auto sm:right-4 sm:w-96',
+                // Glass design
+                'bg-white/80 dark:bg-gray-900/80',
+                'backdrop-blur-2xl',
+                'border border-white/30 dark:border-white/10',
+                'rounded-2xl',
+                'shadow-2xl shadow-black/10 dark:shadow-black/30',
+                // Safe area for notched devices
+                'max-h-[calc(100vh-120px)] sm:max-h-[70vh]',
+                'overflow-hidden',
+                'flex flex-col'
+              )}
+              style={{
+                // iOS glass effect (private property, graceful fallback)
+                WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+              }}
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-full sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>התראות</SheetTitle>
-          <SheetDescription>
-            {unreadCount > 0 ? `${unreadCount} התראות חדשות` : 'אין התראות חדשות'}
-          </SheetDescription>
-        </SheetHeader>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 mt-4 mb-2">
-          {unreadCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={markAllAsRead}
-              className="text-xs"
-            >
-              <CheckCheck className="h-4 w-4 ml-1" />
-              סמן הכל כנקרא
-            </Button>
-          )}
-          {notifications.some(n => n.is_read) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearAllRead}
-              className="text-xs"
-            >
-              <Trash2 className="h-4 w-4 ml-1" />
-              מחק נקראות
-            </Button>
-          )}
-        </div>
-
-        {/* Notifications List */}
-        <ScrollArea className="h-[calc(100vh-200px)] mt-4">
-          {loading && notifications.length === 0 ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-              <Bell className="h-12 w-12 mb-2 opacity-50" />
-              <p className="text-sm">אין התראות</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={cn(
-                    'relative border rounded-lg p-4 transition-all active:scale-[0.98] cursor-pointer touch-manipulation',
-                    !notification.is_read && 'bg-primary/5 border-primary/20'
-                  )}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  {/* Unread indicator */}
-                  {!notification.is_read && (
-                    <div className="absolute top-3 left-3 w-2 h-2 bg-primary rounded-full"></div>
-                  )}
-
-                  {/* Delete button - Always visible for mobile */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 touch-manipulation active:bg-destructive/20"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      deleteNotification(notification.id)
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-
-                  {/* Content */}
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl flex-shrink-0 mt-1">
-                      {getNotificationIcon(notification.notification_type)}
-                    </span>
-                    <div className="flex-1 min-w-0 pl-6">
-                      <h4 className="font-semibold text-sm mb-1 line-clamp-1">
-                        {notification.title}
-                      </h4>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                        {notification.body}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <time>
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                            locale: he
-                          })}
-                        </time>
-                        {!notification.is_read && (
-                          <>
-                            <span>•</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                markAsRead([notification.id])
-                              }}
-                              className="flex items-center gap-1 hover:text-primary transition-colors"
-                            >
-                              <Check className="h-3 w-3" />
-                              <span>סמן כנקרא</span>
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/20 dark:border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
+                    <Bell className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-base">התראות</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {unreadCount > 0 ? `${unreadCount} חדשות` : 'אין התראות חדשות'}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+                
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setOpen(false)}
+                  className="h-8 w-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
 
-        {hasMore && (
-          <div className="text-center mt-4">
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => fetchNotifications()}
-              className="text-xs"
-            >
-              טען עוד
-            </Button>
-          </div>
+              {/* Quick Actions */}
+              {(unreadCount > 0 || notifications.some(n => n.is_read)) && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/30 dark:bg-white/5 border-b border-white/10">
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={markAllAsRead}
+                      className="text-xs h-7 px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5 ml-1" />
+                      סמן הכל
+                    </Button>
+                  )}
+                  {notifications.some(n => n.is_read) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllRead}
+                      className="text-xs h-7 px-2 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 ml-1" />
+                      מחק נקראות
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Notifications List */}
+              <ScrollArea className="flex-1 p-3">
+                {loading && notifications.length === 0 ? (
+                  <div className="flex items-center justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Sparkles className="h-8 w-8 text-primary/50" />
+                    </motion.div>
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="p-4 rounded-2xl bg-muted/50 mb-4">
+                      <BellOff className="h-10 w-10 text-muted-foreground/50" />
+                    </div>
+                    <p className="font-medium text-muted-foreground">אין התראות</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      כשיהיו תורים זמינים, תקבל התראה כאן
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <AnimatePresence mode="popLayout">
+                      {notifications.map((notification, index) => (
+                        <motion.div
+                          key={notification.id}
+                          layout
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20, scale: 0.9 }}
+                          transition={{ delay: index * 0.03 }}
+                          className={cn(
+                            'relative rounded-xl p-3 transition-all cursor-pointer',
+                            'border backdrop-blur-sm',
+                            'active:scale-[0.98] touch-manipulation',
+                            'hover:shadow-md',
+                            getNotificationColor(notification.notification_type, notification.is_read)
+                          )}
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          {/* Unread dot */}
+                          {!notification.is_read && (
+                            <div className="absolute top-3 left-3 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                          )}
+
+                          {/* Content */}
+                          <div className="flex items-start gap-3">
+                            <span className="text-xl flex-shrink-0">
+                              {getNotificationIcon(notification.notification_type)}
+                            </span>
+                            <div className="flex-1 min-w-0 pr-6">
+                              <h4 className="font-semibold text-sm line-clamp-1">
+                                {notification.title}
+                              </h4>
+                              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                {notification.body}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2 text-[10px] text-muted-foreground">
+                                <time>
+                                  {formatDistanceToNow(new Date(notification.created_at), {
+                                    addSuffix: true,
+                                    locale: he
+                                  })}
+                                </time>
+                                {!notification.is_read && (
+                                  <>
+                                    <span className="text-muted-foreground/30">•</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        markAsRead([notification.id])
+                                      }}
+                                      className="flex items-center gap-0.5 hover:text-primary transition-colors touch-manipulation"
+                                    >
+                                      <Check className="h-3 w-3" />
+                                      <span>סמן</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Delete button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-2 right-2 h-7 w-7 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 rounded-lg touch-manipulation"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteNotification(notification.id)
+                              }}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </ScrollArea>
+
+              {/* Load More */}
+              {hasMore && (
+                <div className="p-3 border-t border-white/10 text-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchNotifications()}
+                    className="text-xs w-full hover:bg-primary/10"
+                  >
+                    טען עוד
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          </>
         )}
-      </SheetContent>
-    </Sheet>
+      </AnimatePresence>
+    </>
   )
 }
-

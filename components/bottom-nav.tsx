@@ -4,8 +4,9 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Home, Search, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useState, useEffect } from 'react'
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { haptics } from '@/hooks/use-haptics'
 
 interface NavItem {
   href: string
@@ -19,90 +20,224 @@ const navItems: NavItem[] = [
   { href: '/subscribe', icon: Bell, label: 'התראות' },
 ]
 
+// iOS-style spring configuration
+const springConfig = {
+  stiffness: 400,
+  damping: 35,
+  mass: 0.8,
+}
+
+// Velocity thresholds for smart hide/show
+const VELOCITY_THRESHOLD = 300 // px/s
+const DISTANCE_THRESHOLD = 50 // px
+const IDLE_TIMEOUT = 2000 // ms
+
 export function BottomNav() {
   const pathname = usePathname()
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [isVisible, setIsVisible] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const [isScrolling, setIsScrolling] = useState(false)
+  const [navScale, setNavScale] = useState(1)
+  
+  // Refs for scroll tracking
+  const lastScrollY = useRef(0)
+  const lastScrollTime = useRef(Date.now())
+  const scrollVelocity = useRef(0)
+  const scrollDirection = useRef<'up' | 'down' | null>(null)
+  const accumulatedScroll = useRef(0)
+  const idleTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const rafRef = useRef<number | null>(null)
+  
+  // Motion values for fluid animations
+  const y = useMotionValue(0)
+  const blur = useTransform(y, [0, 100], [36, 0])
+  const opacity = useTransform(y, [0, 80], [1, 0])
+  const scale = useSpring(1, springConfig)
+
+  // Smart scroll handling with velocity detection
+  const handleScroll = useCallback(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+    }
+    
+    rafRef.current = requestAnimationFrame(() => {
+      const currentScrollY = window.scrollY
+      const currentTime = Date.now()
+      const timeDelta = currentTime - lastScrollTime.current
+      const scrollDelta = currentScrollY - lastScrollY.current
+      
+      // Calculate velocity (px/s)
+      if (timeDelta > 0) {
+        scrollVelocity.current = Math.abs(scrollDelta / timeDelta) * 1000
+      }
+      
+      // Determine scroll direction
+      const newDirection = scrollDelta > 0 ? 'down' : scrollDelta < 0 ? 'up' : null
+      
+      // Track accumulated scroll in current direction
+      if (newDirection === scrollDirection.current) {
+        accumulatedScroll.current += Math.abs(scrollDelta)
+      } else {
+        accumulatedScroll.current = Math.abs(scrollDelta)
+      }
+      
+      scrollDirection.current = newDirection
+      setIsScrolling(true)
+      
+      // Clear existing idle timeout
+      if (idleTimeoutRef.current) {
+        clearTimeout(idleTimeoutRef.current)
+      }
+      
+      // Smart visibility logic
+      if (currentScrollY < 50) {
+        // Always show at top
+        setIsVisible(true)
+        setNavScale(1)
+      } else if (newDirection === 'down') {
+        // Scrolling down - hide based on velocity and distance
+        if (scrollVelocity.current > VELOCITY_THRESHOLD || accumulatedScroll.current > DISTANCE_THRESHOLD) {
+          setIsVisible(false)
+          // Slight scale down when scrolling fast
+          const scaleValue = Math.max(0.95, 1 - (scrollVelocity.current / 5000))
+          setNavScale(scaleValue)
+        }
+      } else if (newDirection === 'up') {
+        // Scrolling up - show immediately
+        setIsVisible(true)
+        setNavScale(1)
+        // Haptic feedback on reveal (subtle)
+        if (!isVisible && scrollVelocity.current > VELOCITY_THRESHOLD) {
+          haptics.selection()
+        }
+      }
+      
+      // Set idle timeout to show nav after scrolling stops
+      idleTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false)
+        setIsVisible(true)
+        setNavScale(1)
+        accumulatedScroll.current = 0
+      }, IDLE_TIMEOUT)
+      
+      lastScrollY.current = currentScrollY
+      lastScrollTime.current = currentTime
+    })
+  }, [isVisible])
 
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout
-    let ticking = false
-
-    const handleScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const currentScrollY = window.scrollY
-          const scrollDelta = currentScrollY - lastScrollY
-          
-          // Clear previous timeout
-          clearTimeout(timeoutId)
-          
-          // Always visible at top of page
-          if (currentScrollY < 50) {
-            setIsVisible(true)
-          } 
-          // Hide on scroll down (threshold: 5px)
-          else if (scrollDelta > 5 && currentScrollY > 100) {
-            setIsVisible(false)
-          } 
-          // Show on scroll up (threshold: 5px)
-          else if (scrollDelta < -5) {
-            setIsVisible(true)
-          }
-          
-          setLastScrollY(currentScrollY)
-          
-          // Auto-reveal after 1.5s of inactivity
-          timeoutId = setTimeout(() => {
-            setIsVisible(true)
-          }, 1500)
-          
-          ticking = false
-        })
-        
-        ticking = true
+    // Use passive listener for better scroll performance
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    // Touch events for rubber-band feel
+    let touchStartY = 0
+    let touchStartTime = 0
+    
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+      touchStartTime = Date.now()
+    }
+    
+    const handleTouchMove = (e: TouchEvent) => {
+      const touchY = e.touches[0].clientY
+      const delta = touchY - touchStartY
+      const velocity = Math.abs(delta / (Date.now() - touchStartTime)) * 1000
+      
+      // Slight scale effect based on scroll velocity
+      if (velocity > 800) {
+        scale.set(0.98)
       }
     }
-
-    window.addEventListener('scroll', handleScroll, { passive: true })
+    
+    const handleTouchEnd = () => {
+      scale.set(1)
+    }
+    
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchmove', handleTouchMove, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
     
     return () => {
       window.removeEventListener('scroll', handleScroll)
-      clearTimeout(timeoutId)
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [lastScrollY])
+  }, [handleScroll, scale])
 
   // Don't show bottom nav on auth pages
   if (pathname === '/login' || pathname === '/verify-otp' || pathname === '/register') {
     return null
   }
 
+  const handleNavClick = (index: number) => {
+    haptics.impact()
+    setHoveredIndex(index)
+  }
+
   return (
     <>
       {/* Spacer to prevent content from being hidden behind nav */}
-      <div className="h-20" />
+      <div className="h-24" />
       
       <motion.nav 
         className="fixed bottom-0 left-0 right-0 z-50"
-        initial={{ y: 0 }}
-        animate={{ y: isVisible ? 0 : 100 }}
-        transition={{ 
-          type: "spring", 
-          stiffness: 400, 
-          damping: 35,
-          mass: 0.8,
-          velocity: 2
+        initial={{ y: 0, scale: 1 }}
+        animate={{ 
+          y: isVisible ? 0 : 120,
+          scale: navScale,
         }}
+        transition={{ 
+          type: "spring",
+          ...springConfig,
+        }}
+        style={{ scale }}
       >
-        {/* Ultra-transparent blurred background for seamless flow */}
-        <div className="absolute inset-0" />
+        {/* iOS 26 Liquid Glass Background - Uses Apple's native effect when available */}
+        <div 
+          className="absolute inset-0 glass-nav"
+          style={{
+            /* Fallback for non-Apple environments */
+            background: 'var(--glass-bg-strong)',
+            backdropFilter: `blur(${isScrolling ? '28px' : '36px'}) saturate(200%)`,
+            WebkitBackdropFilter: `blur(${isScrolling ? '28px' : '36px'}) saturate(200%)`,
+            transition: 'backdrop-filter 0.3s ease',
+          }}
+        />
         
-        {/* Container with safe area padding */}
-        <div className="relative pb-[env(safe-area-inset-bottom)]">
-          <div className="flex items-center justify-center h-16 px-8">
-            {/* Navigation container with subtle background */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-background/40 backdrop-blur-md border border-border/10">
+        {/* Gradient overlay for depth */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to top, rgba(0,0,0,0.02), transparent 50%)',
+          }}
+        />
+        
+        {/* Container with safe area padding for mixed devices */}
+        <div 
+          className="relative"
+          style={{
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)'
+          }}
+        >
+          <div className="flex items-center justify-center h-16 px-6">
+            {/* Navigation pill container with glass effect */}
+            <motion.div 
+              className="flex items-center gap-1 px-2 py-1.5 rounded-[22px] border"
+              style={{
+                background: 'var(--glass-bg-subtle)',
+                borderColor: 'var(--glass-border)',
+                backdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
+                WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
+                boxShadow: isScrolling 
+                  ? '0 4px 20px rgba(0, 0, 0, 0.08)' 
+                  : '0 8px 32px rgba(0, 0, 0, 0.12)',
+              }}
+              layout
+              transition={{ type: "spring", ...springConfig }}
+            >
               {navItems.map((item, index) => {
                 const isActive = pathname === item.href
                 const isHovered = hoveredIndex === index
@@ -114,88 +249,93 @@ export function BottomNav() {
                     onHoverStart={() => setHoveredIndex(index)}
                     onHoverEnd={() => setHoveredIndex(null)}
                   >
-                    <Link href={item.href}>
+                    <Link 
+                      href={item.href}
+                      onClick={() => handleNavClick(index)}
+                    >
                       <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.92 }}
                         className={cn(
-                          "relative flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-300",
-                          "hover:bg-white/80 dark:hover:bg-gray-800/80",
-                          isActive && "bg-white dark:bg-gray-800 shadow-sm"
+                          "relative flex items-center gap-2.5 px-4 py-2.5 rounded-[18px] transition-all duration-200",
+                          "touch-manipulation"
                         )}
                       >
-                        {/* Active background indicator */}
-                        <AnimatePresence>
+                        {/* Active background indicator - iOS 26 style pill */}
+                        <AnimatePresence mode="wait">
                           {isActive && (
                             <motion.div
                               layoutId="activeNavBackground"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute inset-0 rounded-full bg-black dark:bg-white"
-                              transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.9 }}
+                              className="absolute inset-0 rounded-[18px]"
+                              style={{
+                                background: 'var(--foreground)',
+                                boxShadow: '0 2px 12px rgba(0, 0, 0, 0.18)',
+                              }}
+                              transition={{ 
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                              }}
                             />
                           )}
                         </AnimatePresence>
 
-                        {/* Icon */}
+                        {/* Icon with subtle animation */}
                         <motion.div
                           animate={{
-                            rotate: isHovered ? 2 : 0,
+                            y: isHovered && !isActive ? -1 : 0,
+                            rotate: isHovered && !isActive ? -3 : 0,
                           }}
                           transition={{ type: "spring", stiffness: 400, damping: 25 }}
                           className="relative z-10"
                         >
                           <item.icon 
                             className={cn(
-                              "h-4 w-4 transition-all duration-300",
+                              "h-[18px] w-[18px] transition-all duration-200",
                               isActive 
-                                ? "text-white dark:text-black" 
-                                : "text-gray-600 dark:text-gray-400"
+                                ? "text-background" 
+                                : "text-muted-foreground"
                             )} 
                           />
                         </motion.div>
 
-                        {/* Label - only show for active item */}
-                        <AnimatePresence>
+                        {/* Label - only show for active item with smooth expand */}
+                        <AnimatePresence mode="wait">
                           {isActive && (
                             <motion.span 
-                              initial={{ opacity: 0, width: 0 }}
-                              animate={{ opacity: 1, width: "auto" }}
-                              exit={{ opacity: 0, width: 0 }}
+                              initial={{ opacity: 0, width: 0, x: -10 }}
+                              animate={{ opacity: 1, width: "auto", x: 0 }}
+                              exit={{ opacity: 0, width: 0, x: -10 }}
                               className={cn(
-                                "text-sm font-medium whitespace-nowrap relative z-10 overflow-hidden",
-                                "text-white dark:text-black"
+                                "text-sm font-semibold whitespace-nowrap relative z-10 overflow-hidden",
+                                "text-background"
                               )}
-                              transition={{ duration: 0.3 }}
+                              transition={{ 
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 25,
+                              }}
                             >
                               {item.label}
                             </motion.span>
                           )}
                         </AnimatePresence>
 
-                        {/* Subtle hover indicator */}
+                        {/* Subtle hover glass effect */}
                         <AnimatePresence>
                           {isHovered && !isActive && (
                             <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                              className="absolute inset-0 rounded-full bg-gray-200/50 dark:bg-gray-700/50"
-                              transition={{ duration: 0.2 }}
-                            />
-                          )}
-                        </AnimatePresence>
-
-                        {/* Active dot indicator */}
-                        <AnimatePresence>
-                          {isActive && (
-                            <motion.div
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                              className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-gray-400 dark:bg-gray-600 rounded-full"
-                              transition={{ type: "spring", bounce: 0.6, delay: 0.1 }}
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.8, opacity: 0 }}
+                              className="absolute inset-0 rounded-[18px]"
+                              style={{
+                                background: 'var(--glass-bg-subtle)',
+                              }}
+                              transition={{ duration: 0.15 }}
                             />
                           )}
                         </AnimatePresence>
@@ -204,10 +344,27 @@ export function BottomNav() {
                   </motion.div>
                 )
               })}
-            </div>
+            </motion.div>
           </div>
+          
+          {/* iOS home indicator line - subtle visual cue */}
+          <motion.div 
+            className="flex justify-center pb-2"
+            animate={{
+              opacity: isScrolling ? 0.3 : 0.6,
+            }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="h-1 rounded-full bg-foreground/20"
+              animate={{
+                width: isScrolling ? 100 : 128,
+              }}
+              transition={{ type: "spring", ...springConfig }}
+            />
+          </motion.div>
         </div>
       </motion.nav>
     </>
   )
-} 
+}

@@ -194,30 +194,34 @@ export function Header() {
 
   return (
     <header 
-      className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md border-b transition-all duration-300"
+      className="sticky top-0 z-50 w-full glass-nav transition-all duration-300"
       style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)'
+        paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)'
       }}
     >
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Right section (RTL) - App Icon & Title */}
-          <div className="flex items-center gap-2 mr-2">
-            <Image 
-              src="/icons/icon-96x96.png" 
-              alt="תור רם-אל" 
-              width={32}
-              height={32}
-              className="rounded-lg shadow-sm"
-            />
-            <h1 className="text-lg font-semibold">{config.title}</h1>
+          <div className="flex items-center gap-3 mr-2">
+            <div className="relative">
+              <Image 
+                src="/icons/icon-96x96.png" 
+                alt="תור רם-אל" 
+                width={36}
+                height={36}
+                className="rounded-xl shadow-md ring-1 ring-white/20"
+              />
+              {/* Subtle glow effect */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
+            </div>
+            <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">{config.title}</h1>
           </div>
 
           {/* Center section - empty for spacing */}
           <div className="flex-1" />
 
           {/* Left section (RTL) - Hamburger Menu, User & Theme Toggle */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Theme Toggle */}
             {mounted && (
               <Button
@@ -225,12 +229,12 @@ export function Header() {
                 size="icon"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 aria-label={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
-                className="hover:bg-accent/50 transition-colors"
+                className="glass-button h-9 w-9 hover:scale-105 active:scale-95 transition-all"
               >
                 {theme === 'dark' ? (
-                  <Sun className="h-5 w-5 transition-all" />
+                  <Sun className="h-[18px] w-[18px] transition-all" />
                 ) : (
-                  <Moon className="h-5 w-5 transition-all" />
+                  <Moon className="h-[18px] w-[18px] transition-all" />
                 )}
               </Button>
             )}
@@ -245,23 +249,23 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center gap-2 hover:bg-accent/50 transition-colors px-2 h-8"
+                    className="flex items-center gap-2 glass-button px-2.5 h-9 hover:scale-105 active:scale-95 transition-all"
                   >
-                    <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50 border border-border/50">
-                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{username}</span>
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="end" 
-                  className="w-48 rounded-xl border-border/50 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
+                  className="w-52 glass-modal p-1.5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
                 >
-                  <div className="px-3 py-2 border-b border-border/50">
-                    <p className="text-sm font-medium">{user.email}</p>
+                  <div className="px-3 py-2.5 mb-1 rounded-xl bg-muted/30">
+                    <p className="text-sm font-medium truncate">{user.email}</p>
                   </div>
                   <DropdownMenuItem 
-                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5 mt-1"
+                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl"
                     onClick={logout}
                   >
                     <LogOut className="h-4 w-4 opacity-60" />
@@ -278,50 +282,50 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="hover:bg-accent/50 transition-colors"
+                    className="glass-button h-9 w-9 hover:scale-105 active:scale-95 transition-all"
                     aria-label="פתח תפריט"
                   >
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-[18px] w-[18px]" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent 
                   align="end" 
-                  className="w-48 rounded-xl border-border/50 shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
+                  className="w-52 glass-modal p-1.5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
                 >
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/">
                       <Home className="h-4 w-4 opacity-60" />
                       <span className="flex-1">דף הבית</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/search">
                       <Search className="h-4 w-4 opacity-60" />
                       <span className="flex-1">חיפוש תורים</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/subscribe">
                       <Bell className="h-4 w-4 opacity-60" />
                       <span className="flex-1">התראות</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/notifications">
                       <Trash2 className="h-4 w-4 opacity-60" />
                       <span className="flex-1">זמנים שהתעלמתי</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1" />
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-accent/50 focus:bg-accent/50 transition-colors rounded-lg mx-1 my-0.5" asChild>
+                  <DropdownMenuSeparator className="my-1.5 bg-white/10" />
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/about">
                       <Info className="h-4 w-4 opacity-60" />
                       <span className="flex-1">אודות</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuSeparator className="my-1.5 bg-white/10" />
                   <DropdownMenuItem 
-                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 transition-colors rounded-lg mx-1 my-0.5 text-destructive"
+                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-destructive/20 focus:bg-destructive/20 transition-colors rounded-xl text-destructive"
                     onClick={clearAllCache}
                   >
                     <Trash2 className="h-4 w-4" />

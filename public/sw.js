@@ -1,12 +1,15 @@
 // Service Worker for Tor-Ramel PWA
-// AUTO-GENERATED VERSION - DO NOT EDIT
-const VERSION = 'v1.0';
-const BUILD_TIME = '2025-10-09T16:24:50.187Z';
+// iOS 26 Optimized - Navigation Preload + Badge API
+const VERSION = 'v2.0';
+const BUILD_TIME = new Date().toISOString();
 const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
 const DYNAMIC_CACHE = `tor-ramel-dynamic-${SW_VERSION}`;
 const API_CACHE = `tor-ramel-api-${SW_VERSION}`;
 const FONT_CACHE = 'tor-ramel-fonts-v2';
+
+// Navigation Preload ID
+const NAV_PRELOAD_HEADER = 'tor-ramel-preload';
 
 // Critical fonts to preload
 const CRITICAL_FONTS = [
@@ -63,12 +66,13 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and enable Navigation Preload
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
+    Promise.all([
+      // Clean old caches
+      caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames
             .filter((name) => name !== CACHE_NAME && name !== DYNAMIC_CACHE && name !== API_CACHE && name !== FONT_CACHE)
@@ -77,8 +81,16 @@ self.addEventListener('activate', (event) => {
               return caches.delete(name);
             })
         );
-      })
-      .then(() => self.clients.claim())
+      }),
+      // Enable Navigation Preload for faster page loads
+      (async () => {
+        if (self.registration.navigationPreload) {
+          await self.registration.navigationPreload.enable();
+          await self.registration.navigationPreload.setHeaderValue(NAV_PRELOAD_HEADER);
+          console.log('[SW] Navigation Preload enabled');
+        }
+      })()
+    ]).then(() => self.clients.claim())
   );
 });
 
@@ -267,7 +279,7 @@ async function syncAppointments() {
   console.log('[SW] Syncing appointments...');
 }
 
-// Push notifications - Enhanced with structured payload
+// Push notifications - Enhanced with structured payload and Badge API
 self.addEventListener('push', (event) => {
   console.log('[SW] 📬 Push notification received');
   
@@ -276,7 +288,8 @@ self.addEventListener('push', (event) => {
     body: 'תור חדש זמין!',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-72x72.png',
-    data: { url: '/' }
+    data: { url: '/' },
+    badgeCount: 1  // iOS 26+ Badge API
   };
 
   if (event.data) {
@@ -289,6 +302,11 @@ self.addEventListener('push', (event) => {
           ...notificationData,
           ...payload.notification
         };
+      }
+      
+      // Extract badge count if provided
+      if (payload.badgeCount !== undefined) {
+        notificationData.badgeCount = payload.badgeCount;
       }
     } catch (err) {
       console.error('[SW] ❌ Error parsing push data:', err);
@@ -319,11 +337,33 @@ self.addEventListener('push', (event) => {
   console.log('[SW] 🔔 Showing notification:', notificationData.title);
   
   event.waitUntil(
-    self.registration.showNotification(notificationData.title, options)
+    Promise.all([
+      // Show the notification
+      self.registration.showNotification(notificationData.title, options),
+      // Update app badge count (iOS 26+)
+      updateBadge(notificationData.badgeCount)
+    ])
   );
 });
 
-// Notification click handling - Enhanced with smart URL navigation
+// iOS 26+ Badge API helper
+async function updateBadge(count) {
+  if ('setAppBadge' in navigator) {
+    try {
+      if (count > 0) {
+        await navigator.setAppBadge(count);
+        console.log(`[SW] 🔢 Badge set to ${count}`);
+      } else {
+        await navigator.clearAppBadge();
+        console.log('[SW] 🔢 Badge cleared');
+      }
+    } catch (err) {
+      console.error('[SW] ❌ Badge API error:', err);
+    }
+  }
+}
+
+// Notification click handling - Enhanced with smart URL navigation and badge clearing
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] 🖱️ Notification clicked:', event.action);
   event.notification.close();
@@ -339,26 +379,31 @@ self.addEventListener('notificationclick', (event) => {
   
   // For 'view' action or general click, open/focus app
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then(windowClients => {
-      // Check if there's already a window open with our app
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          console.log('[SW] ✅ Focusing existing window and navigating to:', urlToOpen);
-          // Navigate to the target URL and focus
-          client.navigate(urlToOpen);
-          return client.focus();
+    Promise.all([
+      // Clear badge when notification is opened
+      updateBadge(0),
+      // Open/focus app window
+      clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      }).then(windowClients => {
+        // Check if there's already a window open with our app
+        for (let i = 0; i < windowClients.length; i++) {
+          const client = windowClients[i];
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            console.log('[SW] ✅ Focusing existing window and navigating to:', urlToOpen);
+            // Navigate to the target URL and focus
+            client.navigate(urlToOpen);
+            return client.focus();
+          }
         }
-      }
-      // No window open, open a new one
-      if (clients.openWindow) {
-        console.log('[SW] 🆕 Opening new window:', urlToOpen);
-        return clients.openWindow(urlToOpen);
-      }
-    })
+        // No window open, open a new one
+        if (clients.openWindow) {
+          console.log('[SW] 🆕 Opening new window:', urlToOpen);
+          return clients.openWindow(urlToOpen);
+        }
+      })
+    ])
   );
 });
 

@@ -124,6 +124,33 @@
   --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
   --sidebar-border: oklch(0.923 0.003 48.717);
   --sidebar-ring: oklch(0.709 0.01 56.259);
+  
+  /* iOS 26 Liquid Glass Design System */
+  --glass-blur: 20px;
+  --glass-blur-subtle: 12px;
+  --glass-blur-strong: 28px;
+  --glass-blur-intense: 36px;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.5);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.35);
+  --glass-border-subtle: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --glass-shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.12);
+  --glass-shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.05);
+  
+  /* iOS 26 Larger Border Radii */
+  --glass-radius-sm: 12px;
+  --glass-radius-md: 16px;
+  --glass-radius-lg: 20px;
+  --glass-radius-xl: 24px;
+  --glass-radius-2xl: 28px;
+  --glass-radius-3xl: 32px;
+  
+  /* iOS 26 Animation Timing */
+  --glass-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .dark {
@@ -158,6 +185,16 @@
   --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.553 0.013 58.071);
+  
+  /* iOS 26 Liquid Glass - Dark Mode */
+  --glass-bg: rgba(28, 28, 30, 0.72);
+  --glass-bg-subtle: rgba(28, 28, 30, 0.5);
+  --glass-bg-strong: rgba(28, 28, 30, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-subtle: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --glass-shadow-elevated: 0 16px 48px rgba(0, 0, 0, 0.35);
+  --glass-shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 @layer base {
@@ -470,6 +507,310 @@ body.fonts-failed {
   .backdrop-blur-md {
     transform: translateZ(0);
     will-change: backdrop-filter;
+  }
+}
+
+/* ============================================
+   iOS 26 Liquid Glass Design System Utilities
+   Using Apple's private -apple-visual-effect as progressive enhancement
+   Fallback to CSS backdrop-filter for non-Apple/non-native environments
+   Reference: https://github.com/WebKit/WebKit
+   ============================================ */
+
+/* Base Glass Effect */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius-lg);
+}
+
+/* Apple Native Liquid Glass - Progressive Enhancement */
+/* This only works in native WKWebView with useSystemAppearance enabled */
+@supports (-apple-visual-effect: -apple-system-glass-material) {
+  .glass {
+    background: transparent;
+    -apple-visual-effect: -apple-system-glass-material;
+  }
+  
+  .glass-subtle {
+    background: transparent;
+    -apple-visual-effect: -apple-system-blur-material-thin;
+  }
+  
+  .glass-strong {
+    background: transparent;
+    -apple-visual-effect: -apple-system-glass-material-thick;
+  }
+  
+  .glass-nav {
+    background: transparent;
+    -apple-visual-effect: -apple-system-glass-material;
+  }
+  
+  .glass-card {
+    background: transparent;
+    -apple-visual-effect: -apple-system-blur-material;
+  }
+  
+  .glass-modal {
+    background: transparent;
+    -apple-visual-effect: -apple-system-glass-material-prominent;
+  }
+}
+
+/* Subtle Glass - lighter effect */
+.glass-subtle {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  border: 1px solid var(--glass-border-subtle);
+  box-shadow: var(--glass-shadow-subtle);
+  border-radius: var(--glass-radius-md);
+}
+
+/* Strong Glass - more opaque */
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius-xl);
+}
+
+/* Elevated Glass - with prominent shadow */
+.glass-elevated {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-elevated);
+  border-radius: var(--glass-radius-xl);
+}
+
+/* Navigation Glass - for headers and navbars */
+.glass-nav {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  border-bottom: 1px solid var(--glass-border-subtle);
+  box-shadow: var(--glass-shadow-subtle);
+}
+
+/* Card Glass - for content cards */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius-2xl);
+  transition: transform var(--glass-transition), box-shadow var(--glass-transition);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-elevated);
+}
+
+/* Modal Glass - for dialogs and overlays */
+.glass-modal {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-elevated);
+  border-radius: var(--glass-radius-3xl);
+}
+
+/* Button Glass - for glass-style buttons */
+.glass-button {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius-md);
+  transition: all var(--glass-transition);
+}
+
+.glass-button:hover {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+.glass-button:active {
+  transform: scale(0.98);
+}
+
+/* Input Glass - for form inputs */
+.glass-input {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-subtle)) saturate(150%);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--glass-radius-md);
+  transition: all var(--glass-transition);
+}
+
+.glass-input:focus {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow: 0 0 0 3px var(--glass-border-subtle);
+}
+
+/* Glass Border Radius Utilities */
+.glass-rounded-sm { border-radius: var(--glass-radius-sm); }
+.glass-rounded-md { border-radius: var(--glass-radius-md); }
+.glass-rounded-lg { border-radius: var(--glass-radius-lg); }
+.glass-rounded-xl { border-radius: var(--glass-radius-xl); }
+.glass-rounded-2xl { border-radius: var(--glass-radius-2xl); }
+.glass-rounded-3xl { border-radius: var(--glass-radius-3xl); }
+
+/* ============================================
+   iOS 26 Safe Area Support - Mixed Devices
+   Supports both notched and notchless iPhones
+   ============================================ */
+
+/* Modern safe area handling for all device types */
+.safe-area-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 20px);
+}
+
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 34px);
+}
+
+.safe-area-left {
+  padding-left: max(env(safe-area-inset-left, 0px), 0px);
+}
+
+.safe-area-right {
+  padding-right: max(env(safe-area-inset-right, 0px), 0px);
+}
+
+/* For notchless devices with smaller insets */
+@supports (padding: max(0px)) {
+  .header-safe-mixed {
+    padding-top: max(env(safe-area-inset-top, 0px), 12px);
+  }
+  
+  .bottom-safe-mixed {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  }
+}
+
+/* Dynamic Island / Notch aware header */
+.header-glass {
+  padding-top: max(env(safe-area-inset-top, 0px), 12px);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+/* Bottom navigation with glass effect */
+.bottom-nav-glass {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
+  border-top: 1px solid var(--glass-border-subtle);
+}
+
+/* ============================================
+   iOS Touch Feedback & Reduced Motion
+   ============================================ */
+
+/* Prevent touch callout on iOS */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS Momentum Scrolling */
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Reduced Motion Support - Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .glass,
+  .glass-subtle,
+  .glass-strong,
+  .glass-nav,
+  .glass-card,
+  .glass-modal {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Enhanced iOS Active States */
+@media (hover: none) and (pointer: coarse) {
+  .glass-button:active {
+    transform: scale(0.96);
+    opacity: 0.9;
+  }
+  
+  .glass-card:active {
+    transform: scale(0.98);
+  }
+}
+
+/* iOS Pull-to-Refresh prevention for PWA */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
+  
+  /* Prevent rubber band effect at boundaries */
+  html, body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Allow scrolling in main content */
+  main, .scrollable {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+  }
+}
+
+/* High-DPI Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .glass,
+  .glass-nav,
+  .glass-card {
+    /* Slightly reduce blur on high-DPI for crispness */
+    --glass-blur: 18px;
+  }
+}
+
+/* iPhone 17 Series (Notchless) Specific */
+@supports (padding: max(0px)) {
+  @media screen and (min-device-width: 375px) and (device-aspect-ratio: 9/19.5) {
+    .safe-area-top {
+      padding-top: max(env(safe-area-inset-top, 0px), 8px);
+    }
   }
 }
 

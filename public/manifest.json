@@ -1,7 +1,7 @@
 {
   "name": "תור רם-אל - מערכת חיפוש תורים",
   "short_name": "תור רם-אל",
-  "description": "מערכת חיפוש תורים אוטומטית למספרת רם-אל",
+  "description": "מערכת חיפוש תורים אוטומטית למספרת רם-אל עם התראות בזמן אמת",
   "lang": "he",
   "dir": "rtl",
   "scope": "/",
@@ -9,9 +9,9 @@
   "start_url": "/?source=pwa",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#6366f1",
-  "background_color": "#0f172a",
-  "categories": ["medical", "health", "utilities"],
+  "theme_color": "#f8f8fa",
+  "background_color": "#ffffff",
+  "categories": ["medical", "health", "utilities", "lifestyle"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "prefer_related_applications": false,
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
@@ -92,10 +92,10 @@
       ]
     },
     {
-      "name": "התראות",
+      "name": "ניהול התראות",
       "short_name": "התראות",
-      "description": "הגדרות התראות",
-      "url": "/notifications?source=pwa",
+      "description": "ניהול מנויים והתראות",
+      "url": "/subscribe?source=pwa",
       "icons": [
         {
           "src": "/icons/shortcut-week.png",
@@ -105,14 +105,10 @@
     }
   ],
   "related_applications": [],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
+  "protocol_handlers": [
+    {
+      "protocol": "web+tor",
+      "url": "/?action=%s"
     }
-  }
-} 
+  ]
+}

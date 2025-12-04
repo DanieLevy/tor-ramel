@@ -2,12 +2,27 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+// Card variants for iOS 26 Liquid Glass design
+type CardVariant = 'default' | 'glass' | 'glass-subtle' | 'glass-elevated'
+
+interface CardProps extends React.ComponentProps<"div"> {
+  variant?: CardVariant
+}
+
+const variantClasses: Record<CardVariant, string> = {
+  default: "bg-card text-card-foreground border shadow-sm",
+  glass: "glass-card text-card-foreground",
+  'glass-subtle': "glass-subtle text-card-foreground",
+  'glass-elevated': "glass-elevated text-card-foreground",
+}
+
+function Card({ className, variant = 'default', ...props }: CardProps) {
   return (
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "flex flex-col gap-6 rounded-[var(--glass-radius-2xl)] py-6 transition-all duration-200",
+        variantClasses[variant],
         className
       )}
       {...props}

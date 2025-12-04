@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Bell, Calendar, CalendarDays, Loader2, Trash2, CheckCircle, Edit, Mail, Smartphone, CheckCircle2, X, AlertCircle, Clock, Sparkles, TrendingUp } from 'lucide-react'
+import { Bell, Calendar, CalendarDays, Loader2, CheckCircle, Edit, Mail, Smartphone, CheckCircle2, X, AlertCircle, Clock, Sparkles, Smartphone as PhoneIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { NativeDatePicker, NativeDateRangePicker } from '@/components/ui/native-date-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
@@ -30,7 +31,7 @@ interface Subscription {
 type NotificationMethod = 'email' | 'push' | 'both'
 
 function SubscribePage() {
-  const { user } = useAuth()
+  useAuth() // Auth context is used for authentication state
   const [mounted, setMounted] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
@@ -53,27 +54,39 @@ function SubscribePage() {
     to: undefined
   })
   const [editLoading, setEditLoading] = useState(false)
+  
+  // Native picker preference (iOS optimization)
+  const [useNativePicker, setUseNativePicker] = useState(false)
 
-  // Push notifications hook
+  // Push notifications hook - variables kept for future use
   const { 
-    isSupported: pushSupported, 
-    permission: pushPermission, 
-    isSubscribed: isPushSubscribed, 
-    isLoading: pushLoading, 
-    subscribe: subscribeToPush,
-    showIOSInstallPrompt
+    isSupported: _pushSupported, 
+    permission: _pushPermission, 
+    isSubscribed: _isPushSubscribed, 
+    isLoading: _pushLoading, 
+    subscribe: _subscribeToPush,
+    showIOSInstallPrompt: _showIOSInstallPrompt
   } = usePushNotifications()
 
   // Check if iOS and PWA
   const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
-  const isPWA = typeof window !== 'undefined' && (
+  const _isPWA = typeof window !== 'undefined' && (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as any).standalone === true
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true
+  )
+  
+  // Check if touch device (for native picker preference)
+  const isTouchDevice = typeof window !== 'undefined' && (
+    'ontouchstart' in window || navigator.maxTouchPoints > 0
   )
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    // Default to native picker on iOS devices
+    if (isIOS) {
+      setUseNativePicker(true)
+    }
+  }, [isIOS])
 
   useEffect(() => {
     if (mounted) {
@@ -510,6 +523,34 @@ function SubscribePage() {
               })}
               </div>
 
+            {/* Native/Custom Picker Toggle - iOS optimization */}
+            {isTouchDevice && (
+              <div className="flex items-center justify-between py-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                  <PhoneIcon className="h-3 w-3" />
+                  בחירת תאריך מקורית
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUseNativePicker(!useNativePicker)}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none touch-manipulation",
+                    useNativePicker ? "bg-black dark:bg-white" : "bg-gray-200 dark:bg-gray-700"
+                  )}
+                  role="switch"
+                  aria-checked={useNativePicker}
+                  aria-label="שימוש בבחירת תאריך מקורית"
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-black shadow ring-0 transition duration-200 ease-in-out",
+                      useNativePicker ? "translate-x-4" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+            )}
+            
             {/* Date Picker - Clean */}
             <AnimatePresence mode="wait">
               {dateMode === 'single' ? (
@@ -519,77 +560,95 @@ function SubscribePage() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-center h-10 text-sm font-normal align-middle",
-                          selectedDate && "border-black dark:border-white"
-                        )}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {mounted && selectedDate ? (
-                          format(selectedDate, "dd/MM/yyyy")
-                        ) : (
-                          <span className="text-gray-400">בחר תאריך</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        disabled={isDateDisabled}
-                        locale={he}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {useNativePicker ? (
+                    <NativeDatePicker
+                      value={selectedDate}
+                      onChange={setSelectedDate}
+                      minDate={new Date()}
+                      placeholder="בחר תאריך"
+                      label="תאריך להתראה"
+                    />
+                  ) : (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-center h-10 text-sm font-normal align-middle",
+                            selectedDate && "border-black dark:border-white"
+                          )}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {mounted && selectedDate ? (
+                            format(selectedDate, "dd/MM/yyyy")
+                          ) : (
+                            <span className="text-gray-400">בחר תאריך</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={setSelectedDate}
+                          disabled={isDateDisabled}
+                          locale={he}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </motion.div>
               ) : (
-                    <motion.div 
+                <motion.div 
                   key="range"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-center h-10 text-sm font-normal align-middle",
-                          dateRange.from && "border-black dark:border-white"
-                        )}
-                      >
-                        <CalendarDays className="mr-2 h-4 w-4" />
-                        {mounted && dateRange.from ? (
-                          dateRange.to ? (
-                            `${format(dateRange.from, "dd/MM")} - ${format(dateRange.to, "dd/MM/yyyy")}`
+                  {useNativePicker ? (
+                    <NativeDateRangePicker
+                      value={dateRange}
+                      onChange={(range) => setDateRange(range)}
+                      minDate={new Date()}
+                    />
+                  ) : (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-center h-10 text-sm font-normal align-middle",
+                            dateRange.from && "border-black dark:border-white"
+                          )}
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {mounted && dateRange.from ? (
+                            dateRange.to ? (
+                              `${format(dateRange.from, "dd/MM")} - ${format(dateRange.to, "dd/MM/yyyy")}`
+                            ) : (
+                              format(dateRange.from, "dd/MM/yyyy")
+                            )
                           ) : (
-                            format(dateRange.from, "dd/MM/yyyy")
-                          )
-                        ) : (
-                          <span className="text-gray-400">בחר טווח</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="range"
-                        selected={dateRange}
-                        onSelect={handleDateRangeSelect}
-                        disabled={isDateDisabled}
-                        locale={he}
-                        initialFocus
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                    </motion.div>
+                            <span className="text-gray-400">בחר טווח</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="range"
+                          selected={dateRange}
+                          onSelect={handleDateRangeSelect}
+                          disabled={isDateDisabled}
+                          locale={he}
+                          initialFocus
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   )}
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Submit - Clean Black Button */}
