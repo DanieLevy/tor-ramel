@@ -5,14 +5,9 @@
 /apple-touch-icon-152x152.png /icons/touch-icon-ipad.png 200
 /apple-touch-icon-180x180.png /icons/touch-icon-iphone-retina.png 200
 
-# Netlify function redirects
-/.netlify/functions/* /.netlify/functions/:splat 200
-
-# API routes to Netlify functions
-/api/* /.netlify/functions/:splat 200
-
 # Force HTTPS
 http://tor-ramel.netlify.app/*  https://tor-ramel.netlify.app/:splat  301!
 
-# Handle SPA routes (fallback)
-/*    /index.html   200 
+# NOTE: Do NOT add API redirects here!
+# Next.js API routes are handled automatically by @netlify/plugin-nextjs
+# Adding /api/* redirects will break them!

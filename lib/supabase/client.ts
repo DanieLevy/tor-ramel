@@ -4,12 +4,20 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+console.log('[Supabase] 🔧 Initializing Supabase client...', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseServiceRoleKey,
+  urlPrefix: supabaseUrl?.substring(0, 30) + '...',
+  nodeEnv: process.env.NODE_ENV
+})
+
 if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.error('Missing Supabase environment variables:', {
+  console.error('[Supabase] ❌ Missing Supabase environment variables:', {
     hasUrl: !!supabaseUrl,
-    hasKey: !!supabaseServiceRoleKey
+    hasKey: !!supabaseServiceRoleKey,
+    availableEnvKeys: Object.keys(process.env).filter(k => k.includes('SUPABASE')).join(', ')
   })
-  throw new Error('Missing Supabase environment variables')
+  throw new Error('Missing Supabase environment variables. Check Netlify env vars.')
 }
 
 // Create Supabase client with custom configuration

@@ -167,24 +167,37 @@
 # ============================================
 # Redirects configuration
 # ============================================
+# NOTE: Do NOT add /api/* redirects here!
+# Next.js API routes are handled automatically by @netlify/plugin-nextjs
+# The plugin creates ___netlify-server-handler to handle all Next.js routes
 
-# Handle scheduled function endpoint
+# Handle scheduled function endpoints (only for custom Netlify functions)
 [[redirects]]
   from = "/__scheduled/auto-check"
   to = "/.netlify/functions/auto-check"
   status = 200
   force = true
 
-# Handle notification processor
 [[redirects]]
   from = "/__scheduled/notification-processor"
   to = "/.netlify/functions/notification-processor"
   status = 200
   force = true
 
-# 404 page handling - Must be last
 [[redirects]]
-  from = "/*"
-  to = "/404"
-  status = 404
-  force = false
+  from = "/__scheduled/expiry-reminder"
+  to = "/.netlify/functions/expiry-reminder"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/__scheduled/inactivity-check"
+  to = "/.netlify/functions/inactivity-check"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/__scheduled/weekly-digest"
+  to = "/.netlify/functions/weekly-digest"
+  status = 200
+  force = true
