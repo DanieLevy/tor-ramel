@@ -1,5 +1,5 @@
 [build]
-  command = "npm install --legacy-peer-deps && npm run build"
+  command = "rm -rf node_modules/.cache && npm install --force && npm run build"
   functions = "netlify/functions"
   publish = ".next"
   environment = { NEXT_TELEMETRY_DISABLED = "1", CI = "true" }
