@@ -68,25 +68,25 @@ function SubscribePage() {
     showIOSInstallPrompt: _showIOSInstallPrompt
   } = usePushNotifications()
 
-  // Check if iOS and PWA
-  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
-  const _isPWA = typeof window !== 'undefined' && (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (window.navigator as unknown as { standalone?: boolean }).standalone === true
-  )
-  
-  // Check if touch device (for native picker preference)
-  const isTouchDevice = typeof window !== 'undefined' && (
-    'ontouchstart' in window || navigator.maxTouchPoints > 0
-  )
+  // Touch device state (initialized after mount to avoid hydration mismatch)
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    
+    // Detect touch device and iOS after mount to avoid hydration mismatch
+    const touchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    
+    setIsTouchDevice(touchDevice)
+    setIsIOS(iosDevice)
+    
     // Default to native picker on iOS devices
-    if (isIOS) {
+    if (iosDevice) {
       setUseNativePicker(true)
     }
-  }, [isIOS])
+  }, [])
 
   useEffect(() => {
     if (mounted) {

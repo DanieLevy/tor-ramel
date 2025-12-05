@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pushService } from '@/lib/push-notification-service';
 import { verifyToken } from '@/lib/auth/jwt';
+import { ensureUserPreferences } from '@/lib/user-preferences';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     console.log(`📱 [Push Subscribe API] Subscription request from ${username} (${deviceType})`);
 
     // Save subscription (user is authenticated)
-    await pushService.savePushSubscription({
+    const { subscriptionId } = await pushService.savePushSubscription({
       userId,
       username,
       email: userEmail,
@@ -84,6 +85,11 @@ export async function POST(request: NextRequest) {
       deviceType,
       userAgent
     });
+
+    // Ensure user preferences exist (non-blocking)
+    ensureUserPreferences(userId).catch(err => 
+      console.error('[Push Subscribe API] Failed to ensure user preferences:', err)
+    );
 
     // Send welcome notification
     try {

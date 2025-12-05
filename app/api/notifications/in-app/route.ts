@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/auth/jwt'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Use NEXT_PUBLIC_SUPABASE_URL for consistency across the app
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[In-App Notifications] Missing Supabase credentials')
+}
+
+const supabase = createClient(supabaseUrl!, supabaseKey!)
 
 // GET - Fetch in-app notifications
 export async function GET(request: NextRequest) {

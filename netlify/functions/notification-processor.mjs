@@ -738,10 +738,15 @@ ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notificat
   }
 }
 
-// Helper function to send push notification
+// Permanent error codes that should deactivate subscription
+const PERMANENT_ERROR_CODES = [410, 404, 401]
+// Max consecutive failures before auto-disabling
+const MAX_CONSECUTIVE_FAILURES = 5
+
+// Helper function to send push notification with delivery tracking
 async function sendPushNotification(data) {
   try {
-    const { userId, title, body, url, appointments } = data
+    const { userId, title, body, url, appointments, subscriptionId, bookingUrl } = data
     
     // Get active push subscriptions for this user
     const { data: pushSubscriptions, error: pushError } = await supabase
@@ -757,13 +762,25 @@ async function sendPushNotification(data) {
 
     if (!pushSubscriptions || pushSubscriptions.length === 0) {
       console.log(`⚠️ [Push] No active push subscriptions for user ${userId}`)
-      return false // Return false - push was NOT sent
+      return false
     }
 
     console.log(`📱 [Push] Found ${pushSubscriptions.length} active push subscriptions`)
 
-    // Prepare notification payload
+    // Build actions - include Book Now if booking URL is available
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
+    const defaultActions = bookingUrl
+      ? [
+          { action: 'book', title: '🗓 הזמן עכשיו' },
+          { action: 'view', title: 'צפה בפרטים' },
+          { action: 'dismiss', title: 'סגור' }
+        ]
+      : [
+          { action: 'view', title: 'צפה בתור' },
+          { action: 'dismiss', title: 'סגור' }
+        ]
+
+    // Prepare notification payload with proper structure for sw.js
     const notificationPayload = JSON.stringify({
       notification: {
         title,
@@ -772,19 +789,19 @@ async function sendPushNotification(data) {
         badge: '/icons/icon-72x72.png',
         tag: 'appointment-notification',
         requireInteraction: true,
-        actions: [
-          { action: 'view', title: 'צפה בתור' },
-          { action: 'dismiss', title: 'בטל' }
-        ],
+        actions: defaultActions,
         data: {
           url: url || baseUrl,
+          booking_url: bookingUrl,
+          subscription_id: subscriptionId,
           appointments: appointments || [],
           timestamp: Date.now()
         }
-      }
+      },
+      badgeCount: 1
     })
 
-    // Send to each subscription
+    // Send to each subscription with delivery tracking
     let sent = 0
     let failed = 0
 
@@ -802,24 +819,49 @@ async function sendPushNotification(data) {
         sent++
         console.log(`✅ [Push] Push sent to ${sub.username} (${sub.device_type})`)
 
-        // Update last_used timestamp
+        // Update delivery status - success
         await supabase
           .from('push_subscriptions')
-          .update({ last_used: new Date().toISOString() })
+          .update({ 
+            last_used: new Date().toISOString(),
+            last_delivery_status: 'success',
+            consecutive_failures: 0,
+            last_failure_reason: null
+          })
           .eq('id', sub.id)
 
       } catch (error) {
         failed++
         console.error(`❌ [Push] Failed to send to ${sub.username}:`, error.message)
+        
+        const statusCode = error.statusCode || 0
 
-        // Handle subscription errors
-        if (error.statusCode === 410 || error.statusCode === 404) {
-          // Subscription expired or gone - remove it
-          console.log(`🗑️ [Push] Removing expired subscription for ${sub.username}`)
+        // Get current failure count
+        const currentFailures = sub.consecutive_failures || 0
+        const newFailureCount = currentFailures + 1
+
+        // Check if permanent error or too many failures
+        if (PERMANENT_ERROR_CODES.includes(statusCode) || newFailureCount >= MAX_CONSECUTIVE_FAILURES) {
+          console.log(`🗑️ [Push] Deactivating subscription for ${sub.username} (status: ${statusCode}, failures: ${newFailureCount})`)
           await supabase
             .from('push_subscriptions')
-            .delete()
-            .eq('endpoint', sub.endpoint)
+            .update({ 
+              is_active: false,
+              last_delivery_status: 'failed',
+              consecutive_failures: newFailureCount,
+              last_failure_reason: `Deactivated: ${error.message} (status ${statusCode})`
+            })
+            .eq('id', sub.id)
+        } else {
+          // Update failure tracking
+          await supabase
+            .from('push_subscriptions')
+            .update({ 
+              last_delivery_status: 'failed',
+              consecutive_failures: newFailureCount,
+              last_failure_reason: error.message
+            })
+            .eq('id', sub.id)
         }
       }
     }

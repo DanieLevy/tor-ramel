@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Mail, Smartphone, Bell, CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
+import { Mail, Smartphone, Bell, CheckCircle, AlertCircle, Sparkles, Flame } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { usePushNotifications } from '@/hooks/use-push-notifications'
+import { Switch } from '@/components/ui/switch'
 
 type NotificationMethod = 'email' | 'push' | 'both'
 
@@ -31,8 +32,10 @@ interface NotificationSettingsContentProps {
 
 export function NotificationSettingsContent({ isOpen = true }: NotificationSettingsContentProps) {
   const [notificationMethod, setNotificationMethod] = useState<NotificationMethod>('email')
+  const [hotAlertsEnabled, setHotAlertsEnabled] = useState(true)
   const [loading, setLoading] = useState(false)
   const [testingPush, setTestingPush] = useState(false)
+  const [savingHotAlerts, setSavingHotAlerts] = useState(false)
   
   // Push notifications hook
   const { 
@@ -54,6 +57,7 @@ export function NotificationSettingsContent({ isOpen = true }: NotificationSetti
   useEffect(() => {
     if (isOpen) {
       loadPreference()
+      loadUserPreferences()
     }
   }, [isOpen])
 
@@ -72,6 +76,48 @@ export function NotificationSettingsContent({ isOpen = true }: NotificationSetti
       }
     } catch (error) {
       console.error('Failed to load notification preference:', error)
+    }
+  }
+
+  const loadUserPreferences = async () => {
+    try {
+      const response = await pwaFetch('/api/user/preferences', {
+        method: 'GET',
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.preferences?.hot_alerts_enabled !== undefined) {
+          setHotAlertsEnabled(data.preferences.hot_alerts_enabled)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load user preferences:', error)
+    }
+  }
+
+  const handleHotAlertsToggle = async (enabled: boolean) => {
+    setSavingHotAlerts(true)
+    try {
+      const response = await pwaFetch('/api/user/preferences', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hot_alerts_enabled: enabled })
+      })
+      
+      if (response.ok) {
+        setHotAlertsEnabled(enabled)
+        toast.success(enabled ? 'התראות דחופות הופעלו' : 'התראות דחופות כובו')
+      } else {
+        toast.error('שגיאה בשמירת העדפות')
+      }
+    } catch (error) {
+      console.error('Failed to save hot alerts preference:', error)
+      toast.error('שגיאה בשמירת העדפות')
+    } finally {
+      setSavingHotAlerts(false)
     }
   }
 
@@ -250,6 +296,27 @@ export function NotificationSettingsContent({ isOpen = true }: NotificationSetti
           </div>
         </div>
       )}
+
+      {/* Hot Alerts Toggle */}
+      <div className="pt-3 border-t border-black/5 dark:border-white/5 space-y-2">
+        <div className="flex items-center justify-between p-3 bg-orange-500/5 rounded-xl border border-orange-200/30 dark:border-orange-800/30">
+          <div className="flex items-start gap-2">
+            <Flame className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+            <div className="text-right">
+              <p className="text-sm font-medium text-foreground">התראות דחופות</p>
+              <p className="text-xs text-muted-foreground">
+                קבל התראה מיידית כשמתפנה תור היום או מחר
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={hotAlertsEnabled}
+            onCheckedChange={handleHotAlertsToggle}
+            disabled={savingHotAlerts}
+            aria-label="Toggle hot alerts"
+          />
+        </div>
+      </div>
 
       {/* Test Push Button */}
       {isPushSubscribed && (

@@ -3,6 +3,7 @@ import { registerSchema } from '@/lib/auth/validation'
 import { hashPassword } from '@/lib/auth/password'
 import { generateTokens, setAuthCookies } from '@/lib/auth/jwt'
 import { supabaseAdmin } from '@/lib/supabase/client'
+import { ensureUserPreferences } from '@/lib/user-preferences'
 
 export async function POST(request: NextRequest) {
   try {
@@ -137,6 +138,11 @@ export async function POST(request: NextRequest) {
 
     // Set cookies
     await setAuthCookies(tokens)
+
+    // Auto-create user preferences (non-blocking)
+    ensureUserPreferences(user.id).catch(err => 
+      console.error('Failed to create user preferences:', err)
+    )
 
     console.log('Registration successful for user:', email)
 

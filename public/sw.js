@@ -1,6 +1,6 @@
 // Service Worker for Tor-Ramel PWA
 // iOS 26 Optimized - Navigation Preload + Badge API
-const VERSION = 'v2.7';
+const VERSION = 'v3.0';
 const BUILD_TIME = new Date().toISOString();
 const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
@@ -317,6 +317,18 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Build actions - include Book Now if booking_url is available
+  const defaultActions = notificationData.data?.booking_url 
+    ? [
+        { action: 'book', title: '🗓 הזמן עכשיו' },
+        { action: 'view', title: 'צפה בפרטים' },
+        { action: 'dismiss', title: 'סגור' }
+      ]
+    : [
+        { action: 'view', title: 'צפה בתור' },
+        { action: 'dismiss', title: 'סגור' }
+      ];
+
   const options = {
     body: notificationData.body,
     icon: notificationData.icon,
@@ -324,11 +336,8 @@ self.addEventListener('push', (event) => {
     image: notificationData.image,
     vibrate: [200, 100, 200],
     tag: notificationData.tag || 'appointment-notification',
-    requireInteraction: notificationData.requireInteraction || true,
-    actions: notificationData.actions || [
-      { action: 'view', title: 'צפה בתור' },
-      { action: 'dismiss', title: 'בטל' }
-    ],
+    requireInteraction: notificationData.requireInteraction !== false,
+    actions: notificationData.actions || defaultActions,
     data: notificationData.data || { url: '/' },
     dir: 'rtl',
     lang: 'he'
@@ -363,17 +372,48 @@ async function updateBadge(count) {
   }
 }
 
-// Notification click handling - Enhanced with smart URL navigation and badge clearing
+// Notification click handling - Enhanced with smart URL navigation, badge clearing, and Book Now action
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] 🖱️ Notification clicked:', event.action);
   event.notification.close();
   
-  const urlToOpen = event.notification.data?.url || '/';
+  const notificationData = event.notification.data || {};
+  const defaultUrl = notificationData.url || '/';
   
   // Handle different actions
   if (event.action === 'dismiss') {
     // Just close, no navigation
     console.log('[SW] ❌ Notification dismissed');
+    // Track dismissal event
+    trackNotificationEvent('dismissed', notificationData);
+    return;
+  }
+  
+  // Handle 'book' action - navigate to app with booking intent
+  if (event.action === 'book') {
+    console.log('[SW] 🗓 Book Now action triggered');
+    // Navigate to notification-action page with book intent, then redirect to booking
+    const bookingUrl = notificationData.booking_url;
+    const appointmentDate = notificationData.appointment_date || notificationData.appointments?.[0]?.date;
+    let targetUrl = '/notification-action?action=book';
+    
+    if (appointmentDate) {
+      targetUrl += `&date=${encodeURIComponent(appointmentDate)}`;
+    }
+    if (bookingUrl) {
+      targetUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`;
+    }
+    if (notificationData.subscription_id) {
+      targetUrl += `&subscription=${notificationData.subscription_id}`;
+    }
+    
+    event.waitUntil(
+      Promise.all([
+        updateBadge(0),
+        trackNotificationEvent('clicked', { ...notificationData, action: 'book' }),
+        openOrFocusWindow(targetUrl)
+      ])
+    );
     return;
   }
   
@@ -382,30 +422,62 @@ self.addEventListener('notificationclick', (event) => {
     Promise.all([
       // Clear badge when notification is opened
       updateBadge(0),
+      // Track click event
+      trackNotificationEvent('clicked', { ...notificationData, action: event.action || 'view' }),
       // Open/focus app window
-      clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-      }).then(windowClients => {
-        // Check if there's already a window open with our app
-        for (let i = 0; i < windowClients.length; i++) {
-          const client = windowClients[i];
-          if (client.url.includes(self.location.origin) && 'focus' in client) {
-            console.log('[SW] ✅ Focusing existing window and navigating to:', urlToOpen);
-            // Navigate to the target URL and focus
-            client.navigate(urlToOpen);
-            return client.focus();
-          }
-        }
-        // No window open, open a new one
-        if (clients.openWindow) {
-          console.log('[SW] 🆕 Opening new window:', urlToOpen);
-          return clients.openWindow(urlToOpen);
-        }
-      })
+      openOrFocusWindow(defaultUrl)
     ])
   );
 });
+
+// Helper function to open or focus app window
+async function openOrFocusWindow(urlToOpen) {
+  const windowClients = await clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true
+  });
+  
+  // Check if there's already a window open with our app
+  for (const client of windowClients) {
+    if (client.url.includes(self.location.origin) && 'focus' in client) {
+      console.log('[SW] ✅ Focusing existing window and navigating to:', urlToOpen);
+      await client.navigate(urlToOpen);
+      return client.focus();
+    }
+  }
+  
+  // No window open, open a new one
+  if (clients.openWindow) {
+    console.log('[SW] 🆕 Opening new window:', urlToOpen);
+    return clients.openWindow(urlToOpen);
+  }
+}
+
+// Helper function to track notification events (sends to API)
+async function trackNotificationEvent(eventType, data) {
+  try {
+    // Only track if we have a notification_id or sufficient data
+    if (!data.notification_id && !data.subscription_id) return;
+    
+    await fetch('/api/notifications/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_type: eventType,
+        notification_id: data.notification_id,
+        subscription_id: data.subscription_id,
+        metadata: {
+          action: data.action,
+          timestamp: Date.now()
+        }
+      })
+    });
+    console.log(`[SW] 📊 Tracked event: ${eventType}`);
+  } catch (err) {
+    // Silent fail for tracking - don't block user experience
+    console.log('[SW] ⚠️ Failed to track event:', err.message);
+  }
+}
 
 // Broadcast version info to clients
 self.addEventListener('activate', (event) => {
@@ -425,10 +497,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Message handling for skip waiting and cache clearing
+// Message handling for skip waiting, cache clearing, and badge management
 self.addEventListener('message', (event) => {
+  if (!event.data || !event.data.type) return;
+  
+  const { type } = event.data;
+  
   // Send version info on request
-  if (event.data && event.data.type === 'GET_VERSION') {
+  if (type === 'GET_VERSION') {
     event.source.postMessage({
       type: 'VERSION_INFO',
       version: VERSION,
@@ -437,11 +513,12 @@ self.addEventListener('message', (event) => {
     return;
   }
   
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
   }
   
-  if (event.data && event.data.type === 'CLEAR_ALL_CACHES') {
+  if (type === 'CLEAR_ALL_CACHES') {
     event.waitUntil(
       caches.keys().then((cacheNames) => {
         return Promise.all(
@@ -452,10 +529,11 @@ self.addEventListener('message', (event) => {
         );
       })
     );
+    return;
   }
   
   // Handle logout - clear auth-sensitive caches
-  if (event.data && event.data.type === 'LOGOUT') {
+  if (type === 'LOGOUT') {
     console.log('[SW] Handling logout, clearing auth-sensitive caches');
     event.waitUntil(
       Promise.all([
@@ -465,10 +543,11 @@ self.addEventListener('message', (event) => {
         console.log('[SW] Auth-sensitive caches cleared');
       })
     );
+    return;
   }
   
   // Handle font caching request
-  if (event.data && event.data.type === 'CACHE_FONTS' && event.data.fonts) {
+  if (type === 'CACHE_FONTS' && event.data.fonts) {
     event.waitUntil(
       caches.open(FONT_CACHE).then((cache) => {
         return Promise.all(
@@ -489,22 +568,19 @@ self.addEventListener('message', (event) => {
         );
       })
     );
-  }
-});
-
-
-// Handle app badge
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SET_BADGE') {
-    if ('setAppBadge' in navigator) {
-      navigator.setAppBadge(event.data.count);
-    }
+    return;
   }
   
-  if (event.data && event.data.type === 'CLEAR_BADGE') {
-    if ('clearAppBadge' in navigator) {
-      navigator.clearAppBadge();
-    }
+  // Handle app badge - SET_BADGE
+  if (type === 'SET_BADGE') {
+    event.waitUntil(updateBadge(event.data.count || 0));
+    return;
+  }
+  
+  // Handle app badge - CLEAR_BADGE
+  if (type === 'CLEAR_BADGE') {
+    event.waitUntil(updateBadge(0));
+    return;
   }
 });
 

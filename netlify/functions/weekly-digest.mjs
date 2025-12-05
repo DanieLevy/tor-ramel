@@ -9,13 +9,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Configure web push
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    'mailto:' + (process.env.VAPID_EMAIL || 'admin@tor-ramel.netlify.app'),
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
+// Configure web push - use NEXT_PUBLIC_VAPID_PUBLIC_KEY for consistency
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || ''
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ''
+const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@tor-ramel.netlify.app'
+
+if (vapidPublicKey && vapidPrivateKey) {
+  try {
+    webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey)
+    console.log('✅ [Weekly] VAPID keys configured successfully')
+  } catch (error) {
+    console.error('❌ [Weekly] Failed to configure VAPID keys:', error)
+  }
+} else {
+  console.warn('⚠️ [Weekly] VAPID keys missing - push notifications will not work')
 }
 
 /**
@@ -47,6 +54,7 @@ async function getWeeklyAvailability() {
 
 /**
  * Send push notification to user
+ * Payload structure matches sw.js expectations: { notification: {...}, badgeCount: number }
  */
 async function sendPushToUser(userId, title, body, data = {}) {
   try {
@@ -60,16 +68,22 @@ async function sendPushToUser(userId, title, body, data = {}) {
       return { sent: 0, failed: 0 }
     }
     
+    // Build payload matching sw.js structure
     const payload = JSON.stringify({
-      title,
-      body,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
-      data: {
-        ...data,
-        url: '/',
-        timestamp: new Date().toISOString()
-      }
+      notification: {
+        title,
+        body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: 'weekly-digest',
+        requireInteraction: false,
+        data: {
+          ...data,
+          url: '/',
+          timestamp: new Date().toISOString()
+        }
+      },
+      badgeCount: 1
     })
     
     let sent = 0
@@ -87,19 +101,47 @@ async function sendPushToUser(userId, title, body, data = {}) {
         
         sent++
         
+        // Update last_used and delivery status
         await supabase
           .from('push_subscriptions')
-          .update({ last_used: new Date().toISOString() })
+          .update({ 
+            last_used: new Date().toISOString(),
+            last_delivery_status: 'success',
+            consecutive_failures: 0
+          })
           .eq('id', sub.id)
           
       } catch (pushError) {
-        console.error(`Push failed:`, pushError.message)
+        console.error(`[Weekly] Push failed:`, pushError.message)
         failed++
         
-        if (pushError.statusCode === 410 || pushError.statusCode === 404) {
+        // Update failure tracking
+        const { data: currentSub } = await supabase
+          .from('push_subscriptions')
+          .select('consecutive_failures')
+          .eq('id', sub.id)
+          .single()
+        
+        const newFailureCount = (currentSub?.consecutive_failures || 0) + 1
+        
+        if (pushError.statusCode === 410 || pushError.statusCode === 404 || newFailureCount >= 5) {
           await supabase
             .from('push_subscriptions')
-            .update({ is_active: false })
+            .update({ 
+              is_active: false,
+              last_delivery_status: 'failed',
+              last_failure_reason: pushError.message,
+              consecutive_failures: newFailureCount
+            })
+            .eq('id', sub.id)
+        } else {
+          await supabase
+            .from('push_subscriptions')
+            .update({ 
+              last_delivery_status: 'failed',
+              last_failure_reason: pushError.message,
+              consecutive_failures: newFailureCount
+            })
             .eq('id', sub.id)
         }
       }
@@ -108,7 +150,7 @@ async function sendPushToUser(userId, title, body, data = {}) {
     return { sent, failed }
     
   } catch (error) {
-    console.error(`Error sending push to user ${userId}:`, error)
+    console.error(`[Weekly] Error sending push to user ${userId}:`, error)
     return { sent: 0, failed: 1 }
   }
 }

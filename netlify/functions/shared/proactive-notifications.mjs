@@ -8,13 +8,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Configure web push
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    'mailto:' + (process.env.VAPID_EMAIL || 'admin@tor-ramel.netlify.app'),
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
+// Configure web push - use NEXT_PUBLIC_VAPID_PUBLIC_KEY for consistency across the app
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || ''
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || ''
+const vapidEmail = process.env.VAPID_EMAIL || 'mailto:admin@tor-ramel.netlify.app'
+
+if (vapidPublicKey && vapidPrivateKey) {
+  try {
+    webpush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey)
+    console.log('✅ [Proactive] VAPID keys configured successfully')
+  } catch (error) {
+    console.error('❌ [Proactive] Failed to configure VAPID keys:', error)
+  }
+} else {
+  console.warn('⚠️ [Proactive] VAPID keys missing - push notifications will not work')
 }
 
 /**
@@ -57,6 +64,7 @@ export function getDaysUntil(dateStr) {
 
 /**
  * Send a push notification to a user
+ * Payload structure matches sw.js expectations: { notification: {...}, badgeCount: number }
  */
 async function sendPushToUser(userId, title, body, data = {}) {
   try {
@@ -68,20 +76,26 @@ async function sendPushToUser(userId, title, body, data = {}) {
       .eq('is_active', true)
     
     if (error || !pushSubs || pushSubs.length === 0) {
-      console.log(`No active push subscriptions for user ${userId}`)
+      console.log(`[Proactive] No active push subscriptions for user ${userId}`)
       return { sent: 0, failed: 0 }
     }
     
+    // Build payload matching sw.js structure
     const payload = JSON.stringify({
-      title,
-      body,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
-      data: {
-        ...data,
-        url: '/',
-        timestamp: new Date().toISOString()
-      }
+      notification: {
+        title,
+        body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: data.type || 'proactive-notification',
+        requireInteraction: true,
+        data: {
+          ...data,
+          url: data.url || '/',
+          timestamp: new Date().toISOString()
+        }
+      },
+      badgeCount: 1
     })
     
     let sent = 0
@@ -99,21 +113,49 @@ async function sendPushToUser(userId, title, body, data = {}) {
         
         sent++
         
-        // Update last_used
+        // Update last_used and delivery status
         await supabase
           .from('push_subscriptions')
-          .update({ last_used: new Date().toISOString() })
+          .update({ 
+            last_used: new Date().toISOString(),
+            last_delivery_status: 'success',
+            consecutive_failures: 0
+          })
           .eq('id', sub.id)
           
       } catch (pushError) {
-        console.error(`Push failed for subscription ${sub.id}:`, pushError.message)
+        console.error(`[Proactive] Push failed for subscription ${sub.id}:`, pushError.message)
         failed++
         
-        // If subscription is invalid, deactivate it
-        if (pushError.statusCode === 410 || pushError.statusCode === 404) {
+        // Update failure status
+        const { data: currentSub } = await supabase
+          .from('push_subscriptions')
+          .select('consecutive_failures')
+          .eq('id', sub.id)
+          .single()
+        
+        const newFailureCount = (currentSub?.consecutive_failures || 0) + 1
+        
+        // If subscription is invalid or too many failures, deactivate it
+        if (pushError.statusCode === 410 || pushError.statusCode === 404 || newFailureCount >= 5) {
           await supabase
             .from('push_subscriptions')
-            .update({ is_active: false })
+            .update({ 
+              is_active: false,
+              last_delivery_status: 'failed',
+              last_failure_reason: pushError.message,
+              consecutive_failures: newFailureCount
+            })
+            .eq('id', sub.id)
+          console.log(`[Proactive] Deactivated subscription ${sub.id} after ${newFailureCount} failures`)
+        } else {
+          await supabase
+            .from('push_subscriptions')
+            .update({ 
+              last_delivery_status: 'failed',
+              last_failure_reason: pushError.message,
+              consecutive_failures: newFailureCount
+            })
             .eq('id', sub.id)
         }
       }
@@ -122,7 +164,7 @@ async function sendPushToUser(userId, title, body, data = {}) {
     return { sent, failed }
     
   } catch (error) {
-    console.error(`Error sending push to user ${userId}:`, error)
+    console.error(`[Proactive] Error sending push to user ${userId}:`, error)
     return { sent: 0, failed: 1 }
   }
 }
@@ -319,11 +361,13 @@ export async function processHotAlerts(availableAppointments) {
       continue
     }
     
-    // Send push notification
+    // Send push notification with booking_url for "Book Now" action
     const pushResult = await sendPushToUser(user.id, title, body, {
       type: 'hot_alert',
       appointment_date: hottestApt.date,
-      times: hottestApt.times
+      times: hottestApt.times,
+      booking_url: hottestApt.booking_url,
+      url: hottestApt.booking_url ? `/notification-action?action=book&date=${hottestApt.date}&booking_url=${encodeURIComponent(hottestApt.booking_url)}` : '/'
     })
     
     if (pushResult.sent > 0) {
@@ -445,11 +489,13 @@ export async function processOpportunityDiscovery(availableAppointments) {
       continue
     }
     
-    // Send push notification
+    // Send push notification with booking_url for "Book Now" action
     const pushResult = await sendPushToUser(user.id, title, body, {
       type: 'opportunity',
       appointment_date: bestApt.date,
-      times: bestApt.times
+      times: bestApt.times,
+      booking_url: bestApt.booking_url,
+      url: bestApt.booking_url ? `/notification-action?action=book&date=${bestApt.date}&booking_url=${encodeURIComponent(bestApt.booking_url)}` : '/'
     })
     
     if (pushResult.sent > 0) {

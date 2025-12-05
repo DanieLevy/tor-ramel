@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth/jwt';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Use consistent env var naming
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Default notification method for users without subscriptions
+const DEFAULT_NOTIFICATION_METHOD = 'email';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -35,24 +39,63 @@ export async function PUT(request: NextRequest) {
 
     console.log(`📝 [Preferences API] Updating notification method to: ${notification_method} for user: ${user.userId}`);
 
-    // Update all active subscriptions for this user
-    const { error } = await supabase
+    // ALWAYS store the preference in user_preferences as the source of truth
+    const { error: upsertError } = await supabase
+      .from('user_preferences')
+      .upsert({
+        user_id: user.userId,
+        default_notification_method: notification_method,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+
+    if (upsertError) {
+      console.error('❌ [Preferences API] Error saving to user_preferences:', upsertError);
+      throw upsertError;
+    }
+    
+    console.log(`✅ [Preferences API] Preference stored in user_preferences`);
+
+    // Also update any existing active subscriptions
+    const { data: subscriptions, error: fetchError } = await supabase
       .from('notification_subscriptions')
-      .update({ notification_method })
+      .select('id')
       .eq('user_id', user.userId)
       .eq('is_active', true);
 
-    if (error) {
-      console.error('❌ [Preferences API] Database error:', error);
-      throw error;
+    if (fetchError) {
+      console.warn('⚠️ [Preferences API] Error fetching subscriptions:', fetchError);
+      // Continue - the main preference is saved
     }
 
-    console.log(`✅ [Preferences API] Notification preferences updated successfully`);
+    let updatedCount = 0;
+
+    if (subscriptions && subscriptions.length > 0) {
+      // Update all active subscriptions for this user
+      const { error: updateError } = await supabase
+        .from('notification_subscriptions')
+        .update({ 
+          notification_method,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.userId)
+        .eq('is_active', true);
+
+      if (updateError) {
+        console.warn('⚠️ [Preferences API] Error updating subscriptions:', updateError);
+        // Continue - the main preference is saved
+      } else {
+        updatedCount = subscriptions.length;
+        console.log(`✅ [Preferences API] Updated ${updatedCount} subscription(s)`);
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Notification preferences updated successfully',
-      notification_method
+      message: updatedCount > 0 
+        ? `Notification preferences updated (${updatedCount} subscription(s) synced)`
+        : 'Notification preferences saved',
+      notification_method,
+      subscriptions_updated: updatedCount
     });
   } catch (error) {
     console.error('❌ [Preferences API] Error:', error);
@@ -63,7 +106,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Get user from JWT token in cookies
     const user = await getCurrentUser();
@@ -78,28 +121,48 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔐 [Preferences API GET] Authenticated user: ${user.email} (${user.userId})`);
 
-    // Get the most recent active subscription to determine notification method
-    const { data: subscription, error } = await supabase
-      .from('notification_subscriptions')
-      .select('notification_method')
-      .eq('user_id', user.userId)
-      .eq('is_active', true)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single();
+    let notification_method = DEFAULT_NOTIFICATION_METHOD;
+    let has_subscriptions = false;
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('❌ [Preferences API GET] Database error:', error);
-      throw error;
+    // First, check user_preferences for the saved preference (source of truth)
+    const { data: userPrefs, error: prefsError } = await supabase
+      .from('user_preferences')
+      .select('default_notification_method')
+      .eq('user_id', user.userId)
+      .limit(1);
+
+    if (prefsError) {
+      console.warn('⚠️ [Preferences API GET] Error fetching user_preferences:', prefsError);
+    } else if (userPrefs && userPrefs.length > 0 && userPrefs[0].default_notification_method) {
+      notification_method = userPrefs[0].default_notification_method;
+      console.log(`📋 [Preferences API GET] Got preference from user_preferences: ${notification_method}`);
     }
 
-    const notification_method = subscription?.notification_method || 'email';
+    // Also check if user has active subscriptions (for UI feedback)
+    const { data: subscriptions, error: subsError } = await supabase
+      .from('notification_subscriptions')
+      .select('id, notification_method')
+      .eq('user_id', user.userId)
+      .eq('is_active', true)
+      .limit(1);
+
+    if (subsError) {
+      console.warn('⚠️ [Preferences API GET] Error fetching subscriptions:', subsError);
+    } else if (subscriptions && subscriptions.length > 0) {
+      has_subscriptions = true;
+      // If no user_preferences record exists yet, use subscription's method
+      if (!userPrefs || userPrefs.length === 0 || !userPrefs[0].default_notification_method) {
+        notification_method = subscriptions[0].notification_method || DEFAULT_NOTIFICATION_METHOD;
+        console.log(`📋 [Preferences API GET] Got preference from subscription: ${notification_method}`);
+      }
+    }
     
-    console.log(`✅ [Preferences API GET] Current preference: ${notification_method}`);
+    console.log(`✅ [Preferences API GET] Returning: ${notification_method}, has_subscriptions: ${has_subscriptions}`);
 
     return NextResponse.json({
       success: true,
-      notification_method
+      notification_method,
+      has_subscriptions
     });
   } catch (error) {
     console.error('❌ [Preferences API GET] Error:', error);

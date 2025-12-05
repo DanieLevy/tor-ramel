@@ -1,11 +1,20 @@
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import {
+  addToRetryQueue,
+  isPermanentError,
+  isRetryableError,
+  resetSubscriptionFailures,
+  incrementSubscriptionFailures,
+  cancelPendingRetries,
+  RETRY_CONFIG,
+} from './notification-retry-service';
 
 // Initialize Supabase client for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize web-push with VAPID keys
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
@@ -37,12 +46,19 @@ export interface PushPayload {
     title: string;
     icon?: string;
   }>;
-  data?: any;
+  data?: Record<string, unknown>;
+  // Additional data for enhanced features
+  booking_url?: string;
+  badgeCount?: number;
+  notification_id?: string;
+  subscription_id?: string;
 }
 
 export interface SendOptions {
   targetUserIds?: string[];
   saveToHistory?: boolean;
+  enableRetry?: boolean; // Enable retry queue for failed deliveries
+  notificationQueueId?: string; // Link to notification queue for retry reference
 }
 
 export interface PushSubscription {
@@ -54,11 +70,14 @@ export interface PushSubscription {
   p256dh: string;
   auth: string;
   device_type: string;
+  consecutive_failures?: number;
+  last_delivery_status?: 'success' | 'failed' | 'pending';
 }
 
 class PushNotificationService {
   /**
    * Send push notification to specified users
+   * Includes delivery tracking and optional retry queue integration
    */
   async sendNotification(
     payload: PushPayload,
@@ -67,16 +86,20 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
+    retried: number;
     errors: string[];
   }> {
     const errors: string[] = [];
     let sent = 0;
     let failed = 0;
+    let retried = 0;
+    const enableRetry = options.enableRetry ?? true; // Enable retry by default
 
     try {
       console.log('📤 [Push Service] Sending push notification:', {
         title: payload.title,
-        targetUserIds: options.targetUserIds?.length || 'all'
+        targetUserIds: options.targetUserIds?.length || 'all',
+        enableRetry
       });
 
       // Check VAPID keys
@@ -84,7 +107,7 @@ class PushNotificationService {
         const error = 'VAPID keys not configured';
         console.error('❌ [Push Service]', error);
         errors.push(error);
-        return { success: false, sent: 0, failed: 0, errors };
+        return { success: false, sent: 0, failed: 0, retried: 0, errors };
       }
 
       // Get target subscriptions
@@ -92,13 +115,25 @@ class PushNotificationService {
 
       if (subscriptions.length === 0) {
         console.warn('⚠️ [Push Service] No active subscriptions found');
-        return { success: false, sent: 0, failed: 0, errors: ['No active subscriptions found'] };
+        return { success: false, sent: 0, failed: 0, retried: 0, errors: ['No active subscriptions found'] };
       }
 
       console.log(`📱 [Push Service] Found ${subscriptions.length} active subscriptions`);
 
-      // Prepare payload
-      const notificationPayload = JSON.stringify({
+      // Build actions - include Book Now if booking_url is available
+      const defaultActions = payload.booking_url
+        ? [
+            { action: 'book', title: '🗓 הזמן עכשיו' },
+            { action: 'view', title: 'צפה בפרטים' },
+            { action: 'dismiss', title: 'סגור' }
+          ]
+        : [
+            { action: 'view', title: 'צפה בתור' },
+            { action: 'dismiss', title: 'סגור' }
+          ];
+
+      // Prepare payload with proper structure for sw.js
+      const notificationPayload = {
         notification: {
           title: payload.title,
           body: payload.body,
@@ -106,17 +141,23 @@ class PushNotificationService {
           badge: payload.badge || '/icons/icon-72x72.png',
           image: payload.image,
           tag: payload.tag || 'appointment-notification',
-          requireInteraction: payload.requireInteraction || false,
-          actions: payload.actions,
+          requireInteraction: payload.requireInteraction !== false,
+          actions: payload.actions || defaultActions,
           data: {
             ...payload.data,
             url: payload.url || '/',
+            booking_url: payload.booking_url,
+            notification_id: payload.notification_id,
+            subscription_id: payload.subscription_id,
             timestamp: Date.now()
           }
-        }
-      });
+        },
+        badgeCount: payload.badgeCount ?? 1
+      };
 
-      // Send to each subscription
+      const notificationPayloadStr = JSON.stringify(notificationPayload);
+
+      // Send to each subscription with delivery tracking
       const sendPromises = subscriptions.map(async (sub) => {
         try {
           const pushSubscription = {
@@ -127,27 +168,59 @@ class PushNotificationService {
             }
           };
 
-          await webpush.sendNotification(pushSubscription, notificationPayload);
+          await webpush.sendNotification(pushSubscription, notificationPayloadStr);
           sent++;
           console.log(`✅ [Push Service] Push sent to ${sub.username} (${sub.device_type})`);
 
-          // Update last_used timestamp
-          await supabase
-            .from('push_subscriptions')
-            .update({ last_used: new Date().toISOString() })
-            .eq('id', sub.id);
+          // Update delivery status - success
+          await resetSubscriptionFailures(sub.id);
 
-        } catch (error: any) {
-          failed++;
-          const errorMsg = `Failed to send to ${sub.username}: ${error.message}`;
+        } catch (error: unknown) {
+          const pushError = error as { statusCode?: number; message?: string };
+          const errorMsg = `Failed to send to ${sub.username}: ${pushError.message || 'Unknown error'}`;
           errors.push(errorMsg);
           console.error(`❌ [Push Service] ${errorMsg}`);
 
-          // Handle subscription errors
-          if (error.statusCode === 410 || error.statusCode === 404) {
-            // Subscription expired or gone - remove it
-            console.log(`🗑️ [Push Service] Removing expired subscription for ${sub.username}`);
-            await this.removePushSubscription(sub.endpoint);
+          // Check error type
+          const statusCode = pushError.statusCode || 0;
+
+          if (isPermanentError(statusCode)) {
+            // Subscription expired or gone - deactivate it
+            console.log(`🗑️ [Push Service] Deactivating expired subscription for ${sub.username}`);
+            await supabase
+              .from('push_subscriptions')
+              .update({
+                is_active: false,
+                last_delivery_status: 'failed',
+                last_failure_reason: `Subscription gone (${statusCode})`,
+              })
+              .eq('id', sub.id);
+            
+            // Cancel any pending retries for this subscription
+            await cancelPendingRetries(sub.id);
+            failed++;
+          } else if (enableRetry && isRetryableError(statusCode)) {
+            // Add to retry queue for retryable errors
+            console.log(`🔄 [Push Service] Adding to retry queue: ${sub.username}`);
+            const retryResult = await addToRetryQueue(
+              sub.id,
+              sub.user_id || '',
+              notificationPayload,
+              pushError.message || 'Unknown error',
+              options.notificationQueueId
+            );
+            
+            if (retryResult.success) {
+              retried++;
+            } else {
+              failed++;
+              // Update failure tracking
+              await incrementSubscriptionFailures(sub.id, pushError.message || 'Unknown error');
+            }
+          } else {
+            // Non-retryable error
+            failed++;
+            await incrementSubscriptionFailures(sub.id, pushError.message || 'Unknown error');
           }
         }
       });
@@ -155,12 +228,13 @@ class PushNotificationService {
       // Wait for all sends
       await Promise.allSettled(sendPromises);
 
-      console.log(`📊 [Push Service] Results: ${sent} sent, ${failed} failed`);
+      console.log(`📊 [Push Service] Results: ${sent} sent, ${failed} failed, ${retried} queued for retry`);
 
       return {
         success: sent > 0,
         sent,
         failed,
+        retried,
         errors
       };
     } catch (error) {
@@ -169,6 +243,7 @@ class PushNotificationService {
         success: false,
         sent,
         failed,
+        retried,
         errors: [...errors, (error as Error).message]
       };
     }
@@ -209,14 +284,14 @@ class PushNotificationService {
     userId: string;  // ✅ Required - no anonymous subscriptions
     username: string;
     email: string;  // ✅ Required - from authenticated user
-    subscription: any;
+    subscription: { endpoint: string; keys: { p256dh: string; auth: string } };
     deviceType: 'ios' | 'android' | 'desktop';
     userAgent: string;
-  }): Promise<void> {
+  }): Promise<{ subscriptionId: string }> {
     try {
       console.log(`💾 [Push Service] Saving subscription for user ${data.userId} (${data.username}, ${data.deviceType})`);
 
-      const { data: existing, error: checkError } = await supabase
+      const { data: existing } = await supabase
         .from('push_subscriptions')
         .select('id')
         .eq('endpoint', data.subscription.endpoint)
@@ -235,15 +310,20 @@ class PushNotificationService {
             device_type: data.deviceType,
             user_agent: data.userAgent,
             is_active: true,
-            last_used: new Date().toISOString()
+            last_used: new Date().toISOString(),
+            // Reset failure tracking on re-subscribe
+            consecutive_failures: 0,
+            last_delivery_status: 'pending',
+            last_failure_reason: null,
           })
           .eq('endpoint', data.subscription.endpoint);
 
         if (error) throw error;
         console.log('✅ [Push Service] Subscription updated for user', data.userId);
+        return { subscriptionId: existing.id };
       } else {
         // Insert new subscription
-        const { error } = await supabase
+        const { data: newSub, error } = await supabase
           .from('push_subscriptions')
           .insert({
             user_id: data.userId,
@@ -256,11 +336,16 @@ class PushNotificationService {
             user_agent: data.userAgent,
             is_active: true,
             created_at: new Date().toISOString(),
-            last_used: new Date().toISOString()
-          });
+            last_used: new Date().toISOString(),
+            consecutive_failures: 0,
+            last_delivery_status: 'pending',
+          })
+          .select('id')
+          .single();
 
         if (error) throw error;
         console.log('✅ [Push Service] New subscription created for user', data.userId);
+        return { subscriptionId: newSub.id };
       }
     } catch (error) {
       console.error('❌ [Push Service] Save subscription error:', error);
@@ -314,6 +399,7 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
+    retried: number;
     errors: string[];
   }> {
     return this.sendNotification(payload, { targetUserIds: [userId] });
@@ -326,6 +412,7 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
+    retried: number;
     errors: string[];
   }> {
     return this.sendToUser(userId, {
@@ -335,8 +422,80 @@ class PushNotificationService {
       badge: '/icons/icon-72x72.png',
       url: '/',
       tag: 'welcome-test',
-      requireInteraction: true
+      requireInteraction: true,
+      badgeCount: 1,
     });
+  }
+
+  /**
+   * Get subscription health status for a user
+   */
+  async getSubscriptionHealth(userId: string): Promise<{
+    total: number;
+    healthy: number;
+    degraded: number;
+    failing: number;
+  }> {
+    try {
+      const { data: subscriptions } = await supabase
+        .from('push_subscriptions')
+        .select('id, consecutive_failures, last_delivery_status')
+        .eq('user_id', userId)
+        .eq('is_active', true);
+
+      if (!subscriptions || subscriptions.length === 0) {
+        return { total: 0, healthy: 0, degraded: 0, failing: 0 };
+      }
+
+      let healthy = 0;
+      let degraded = 0;
+      let failing = 0;
+
+      for (const sub of subscriptions) {
+        const failures = sub.consecutive_failures || 0;
+        if (failures === 0) {
+          healthy++;
+        } else if (failures < RETRY_CONFIG.maxConsecutiveFailures) {
+          degraded++;
+        } else {
+          failing++;
+        }
+      }
+
+      return {
+        total: subscriptions.length,
+        healthy,
+        degraded,
+        failing,
+      };
+    } catch (error) {
+      console.error('❌ [Push Service] Error getting subscription health:', error);
+      return { total: 0, healthy: 0, degraded: 0, failing: 0 };
+    }
+  }
+
+  /**
+   * Deactivate subscription by ID
+   */
+  async deactivateSubscription(subscriptionId: string): Promise<void> {
+    try {
+      await supabase
+        .from('push_subscriptions')
+        .update({
+          is_active: false,
+          last_delivery_status: 'failed',
+          last_failure_reason: 'Manually deactivated',
+        })
+        .eq('id', subscriptionId);
+
+      // Cancel any pending retries
+      await cancelPendingRetries(subscriptionId);
+      
+      console.log(`🗑️ [Push Service] Subscription ${subscriptionId} deactivated`);
+    } catch (error) {
+      console.error('❌ [Push Service] Error deactivating subscription:', error);
+      throw error;
+    }
   }
 }
 

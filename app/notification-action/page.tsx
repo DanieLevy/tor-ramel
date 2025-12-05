@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -49,6 +49,49 @@ function NotificationActionContent() {
   const handleAction = useCallback(async () => {
     const action = searchParams.get('action')
     const subscriptionId = searchParams.get('subscription')
+    const bookingUrl = searchParams.get('booking_url')
+
+    // Handle "book" action - redirect to booking URL
+    if (action === 'book') {
+      // Track the click event
+      try {
+        await fetch('/api/notifications/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'action_taken',
+            subscription_id: subscriptionId,
+            metadata: {
+              action: 'book',
+              booking_url: bookingUrl,
+              date: date
+            }
+          })
+        })
+      } catch (e) {
+        // Silent fail for tracking
+      }
+
+      if (bookingUrl) {
+        // Show brief confirmation then redirect
+        setResult({
+          success: true,
+          message: 'מעביר לאתר ההזמנות...',
+          action: 'book'
+        })
+        setProcessing(false)
+        
+        // Brief delay to show feedback, then redirect
+        setTimeout(() => {
+          window.location.href = decodeURIComponent(bookingUrl)
+        }, 1000)
+        return
+      }
+      
+      // No booking URL - show appointments instead
+      setProcessing(false)
+      return
+    }
 
     // If no action, just show appointments (view mode from push notification)
     if (!action) {

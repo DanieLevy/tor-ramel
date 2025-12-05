@@ -5,10 +5,11 @@ import { validateSubscriptionData } from '@/lib/notification-helpers'
 import { sendSubscriptionConfirmationEmail } from '@/lib/email-sender'
 import { pushService } from '@/lib/push-notification-service'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Use consistent env var naming
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +40,24 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const { subscription_date, date_range_start, date_range_end, notification_method = 'email' } = body
+    const { subscription_date, date_range_start, date_range_end } = body
+    let { notification_method } = body
+
+    // If no notification_method provided, get user's default preference
+    if (!notification_method) {
+      const { data: userPrefs } = await supabase
+        .from('user_preferences')
+        .select('default_notification_method')
+        .eq('user_id', user.userId)
+        .limit(1)
+
+      if (userPrefs && userPrefs.length > 0 && userPrefs[0].default_notification_method) {
+        notification_method = userPrefs[0].default_notification_method
+        console.log(`📋 [Subscribe API] Using user's saved preference: ${notification_method}`)
+      } else {
+        notification_method = 'email' // Default fallback
+      }
+    }
     
     console.log(`📝 [Subscribe API] Creating subscription with notification_method: ${notification_method}`)
 
