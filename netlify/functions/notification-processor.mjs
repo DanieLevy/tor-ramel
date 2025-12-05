@@ -887,7 +887,15 @@ async function sendPushNotification(data) {
           { action: 'dismiss', title: 'סגור' }
         ]
 
-    // Prepare notification payload with proper structure for sw.js
+    // Prepare LIGHTWEIGHT notification payload for push (Apple 4KB limit!)
+    // Only include essential data - full details are in email
+    const lightweightAppointments = appointments 
+      ? appointments.slice(0, 3).map(apt => ({
+          date: apt.date,
+          count: apt.newTimes?.length || 0
+        }))
+      : []
+    
     const notificationPayload = JSON.stringify({
       notification: {
         title,
@@ -901,7 +909,8 @@ async function sendPushNotification(data) {
           url: url || baseUrl,
           booking_url: bookingUrl,
           subscription_id: subscriptionId,
-          appointments: appointments || [],
+          appointment_count: appointments?.length || 0,
+          appointments: lightweightAppointments,
           timestamp: Date.now()
         }
       },
