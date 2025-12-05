@@ -416,7 +416,7 @@ ${manageTimesUrl}
 }
 
 export function generateSubscriptionConfirmationEmail(data: SubscriptionData): { html: string; text: string } {
-  const { email, subscriptionId, subscriptionDate, dateRangeStart, dateRangeEnd } = data
+  const { email: _email, subscriptionId, subscriptionDate, dateRangeStart, dateRangeEnd } = data
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
   const unsubscribeUrl = `${baseUrl}/notification-action?action=unsubscribe&subscription=${subscriptionId}`
   

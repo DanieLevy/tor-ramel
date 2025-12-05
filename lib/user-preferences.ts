@@ -49,7 +49,7 @@ export const ensureUserPreferences = async (userId: string): Promise<UserPrefere
     }
 
     // Check if preferences exist
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: _fetchError } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
@@ -327,4 +327,5 @@ export const canReceiveProactiveNotification = async (
     return false // Default to false on error to prevent spam
   }
 }
+
 

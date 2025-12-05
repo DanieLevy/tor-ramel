@@ -1,6 +1,3 @@
-// Auto-generated Supabase types - December 2025
-// Run `npx supabase gen types typescript` to regenerate
-
 export type Json =
   | string
   | number
@@ -10,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       appointment_checks: {
@@ -41,6 +43,60 @@ export type Database = {
           times?: string[] | null
         }
         Relationships: []
+      }
+      booked_appointments: {
+        Row: {
+          booked_at: string | null
+          booked_date: string
+          booked_time: string | null
+          booking_url: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          source: string
+          subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          booked_at?: string | null
+          booked_date: string
+          booked_time?: string | null
+          booking_url?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          source?: string
+          subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          booked_at?: string | null
+          booked_date?: string
+          booked_time?: string | null
+          booking_url?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          source?: string
+          subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booked_appointments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "notification_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booked_appointments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ignored_appointment_times: {
         Row: {
@@ -138,6 +194,51 @@ export type Database = {
           },
         ]
       }
+      notification_events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          notification_id: string | null
+          push_subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          notification_id?: string | null
+          push_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          notification_id?: string | null
+          push_subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_events_push_subscription_id_fkey"
+            columns: ["push_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "push_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_queue: {
         Row: {
           appointment_date: string | null
@@ -184,6 +285,73 @@ export type Database = {
             columns: ["subscription_id"]
             isOneToOne: false
             referencedRelation: "notification_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_retry_queue: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_error: string | null
+          max_retries: number | null
+          next_retry_at: string
+          original_queue_id: string | null
+          payload: Json
+          push_subscription_id: string | null
+          retry_count: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_retries?: number | null
+          next_retry_at: string
+          original_queue_id?: string | null
+          payload: Json
+          push_subscription_id?: string | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_retries?: number | null
+          next_retry_at?: string
+          original_queue_id?: string | null
+          payload?: Json
+          push_subscription_id?: string | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_retry_queue_original_queue_id_fkey"
+            columns: ["original_queue_id"]
+            isOneToOne: false
+            referencedRelation: "notification_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_retry_queue_push_subscription_id_fkey"
+            columns: ["push_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "push_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_retry_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -294,15 +462,65 @@ export type Database = {
           },
         ]
       }
+      proactive_notification_log: {
+        Row: {
+          created_at: string | null
+          data: Json | null
+          dedup_key: string | null
+          id: string
+          in_app_created: boolean | null
+          notification_type: string
+          push_sent: boolean | null
+          related_dates: string[] | null
+          sent_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data?: Json | null
+          dedup_key?: string | null
+          id?: string
+          in_app_created?: boolean | null
+          notification_type: string
+          push_sent?: boolean | null
+          related_dates?: string[] | null
+          sent_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json | null
+          dedup_key?: string | null
+          id?: string
+          in_app_created?: boolean | null
+          notification_type?: string
+          push_sent?: boolean | null
+          related_dates?: string[] | null
+          sent_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proactive_notification_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           auth: string
+          consecutive_failures: number | null
           created_at: string
           device_type: string
           email: string | null
           endpoint: string
           id: string
           is_active: boolean
+          last_delivery_status: string | null
+          last_failure_reason: string | null
           last_used: string
           p256dh: string
           user_agent: string | null
@@ -311,12 +529,15 @@ export type Database = {
         }
         Insert: {
           auth: string
+          consecutive_failures?: number | null
           created_at?: string
           device_type: string
           email?: string | null
           endpoint: string
           id?: string
           is_active?: boolean
+          last_delivery_status?: string | null
+          last_failure_reason?: string | null
           last_used?: string
           p256dh: string
           user_agent?: string | null
@@ -325,12 +546,15 @@ export type Database = {
         }
         Update: {
           auth?: string
+          consecutive_failures?: number | null
           created_at?: string
           device_type?: string
           email?: string | null
           endpoint?: string
           id?: string
           is_active?: boolean
+          last_delivery_status?: string | null
+          last_failure_reason?: string | null
           last_used?: string
           p256dh?: string
           user_agent?: string | null
@@ -382,6 +606,89 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          batch_interval_hours: number | null
+          batch_notifications: boolean | null
+          created_at: string | null
+          default_notification_method: string | null
+          expiry_reminders_enabled: boolean
+          hot_alerts_enabled: boolean
+          id: string
+          inactivity_alerts_enabled: boolean
+          last_app_open: string | null
+          last_proactive_notification_at: string | null
+          max_notifications_per_day: number | null
+          notification_cooldown_hours: number
+          notification_cooldown_minutes: number | null
+          preferred_delivery_end: string | null
+          preferred_delivery_start: string | null
+          preferred_times: Json | null
+          proactive_notifications_enabled: boolean
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          updated_at: string | null
+          user_id: string
+          weekly_digest_enabled: boolean
+        }
+        Insert: {
+          batch_interval_hours?: number | null
+          batch_notifications?: boolean | null
+          created_at?: string | null
+          default_notification_method?: string | null
+          expiry_reminders_enabled?: boolean
+          hot_alerts_enabled?: boolean
+          id?: string
+          inactivity_alerts_enabled?: boolean
+          last_app_open?: string | null
+          last_proactive_notification_at?: string | null
+          max_notifications_per_day?: number | null
+          notification_cooldown_hours?: number
+          notification_cooldown_minutes?: number | null
+          preferred_delivery_end?: string | null
+          preferred_delivery_start?: string | null
+          preferred_times?: Json | null
+          proactive_notifications_enabled?: boolean
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string | null
+          user_id: string
+          weekly_digest_enabled?: boolean
+        }
+        Update: {
+          batch_interval_hours?: number | null
+          batch_notifications?: boolean | null
+          created_at?: string | null
+          default_notification_method?: string | null
+          expiry_reminders_enabled?: boolean
+          hot_alerts_enabled?: boolean
+          id?: string
+          inactivity_alerts_enabled?: boolean
+          last_app_open?: string | null
+          last_proactive_notification_at?: string | null
+          max_notifications_per_day?: number | null
+          notification_cooldown_hours?: number
+          notification_cooldown_minutes?: number | null
+          preferred_delivery_end?: string | null
+          preferred_delivery_start?: string | null
+          preferred_times?: Json | null
+          proactive_notifications_enabled?: boolean
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          updated_at?: string | null
+          user_id?: string
+          weekly_digest_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string | null
@@ -420,8 +727,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_expired_otps: { Args: Record<PropertyKey, never>; Returns: number }
-      cleanup_old_appointment_checks: { Args: Record<PropertyKey, never>; Returns: number }
+      cleanup_expired_otps: { Args: never; Returns: number }
+      cleanup_old_appointment_checks: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
@@ -432,21 +739,125 @@ export type Database = {
   }
 }
 
-// Helper types for easier usage
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
-export type InsertTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
-export type UpdateTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-// Commonly used table types
-export type User = Tables<'users'>
-export type Subscription = Tables<'notification_subscriptions'>
-export type AppointmentCheck = Tables<'appointment_checks'>
-export type PushSubscription = Tables<'push_subscriptions'>
-export type InAppNotification = Tables<'in_app_notifications'>
-export type NotifiedAppointment = Tables<'notified_appointments'>
-export type NotificationQueue = Tables<'notification_queue'>
-export type IgnoredAppointmentTime = Tables<'ignored_appointment_times'>
-export type UserOtp = Tables<'user_otps'>
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

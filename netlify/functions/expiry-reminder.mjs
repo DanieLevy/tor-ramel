@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { ISRAEL_TIMEZONE } from './shared/date-utils.mjs'
 import { isWithinQuietHours } from './shared/proactive-notifications.mjs'
+import { sendExpiryReminderEmail } from './shared/email-service.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -182,7 +183,7 @@ async function createInAppNotification(userId, subscriptionId, title, body, data
 /**
  * Log proactive notification
  */
-async function logProactiveNotification(userId, subscriptionId, endDate) {
+async function logProactiveNotification(userId, subscriptionId, endDate, emailSent = false, pushSent = false) {
   try {
     const dedupKey = `expiry-${subscriptionId}-${endDate}`
     
@@ -193,8 +194,8 @@ async function logProactiveNotification(userId, subscriptionId, endDate) {
         notification_type: 'expiry_reminder',
         related_dates: [endDate],
         dedup_key: dedupKey,
-        data: { subscription_id: subscriptionId },
-        push_sent: true,
+        data: { subscription_id: subscriptionId, email_sent: emailSent },
+        push_sent: pushSent,
         in_app_created: true
       })
       
@@ -219,9 +220,49 @@ async function getUserPreferences(userId) {
   
   return data || {
     expiry_reminders_enabled: true,
+    default_notification_method: 'email',
     quiet_hours_start: '22:00',
     quiet_hours_end: '07:00'
   }
+}
+
+/**
+ * Send notification to user based on their method preference
+ */
+async function sendNotificationToUser(userId, userEmail, prefs, title, body, emailData, pushData) {
+  const method = prefs?.default_notification_method || 'email'
+  let emailSent = false
+  let pushSent = false
+  
+  console.log(`[Expiry] Sending to ${userEmail} via ${method}`)
+  
+  // Send email if method is 'email' or 'both'
+  if (method === 'email' || method === 'both') {
+    try {
+      emailSent = await sendExpiryReminderEmail(userEmail, emailData)
+      if (emailSent) {
+        console.log(`✅ [Expiry] Email sent to ${userEmail}`)
+      }
+    } catch (error) {
+      console.error(`❌ [Expiry] Email failed for ${userEmail}:`, error.message)
+    }
+  }
+  
+  // Send push if method is 'push' or 'both'
+  if (method === 'push' || method === 'both') {
+    const pushResult = await sendPushToUser(userId, title, body, pushData)
+    pushSent = pushResult.sent > 0
+    if (pushSent) {
+      console.log(`✅ [Expiry] Push sent to ${userEmail}`)
+    }
+  }
+  
+  // Return true if at least one notification was sent based on preference
+  const success = (method === 'email' && emailSent) ||
+                  (method === 'push' && pushSent) ||
+                  (method === 'both' && (emailSent || pushSent))
+  
+  return { success, emailSent, pushSent }
 }
 
 /**
@@ -246,14 +287,21 @@ async function processExpiryReminders() {
   
   for (const subscription of expiringSubscriptions) {
     const userId = subscription.user_id
+    const userEmail = subscription.users?.email
     const endDate = subscription.date_range_end
     const isToday = endDate === today
+    
+    if (!userEmail) {
+      console.log(`[Expiry] No email found for user ${userId}`)
+      totalSkipped++
+      continue
+    }
     
     // Get user preferences
     const prefs = await getUserPreferences(userId)
     
     // Check if user opted out
-    if (!prefs.expiry_reminders_enabled) {
+    if (prefs.expiry_reminders_enabled === false) {
       totalSkipped++
       continue
     }
@@ -288,15 +336,33 @@ async function processExpiryReminders() {
       ? `החיפוש עבור ${dateRange} מסתיים היום. רוצה להאריך?`
       : `החיפוש עבור ${dateRange} מסתיים מחר. לחץ להארכה`
     
-    // Send push notification
-    const pushResult = await sendPushToUser(userId, title, body, {
+    // Prepare email data
+    const emailData = {
+      subscriptionDateRange: dateRange,
+      daysRemaining: isToday ? 0 : 1,
+      subscriptionId: subscription.id
+    }
+    
+    // Prepare push data
+    const pushData = {
       type: 'expiry_reminder',
       subscription_id: subscription.id,
       end_date: endDate,
       is_today: isToday
-    })
+    }
     
-    if (pushResult.sent > 0) {
+    // Send notification based on user's preference
+    const result = await sendNotificationToUser(
+      userId,
+      userEmail,
+      prefs,
+      title,
+      body,
+      emailData,
+      pushData
+    )
+    
+    if (result.success) {
       // Create in-app notification
       await createInAppNotification(userId, subscription.id, title, body, {
         subscription_id: subscription.id,
@@ -305,9 +371,11 @@ async function processExpiryReminders() {
       })
       
       // Log the notification
-      await logProactiveNotification(userId, subscription.id, endDate)
+      await logProactiveNotification(userId, subscription.id, endDate, result.emailSent, result.pushSent)
       
       totalSent++
+    } else {
+      totalSkipped++
     }
   }
   
@@ -316,7 +384,7 @@ async function processExpiryReminders() {
 }
 
 // Netlify Function Handler
-export default async (req) => {
+export default async (_req) => {
   const functionStart = Date.now()
   
   try {
@@ -365,6 +433,3 @@ export default async (req) => {
 export const config = {
   schedule: "0 7 * * *"
 }
-
-
-

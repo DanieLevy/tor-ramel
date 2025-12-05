@@ -7,8 +7,8 @@ import {
   formatDateIsrael, 
   getCurrentDateIsrael, 
   getDayNameHebrew,
-  addDaysIsrael,
-  isClosedDay,
+  // addDaysIsrael - Available but unused
+  // isClosedDay - Available but unused
   getOpenDays,
   generateBookingUrl
 } from './shared/date-utils.mjs'
@@ -492,7 +492,7 @@ export default async (req) => {
         nextRun = body.next_run
         console.log(`⏰ Scheduled invocation - Next run: ${nextRun}`)
       }
-    } catch (e) {
+    } catch {
       console.log('🔧 Manual invocation (no next_run in body)')
     }
     

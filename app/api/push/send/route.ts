@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         throw new Error('Invalid token');
       }
       console.log(`🔐 [Push Send API] Authenticated user: ${payload.email}`);
-    } catch (error) {
+    } catch {
       console.error('❌ [Push Send API] Invalid token');
       return NextResponse.json({
         error: 'Invalid authentication token',

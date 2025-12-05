@@ -53,8 +53,8 @@ export function BottomNav() {
   
   // Motion values for fluid animations
   const y = useMotionValue(0)
-  const blur = useTransform(y, [0, 100], [36, 0])
-  const opacity = useTransform(y, [0, 80], [1, 0])
+  const _blur = useTransform(y, [0, 100], [36, 0]) // Reserved for glass effects
+  const _opacity = useTransform(y, [0, 80], [1, 0]) // Reserved for fade effects
   const scale = useSpring(1, springConfig)
 
   // Smart scroll handling with velocity detection

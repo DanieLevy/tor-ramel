@@ -35,7 +35,7 @@ export function NotificationSettingsDialog() {
   // Push notifications hook
   const { 
     isSupported: pushSupported, 
-    permission: pushPermission, 
+    permission: _pushPermission, 
     isSubscribed: isPushSubscribed, 
     isLoading: pushLoading, 
     subscribe: subscribeToPush,

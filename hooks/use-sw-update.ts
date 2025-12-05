@@ -18,13 +18,13 @@ export function useSwUpdate() {
       return
     }
 
-    let registration: ServiceWorkerRegistration | null = null
+    let _registration: ServiceWorkerRegistration | null = null
 
     // Check for updates periodically (every 10 minutes)
     const checkForUpdates = async () => {
       try {
         const reg = await navigator.serviceWorker.ready
-        registration = reg
+        _registration = reg
         
         // Try to update
         await reg.update()
@@ -90,7 +90,7 @@ export function useSwUpdate() {
 
     // Check for waiting service worker on load
     navigator.serviceWorker.ready.then(reg => {
-      registration = reg
+      _registration = reg
       
       if (reg.waiting) {
         console.log('⚠️ [SW Update] Service worker waiting to activate')

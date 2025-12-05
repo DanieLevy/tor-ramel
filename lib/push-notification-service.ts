@@ -1,14 +1,5 @@
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
-import {
-  addToRetryQueue,
-  isPermanentError,
-  isRetryableError,
-  resetSubscriptionFailures,
-  incrementSubscriptionFailures,
-  cancelPendingRetries,
-  RETRY_CONFIG,
-} from './notification-retry-service';
 
 // Initialize Supabase client for server-side operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -32,6 +23,80 @@ if (vapidPublicKey && vapidPrivateKey) {
   console.error('❌ VAPID keys missing - push notifications will not work');
 }
 
+// Error types that should trigger immediate subscription deactivation
+const PERMANENT_ERROR_CODES = [410, 404, 401];
+
+// Maximum consecutive failures before auto-disabling subscription
+const MAX_CONSECUTIVE_FAILURES = 5;
+
+/**
+ * Check if an error is permanent (subscription should be deactivated)
+ */
+const isPermanentError = (statusCode: number): boolean => {
+  return PERMANENT_ERROR_CODES.includes(statusCode);
+};
+
+/**
+ * Update subscription failure tracking
+ */
+const incrementSubscriptionFailures = async (subscriptionId: string, errorMessage: string): Promise<void> => {
+  try {
+    const { data: subscription } = await supabase
+      .from('push_subscriptions')
+      .select('consecutive_failures')
+      .eq('id', subscriptionId)
+      .single();
+
+    if (!subscription) return;
+
+    const newFailureCount = (subscription.consecutive_failures || 0) + 1;
+
+    if (newFailureCount >= MAX_CONSECUTIVE_FAILURES) {
+      await supabase
+        .from('push_subscriptions')
+        .update({
+          is_active: false,
+          consecutive_failures: newFailureCount,
+          last_delivery_status: 'failed',
+          last_failure_reason: `Auto-disabled after ${newFailureCount} consecutive failures: ${errorMessage}`,
+        })
+        .eq('id', subscriptionId);
+
+      console.log(`[Push Service] Subscription ${subscriptionId} auto-disabled after ${newFailureCount} failures`);
+    } else {
+      await supabase
+        .from('push_subscriptions')
+        .update({
+          consecutive_failures: newFailureCount,
+          last_delivery_status: 'failed',
+          last_failure_reason: errorMessage,
+        })
+        .eq('id', subscriptionId);
+    }
+  } catch (err) {
+    console.error('[Push Service] Error updating subscription failures:', err);
+  }
+};
+
+/**
+ * Reset consecutive failures on a subscription after successful delivery
+ */
+const resetSubscriptionFailures = async (subscriptionId: string): Promise<void> => {
+  try {
+    await supabase
+      .from('push_subscriptions')
+      .update({
+        consecutive_failures: 0,
+        last_delivery_status: 'success',
+        last_failure_reason: null,
+        last_used: new Date().toISOString(),
+      })
+      .eq('id', subscriptionId);
+  } catch (err) {
+    console.error('[Push Service] Error resetting subscription failures:', err);
+  }
+};
+
 export interface PushPayload {
   title: string;
   body: string;
@@ -47,7 +112,6 @@ export interface PushPayload {
     icon?: string;
   }>;
   data?: Record<string, unknown>;
-  // Additional data for enhanced features
   booking_url?: string;
   badgeCount?: number;
   notification_id?: string;
@@ -57,8 +121,6 @@ export interface PushPayload {
 export interface SendOptions {
   targetUserIds?: string[];
   saveToHistory?: boolean;
-  enableRetry?: boolean; // Enable retry queue for failed deliveries
-  notificationQueueId?: string; // Link to notification queue for retry reference
 }
 
 export interface PushSubscription {
@@ -77,7 +139,6 @@ export interface PushSubscription {
 class PushNotificationService {
   /**
    * Send push notification to specified users
-   * Includes delivery tracking and optional retry queue integration
    */
   async sendNotification(
     payload: PushPayload,
@@ -86,20 +147,16 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
-    retried: number;
     errors: string[];
   }> {
     const errors: string[] = [];
     let sent = 0;
     let failed = 0;
-    let retried = 0;
-    const enableRetry = options.enableRetry ?? true; // Enable retry by default
 
     try {
       console.log('📤 [Push Service] Sending push notification:', {
         title: payload.title,
         targetUserIds: options.targetUserIds?.length || 'all',
-        enableRetry
       });
 
       // Check VAPID keys
@@ -107,7 +164,7 @@ class PushNotificationService {
         const error = 'VAPID keys not configured';
         console.error('❌ [Push Service]', error);
         errors.push(error);
-        return { success: false, sent: 0, failed: 0, retried: 0, errors };
+        return { success: false, sent: 0, failed: 0, errors };
       }
 
       // Get target subscriptions
@@ -115,7 +172,7 @@ class PushNotificationService {
 
       if (subscriptions.length === 0) {
         console.warn('⚠️ [Push Service] No active subscriptions found');
-        return { success: false, sent: 0, failed: 0, retried: 0, errors: ['No active subscriptions found'] };
+        return { success: false, sent: 0, failed: 0, errors: ['No active subscriptions found'] };
       }
 
       console.log(`📱 [Push Service] Found ${subscriptions.length} active subscriptions`);
@@ -195,30 +252,9 @@ class PushNotificationService {
                 last_failure_reason: `Subscription gone (${statusCode})`,
               })
               .eq('id', sub.id);
-            
-            // Cancel any pending retries for this subscription
-            await cancelPendingRetries(sub.id);
             failed++;
-          } else if (enableRetry && isRetryableError(statusCode)) {
-            // Add to retry queue for retryable errors
-            console.log(`🔄 [Push Service] Adding to retry queue: ${sub.username}`);
-            const retryResult = await addToRetryQueue(
-              sub.id,
-              sub.user_id || '',
-              notificationPayload,
-              pushError.message || 'Unknown error',
-              options.notificationQueueId
-            );
-            
-            if (retryResult.success) {
-              retried++;
-            } else {
-              failed++;
-              // Update failure tracking
-              await incrementSubscriptionFailures(sub.id, pushError.message || 'Unknown error');
-            }
           } else {
-            // Non-retryable error
+            // Track failure
             failed++;
             await incrementSubscriptionFailures(sub.id, pushError.message || 'Unknown error');
           }
@@ -228,13 +264,12 @@ class PushNotificationService {
       // Wait for all sends
       await Promise.allSettled(sendPromises);
 
-      console.log(`📊 [Push Service] Results: ${sent} sent, ${failed} failed, ${retried} queued for retry`);
+      console.log(`📊 [Push Service] Results: ${sent} sent, ${failed} failed`);
 
       return {
         success: sent > 0,
         sent,
         failed,
-        retried,
         errors
       };
     } catch (error) {
@@ -243,7 +278,6 @@ class PushNotificationService {
         success: false,
         sent,
         failed,
-        retried,
         errors: [...errors, (error as Error).message]
       };
     }
@@ -281,9 +315,9 @@ class PushNotificationService {
    * Save push subscription (requires authentication)
    */
   async savePushSubscription(data: {
-    userId: string;  // ✅ Required - no anonymous subscriptions
+    userId: string;
     username: string;
-    email: string;  // ✅ Required - from authenticated user
+    email: string;
     subscription: { endpoint: string; keys: { p256dh: string; auth: string } };
     deviceType: 'ios' | 'android' | 'desktop';
     userAgent: string;
@@ -311,7 +345,6 @@ class PushNotificationService {
             user_agent: data.userAgent,
             is_active: true,
             last_used: new Date().toISOString(),
-            // Reset failure tracking on re-subscribe
             consecutive_failures: 0,
             last_delivery_status: 'pending',
             last_failure_reason: null,
@@ -399,7 +432,6 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
-    retried: number;
     errors: string[];
   }> {
     return this.sendNotification(payload, { targetUserIds: [userId] });
@@ -412,7 +444,6 @@ class PushNotificationService {
     success: boolean;
     sent: number;
     failed: number;
-    retried: number;
     errors: string[];
   }> {
     return this.sendToUser(userId, {
@@ -455,7 +486,7 @@ class PushNotificationService {
         const failures = sub.consecutive_failures || 0;
         if (failures === 0) {
           healthy++;
-        } else if (failures < RETRY_CONFIG.maxConsecutiveFailures) {
+        } else if (failures < MAX_CONSECUTIVE_FAILURES) {
           degraded++;
         } else {
           failing++;
@@ -487,9 +518,6 @@ class PushNotificationService {
           last_failure_reason: 'Manually deactivated',
         })
         .eq('id', subscriptionId);
-
-      // Cancel any pending retries
-      await cancelPendingRetries(subscriptionId);
       
       console.log(`🗑️ [Push Service] Subscription ${subscriptionId} deactivated`);
     } catch (error) {
@@ -500,4 +528,3 @@ class PushNotificationService {
 }
 
 export const pushService = new PushNotificationService();
-

@@ -4,7 +4,7 @@ import { useEffect, ReactNode, useState } from 'react'
 import { useServiceWorker } from '@/hooks/use-service-worker'
 import { usePWAInstall } from '@/hooks/use-pwa-install'
 import { Button } from '@/components/ui/button'
-import { Download, RefreshCw, Wifi, WifiOff, X } from 'lucide-react'
+import { Download, RefreshCw, WifiOff, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 

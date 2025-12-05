@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { ISRAEL_TIMEZONE, getDayNameHebrew } from './date-utils.mjs'
+import { sendHotAlertEmail, sendOpportunityEmail } from './email-service.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -60,6 +61,34 @@ export function getDaysUntil(dateStr) {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   
   return diffDays
+}
+
+/**
+ * Get user's notification preferences
+ */
+async function getUserPreferences(userId) {
+  const { data: prefs, error } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error(`[Proactive] Error fetching user preferences for ${userId}:`, error)
+  }
+  
+  // Return defaults if no preferences found
+  return prefs || {
+    default_notification_method: 'email',
+    hot_alerts_enabled: true,
+    weekly_digest_enabled: true,
+    expiry_reminders_enabled: true,
+    inactivity_alerts_enabled: true,
+    proactive_notifications_enabled: true,
+    quiet_hours_start: '22:00',
+    quiet_hours_end: '07:00',
+    notification_cooldown_hours: 4
+  }
 }
 
 /**
@@ -200,7 +229,7 @@ async function createInAppNotification(userId, title, body, notificationType, da
 /**
  * Log a proactive notification to prevent duplicates
  */
-async function logProactiveNotification(userId, notificationType, relatedDates, data = {}) {
+async function logProactiveNotification(userId, notificationType, relatedDates, data = {}, emailSent = false, pushSent = false) {
   try {
     const dedupKey = `${userId}-${notificationType}-${relatedDates.sort().join(',')}`
     
@@ -210,9 +239,9 @@ async function logProactiveNotification(userId, notificationType, relatedDates, 
         user_id: userId,
         notification_type: notificationType,
         related_dates: relatedDates,
-        data,
+        data: { ...data, email_sent: emailSent },
         dedup_key: dedupKey,
-        push_sent: true,
+        push_sent: pushSent,
         in_app_created: true
       })
     
@@ -236,48 +265,91 @@ async function logProactiveNotification(userId, notificationType, relatedDates, 
 /**
  * Check if user is eligible for proactive notification
  */
-async function isEligibleForProactive(userId, notificationType, cooldownHours = 4) {
+async function isEligibleForProactive(userId, notificationType, prefs = null) {
   try {
-    // Check user preferences
-    const { data: prefs } = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', userId)
-      .single()
+    // Get preferences if not passed
+    if (!prefs) {
+      prefs = await getUserPreferences(userId)
+    }
     
     // Check if user has opted out
     if (prefs) {
-      if (notificationType === 'hot_alert' && !prefs.hot_alerts_enabled) return false
-      if (notificationType === 'opportunity' && !prefs.proactive_notifications_enabled) return false
-      if (notificationType === 'weekly_summary' && !prefs.weekly_digest_enabled) return false
-      if (notificationType === 'expiry_reminder' && !prefs.expiry_reminders_enabled) return false
-      if (notificationType === 'inactivity' && !prefs.inactivity_alerts_enabled) return false
+      if (notificationType === 'hot_alert' && prefs.hot_alerts_enabled === false) return { eligible: false, prefs }
+      if (notificationType === 'opportunity' && prefs.proactive_notifications_enabled === false) return { eligible: false, prefs }
+      if (notificationType === 'weekly_summary' && prefs.weekly_digest_enabled === false) return { eligible: false, prefs }
+      if (notificationType === 'expiry_reminder' && prefs.expiry_reminders_enabled === false) return { eligible: false, prefs }
+      if (notificationType === 'inactivity' && prefs.inactivity_alerts_enabled === false) return { eligible: false, prefs }
       
       // Check quiet hours
       if (isWithinQuietHours(prefs.quiet_hours_start, prefs.quiet_hours_end)) {
         console.log(`User ${userId} is in quiet hours`)
-        return false
+        return { eligible: false, prefs }
       }
       
       // Check cooldown
       if (prefs.last_proactive_notification_at) {
         const lastNotif = new Date(prefs.last_proactive_notification_at)
         const hoursSince = (Date.now() - lastNotif.getTime()) / (1000 * 60 * 60)
-        const userCooldown = prefs.notification_cooldown_hours || cooldownHours
+        const userCooldown = prefs.notification_cooldown_hours || 4
         
         if (hoursSince < userCooldown) {
           console.log(`User ${userId} in cooldown (${hoursSince.toFixed(1)}h < ${userCooldown}h)`)
-          return false
+          return { eligible: false, prefs }
         }
       }
     }
     
-    return true
+    return { eligible: true, prefs }
     
   } catch (error) {
     console.error('Error checking eligibility:', error)
-    return true // Default to eligible on error
+    return { eligible: true, prefs: null } // Default to eligible on error
   }
+}
+
+/**
+ * Send notification to user based on their method preference
+ */
+async function sendNotificationToUser(userId, userEmail, prefs, title, body, notificationType, emailData, pushData) {
+  const method = prefs?.default_notification_method || 'email'
+  let emailSent = false
+  let pushSent = false
+  
+  console.log(`[Proactive] Sending ${notificationType} to ${userEmail} via ${method}`)
+  
+  // Send email if method is 'email' or 'both'
+  if (method === 'email' || method === 'both') {
+    try {
+      if (notificationType === 'hot_alert') {
+        emailSent = await sendHotAlertEmail(userEmail, emailData)
+      } else if (notificationType === 'opportunity') {
+        emailSent = await sendOpportunityEmail(userEmail, emailData)
+      }
+      
+      if (emailSent) {
+        console.log(`✅ [Proactive] Email sent to ${userEmail}`)
+      }
+    } catch (error) {
+      console.error(`❌ [Proactive] Email failed for ${userEmail}:`, error.message)
+    }
+  }
+  
+  // Send push if method is 'push' or 'both'
+  if (method === 'push' || method === 'both') {
+    const pushResult = await sendPushToUser(userId, title, body, pushData)
+    pushSent = pushResult.sent > 0
+    
+    if (pushSent) {
+      console.log(`✅ [Proactive] Push sent to ${userEmail}`)
+    }
+  }
+  
+  // Return true if at least one notification was sent based on preference
+  const success = (method === 'email' && emailSent) ||
+                  (method === 'push' && pushSent) ||
+                  (method === 'both' && (emailSent || pushSent))
+  
+  return { success, emailSent, pushSent }
 }
 
 /**
@@ -299,7 +371,7 @@ export async function processHotAlerts(availableAppointments) {
   
   console.log(`🔥 Found ${hotAppointments.length} hot appointments`)
   
-  // Get all users with push subscriptions and hot_alerts_enabled
+  // Get all active users
   const { data: users, error } = await supabase
     .from('users')
     .select('id, email')
@@ -354,23 +426,46 @@ export async function processHotAlerts(availableAppointments) {
       continue
     }
     
-    // Check eligibility
-    const eligible = await isEligibleForProactive(user.id, 'hot_alert')
+    // Check eligibility and get preferences
+    const { eligible, prefs } = await isEligibleForProactive(user.id, 'hot_alert')
     if (!eligible) {
       totalSkipped++
       continue
     }
     
-    // Send push notification with booking_url for "Book Now" action
-    const pushResult = await sendPushToUser(user.id, title, body, {
+    // Prepare email data
+    const emailData = {
+      date: hottestApt.date,
+      dayName,
+      times: hottestApt.times,
+      daysUntil,
+      bookingUrl: hottestApt.booking_url
+    }
+    
+    // Prepare push data
+    const pushData = {
       type: 'hot_alert',
       appointment_date: hottestApt.date,
       times: hottestApt.times,
       booking_url: hottestApt.booking_url,
-      url: hottestApt.booking_url ? `/notification-action?action=book&date=${hottestApt.date}&booking_url=${encodeURIComponent(hottestApt.booking_url)}` : '/'
-    })
+      url: hottestApt.booking_url 
+        ? `/notification-action?action=book&date=${hottestApt.date}&booking_url=${encodeURIComponent(hottestApt.booking_url)}` 
+        : '/'
+    }
     
-    if (pushResult.sent > 0) {
+    // Send notification based on user's preference
+    const result = await sendNotificationToUser(
+      user.id, 
+      user.email, 
+      prefs, 
+      title, 
+      body, 
+      'hot_alert', 
+      emailData, 
+      pushData
+    )
+    
+    if (result.success) {
       // Create in-app notification
       await createInAppNotification(user.id, title, body, 'hot_alert', {
         appointment_date: hottestApt.date,
@@ -382,9 +477,11 @@ export async function processHotAlerts(availableAppointments) {
       await logProactiveNotification(user.id, 'hot_alert', relatedDates, {
         appointment_date: hottestApt.date,
         times: hottestApt.times
-      })
+      }, result.emailSent, result.pushSent)
       
       totalSent++
+    } else {
+      totalSkipped++
     }
   }
   
@@ -454,6 +551,9 @@ export async function processOpportunityDiscovery(availableAppointments) {
   const daysUntil = getDaysUntil(bestApt.date)
   const dayName = getDayNameHebrew(bestApt.date)
   
+  // Calculate total slots
+  const totalSlots = upcomingAppointments.reduce((sum, apt) => sum + (apt.times?.length || 0), 0)
+  
   // Build notification content
   const title = '💡 מצאנו תור בשבילך!'
   let body
@@ -464,8 +564,6 @@ export async function processOpportunityDiscovery(availableAppointments) {
   } else {
     body = `יש תור פנוי ב${dayName} הבא בשעה ${bestApt.times[0]}`
   }
-  
-  const relatedDates = upcomingAppointments.map(a => a.date)
   
   for (const user of usersWithoutSubs) {
     // Check if already notified about opportunity recently
@@ -482,23 +580,48 @@ export async function processOpportunityDiscovery(availableAppointments) {
       continue
     }
     
-    // Check eligibility
-    const eligible = await isEligibleForProactive(user.id, 'opportunity')
+    // Check eligibility and get preferences
+    const { eligible, prefs } = await isEligibleForProactive(user.id, 'opportunity')
     if (!eligible) {
       totalSkipped++
       continue
     }
     
-    // Send push notification with booking_url for "Book Now" action
-    const pushResult = await sendPushToUser(user.id, title, body, {
+    // Prepare email data
+    const emailData = {
+      appointments: upcomingAppointments.map(apt => ({
+        date: apt.date,
+        dayName: getDayNameHebrew(apt.date),
+        times: apt.times,
+        booking_url: apt.booking_url
+      })),
+      totalSlots
+    }
+    
+    // Prepare push data
+    const pushData = {
       type: 'opportunity',
       appointment_date: bestApt.date,
       times: bestApt.times,
       booking_url: bestApt.booking_url,
-      url: bestApt.booking_url ? `/notification-action?action=book&date=${bestApt.date}&booking_url=${encodeURIComponent(bestApt.booking_url)}` : '/'
-    })
+      url: bestApt.booking_url 
+        ? `/notification-action?action=book&date=${bestApt.date}&booking_url=${encodeURIComponent(bestApt.booking_url)}` 
+        : '/'
+    }
     
-    if (pushResult.sent > 0) {
+    // Send notification based on user's preference
+    const result = await sendNotificationToUser(
+      user.id, 
+      user.email, 
+      prefs, 
+      title, 
+      body, 
+      'opportunity', 
+      emailData, 
+      pushData
+    )
+    
+    if (result.success) {
       // Create in-app notification
       await createInAppNotification(user.id, title, body, 'proactive', {
         appointment_date: bestApt.date,
@@ -512,15 +635,14 @@ export async function processOpportunityDiscovery(availableAppointments) {
         appointment_date: bestApt.date,
         times: bestApt.times,
         available_count: upcomingAppointments.length
-      })
+      }, result.emailSent, result.pushSent)
       
       totalSent++
+    } else {
+      totalSkipped++
     }
   }
   
   console.log(`💡 Opportunity discovery: ${totalSent} sent, ${totalSkipped} skipped`)
   return { sent: totalSent, skipped: totalSkipped }
 }
-
-
-

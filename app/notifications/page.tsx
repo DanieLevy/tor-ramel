@@ -5,13 +5,14 @@ import { useHeader } from '@/components/header-context'
 import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+// Badge imported but unused - kept for future use
+// import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Bell, Clock, Undo2, Trash2, Calendar, AlertCircle, Loader2 } from 'lucide-react'
+import { Bell, Clock, Undo2, Calendar, AlertCircle, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
-import { cn, pwaFetch } from '@/lib/utils'
+import { pwaFetch } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -36,7 +37,7 @@ export default function NotificationsHistoryPage() {
   const updateHeader = useHeader()
   const { user, isLoading: authLoading } = useAuth()
   const [ignoredTimes, setIgnoredTimes] = useState<IgnoredTime[]>([])
-  const [notifiedAppointments, setNotifiedAppointments] = useState<NotifiedAppointment[]>([])
+  const [_notifiedAppointments, _setNotifiedAppointments] = useState<NotifiedAppointment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('ignored')
 

@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     console.log(`📱 [Push Subscribe API] Subscription request from ${username} (${deviceType})`);
 
     // Save subscription (user is authenticated)
-    const { subscriptionId } = await pushService.savePushSubscription({
+    const { subscriptionId: _subscriptionId } = await pushService.savePushSubscription({
       userId,
       username,
       email: userEmail,
@@ -133,7 +133,7 @@ export async function DELETE(request: NextRequest) {
         if (payload) {
           userId = payload.userId;
         }
-      } catch (error) {
+      } catch {
         console.log('⚠️ [Push Unsubscribe API] Invalid token');
       }
     }

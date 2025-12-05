@@ -369,7 +369,7 @@ const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
   // Handle URL-safe base64
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding)
-    .replace(/\-/g, '+')
+    .replace(/-/g, '+')
     .replace(/_/g, '/');
 
   // Decode base64

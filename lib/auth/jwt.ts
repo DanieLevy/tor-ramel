@@ -50,7 +50,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     }
     
     return null
-  } catch (error) {
+  } catch {
     return null
   }
 }

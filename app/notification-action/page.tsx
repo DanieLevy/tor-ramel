@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle, ExternalLink } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -68,7 +68,7 @@ function NotificationActionContent() {
             }
           })
         })
-      } catch (e) {
+      } catch {
         // Silent fail for tracking
       }
 
@@ -148,7 +148,7 @@ function NotificationActionContent() {
         }
       } else if (action === 'decline') {
         // Handle decline action
-        let bodyData: any = {
+        const bodyData: Record<string, unknown> = {
           action: 'decline',
           subscriptionId
         }
@@ -386,7 +386,7 @@ function NotificationActionContent() {
           message: error.message || 'אירעה שגיאה בעדכון המנוי'
         })
       }
-    } catch (error) {
+    } catch {
       setResult({
         success: false,
         message: 'אירעה שגיאה בתקשורת עם השרת'
@@ -402,7 +402,7 @@ function NotificationActionContent() {
     setProcessing(true)
     
     try {
-      let bodyData: any = {
+      const bodyData: Record<string, unknown> = {
         action: 'decline',
         subscriptionId
       }
@@ -434,7 +434,7 @@ function NotificationActionContent() {
           message: error.message || 'אירעה שגיאה'
         })
       }
-    } catch (error) {
+    } catch {
       setResult({
         success: false,
         message: 'אירעה שגיאה בתקשורת עם השרת'

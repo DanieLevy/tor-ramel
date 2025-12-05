@@ -63,7 +63,7 @@ function SearchPage() {
         } else {
           localStorage.removeItem('tor-ramel-search-cache')
         }
-      } catch (e) {
+      } catch {
         localStorage.removeItem('tor-ramel-search-cache')
       }
     }

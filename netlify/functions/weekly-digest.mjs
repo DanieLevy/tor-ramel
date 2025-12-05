@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { ISRAEL_TIMEZONE, getDayNameHebrew } from './shared/date-utils.mjs'
 import { isWithinQuietHours, getDaysUntil } from './shared/proactive-notifications.mjs'
+import { sendWeeklyDigestEmail } from './shared/email-service.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -178,7 +179,7 @@ async function createInAppNotification(userId, title, body, data = {}) {
 /**
  * Log proactive notification
  */
-async function logProactiveNotification(userId, relatedDates) {
+async function logProactiveNotification(userId, relatedDates, emailSent = false, pushSent = false) {
   try {
     const dedupKey = `weekly-${new Date().toISOString().split('T')[0]}`
     
@@ -188,14 +189,54 @@ async function logProactiveNotification(userId, relatedDates) {
         user_id: userId,
         notification_type: 'weekly_summary',
         related_dates: relatedDates,
+        data: { email_sent: emailSent },
         dedup_key: dedupKey,
-        push_sent: true,
+        push_sent: pushSent,
         in_app_created: true
       })
       
   } catch (error) {
     console.error('Error logging notification:', error)
   }
+}
+
+/**
+ * Send notification to user based on their method preference
+ */
+async function sendNotificationToUser(userId, userEmail, prefs, title, body, emailData, pushData) {
+  const method = prefs?.default_notification_method || 'email'
+  let emailSent = false
+  let pushSent = false
+  
+  console.log(`[Weekly] Sending to ${userEmail} via ${method}`)
+  
+  // Send email if method is 'email' or 'both'
+  if (method === 'email' || method === 'both') {
+    try {
+      emailSent = await sendWeeklyDigestEmail(userEmail, emailData)
+      if (emailSent) {
+        console.log(`✅ [Weekly] Email sent to ${userEmail}`)
+      }
+    } catch (error) {
+      console.error(`❌ [Weekly] Email failed for ${userEmail}:`, error.message)
+    }
+  }
+  
+  // Send push if method is 'push' or 'both'
+  if (method === 'push' || method === 'both') {
+    const pushResult = await sendPushToUser(userId, title, body, pushData)
+    pushSent = pushResult.sent > 0
+    if (pushSent) {
+      console.log(`✅ [Weekly] Push sent to ${userEmail}`)
+    }
+  }
+  
+  // Return true if at least one notification was sent based on preference
+  const success = (method === 'email' && emailSent) ||
+                  (method === 'push' && pushSent) ||
+                  (method === 'both' && (emailSent || pushSent))
+  
+  return { success, emailSent, pushSent }
 }
 
 /**
@@ -235,52 +276,76 @@ async function processWeeklyDigest() {
     body = `הכי קרוב: ${closestDayName} בשעה ${closest.times?.[0] || 'N/A'}. ${totalSlots} זמנים זמינים`
   }
   
-  // Get users who opted in to weekly digest
-  const { data: eligibleUsers, error } = await supabase
+  // Get users with preferences (includes notification method)
+  const { data: usersWithPrefs, error } = await supabase
     .from('user_preferences')
-    .select('user_id, quiet_hours_start, quiet_hours_end')
-    .eq('weekly_digest_enabled', true)
+    .select('user_id, quiet_hours_start, quiet_hours_end, weekly_digest_enabled, default_notification_method')
   
   if (error) {
-    console.error('Error fetching eligible users:', error)
-    return { sent: 0, skipped: 0, reason: 'db_error' }
+    console.error('Error fetching user preferences:', error)
   }
   
-  // Also include users without preferences (default is enabled)
+  // Get all active users with their emails
   const { data: allUsers } = await supabase
     .from('users')
-    .select('id')
+    .select('id, email')
     .eq('is_active', true)
   
-  const usersWithPrefs = new Set((eligibleUsers || []).map(u => u.user_id))
-  const usersWithoutPrefs = (allUsers || []).filter(u => !usersWithPrefs.has(u.id))
-  
-  // Combine: users with weekly_digest_enabled + users without preferences
-  const allEligibleUsers = [
-    ...(eligibleUsers || []),
-    ...usersWithoutPrefs.map(u => ({ 
-      user_id: u.id, 
-      quiet_hours_start: '22:00', 
-      quiet_hours_end: '07:00' 
-    }))
-  ]
-  
-  if (allEligibleUsers.length === 0) {
-    console.log('No eligible users for weekly digest')
+  if (!allUsers || allUsers.length === 0) {
+    console.log('No active users found')
     return { sent: 0, skipped: 0, reason: 'no_users' }
   }
   
-  console.log(`📅 ${allEligibleUsers.length} users eligible for weekly digest`)
+  // Build user map with preferences
+  const userPrefsMap = new Map((usersWithPrefs || []).map(p => [p.user_id, p]))
+  
+  // Filter eligible users (weekly_digest_enabled = true or not set)
+  const eligibleUsers = allUsers.filter(user => {
+    const prefs = userPrefsMap.get(user.id)
+    return !prefs || prefs.weekly_digest_enabled !== false
+  })
+  
+  if (eligibleUsers.length === 0) {
+    console.log('No eligible users for weekly digest')
+    return { sent: 0, skipped: 0, reason: 'no_eligible_users' }
+  }
+  
+  console.log(`📅 ${eligibleUsers.length} users eligible for weekly digest`)
   
   let totalSent = 0
   let totalSkipped = 0
   const relatedDates = weeklyAppointments.map(a => a.check_date)
   
-  for (const userPref of allEligibleUsers) {
-    const userId = userPref.user_id
+  // Prepare email data
+  const emailData = {
+    appointments: weeklyAppointments.map(a => ({
+      check_date: a.check_date,
+      day_name: a.day_name || getDayNameHebrew(a.check_date),
+      times: a.times || []
+    })),
+    totalSlots,
+    closestDate: closest.check_date,
+    closestDayName,
+    closestTime: closest.times?.[0] || 'N/A'
+  }
+  
+  // Prepare push data
+  const pushData = {
+    type: 'weekly_summary',
+    appointments_count: weeklyAppointments.length,
+    total_slots: totalSlots,
+    closest_date: closest.check_date
+  }
+  
+  for (const user of eligibleUsers) {
+    const prefs = userPrefsMap.get(user.id) || {
+      quiet_hours_start: '22:00',
+      quiet_hours_end: '07:00',
+      default_notification_method: 'email'
+    }
     
     // Check quiet hours
-    if (isWithinQuietHours(userPref.quiet_hours_start, userPref.quiet_hours_end)) {
+    if (isWithinQuietHours(prefs.quiet_hours_start, prefs.quiet_hours_end)) {
       totalSkipped++
       continue
     }
@@ -292,7 +357,7 @@ async function processWeeklyDigest() {
     const { data: existingLog } = await supabase
       .from('proactive_notification_log')
       .select('id')
-      .eq('user_id', userId)
+      .eq('user_id', user.id)
       .eq('notification_type', 'weekly_summary')
       .gte('sent_at', weekStart.toISOString())
       .single()
@@ -302,17 +367,20 @@ async function processWeeklyDigest() {
       continue
     }
     
-    // Send push notification
-    const pushResult = await sendPushToUser(userId, title, body, {
-      type: 'weekly_summary',
-      appointments_count: weeklyAppointments.length,
-      total_slots: totalSlots,
-      closest_date: closest.check_date
-    })
+    // Send notification based on user's preference
+    const result = await sendNotificationToUser(
+      user.id,
+      user.email,
+      prefs,
+      title,
+      body,
+      emailData,
+      pushData
+    )
     
-    if (pushResult.sent > 0) {
+    if (result.success) {
       // Create in-app notification
-      await createInAppNotification(userId, title, body, {
+      await createInAppNotification(user.id, title, body, {
         appointments: weeklyAppointments.map(a => ({
           date: a.check_date,
           day_name: a.day_name,
@@ -322,9 +390,11 @@ async function processWeeklyDigest() {
       })
       
       // Log the notification
-      await logProactiveNotification(userId, relatedDates)
+      await logProactiveNotification(user.id, relatedDates, result.emailSent, result.pushSent)
       
       totalSent++
+    } else {
+      totalSkipped++
     }
   }
   
@@ -333,7 +403,7 @@ async function processWeeklyDigest() {
 }
 
 // Netlify Function Handler
-export default async (req) => {
+export default async (_req) => {
   const functionStart = Date.now()
   
   try {
@@ -382,6 +452,3 @@ export default async (req) => {
 export const config = {
   schedule: "0 6 * * 0"
 }
-
-
-

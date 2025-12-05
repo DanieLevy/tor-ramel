@@ -8,8 +8,63 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Default notification method for users without subscriptions
-const DEFAULT_NOTIFICATION_METHOD = 'email';
+// Default preferences
+const DEFAULT_PREFERENCES = {
+  default_notification_method: 'email',
+  // Notification types
+  hot_alerts_enabled: true,
+  weekly_digest_enabled: true,
+  expiry_reminders_enabled: true,
+  inactivity_alerts_enabled: true,
+  proactive_notifications_enabled: true,
+  // Frequency control
+  max_notifications_per_day: 10,
+  notification_cooldown_minutes: 30,
+  batch_notifications: false,
+  batch_interval_hours: 4,
+  // Delivery schedule
+  preferred_delivery_start: '08:00',
+  preferred_delivery_end: '21:00',
+  quiet_hours_start: '22:00',
+  quiet_hours_end: '07:00',
+  notification_cooldown_hours: 4,
+};
+
+// Validation helpers
+const isValidNotificationMethod = (method: string): boolean => {
+  return ['email', 'push', 'both'].includes(method);
+};
+
+const isValidTimeString = (time: string): boolean => {
+  return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time);
+};
+
+const isValidInteger = (value: unknown, min: number, max: number): boolean => {
+  if (typeof value !== 'number') return false;
+  return Number.isInteger(value) && value >= min && value <= max;
+};
+
+const isValidBoolean = (value: unknown): boolean => {
+  return typeof value === 'boolean';
+};
+
+interface UserPreferences {
+  default_notification_method: string;
+  hot_alerts_enabled: boolean;
+  weekly_digest_enabled: boolean;
+  expiry_reminders_enabled: boolean;
+  inactivity_alerts_enabled: boolean;
+  proactive_notifications_enabled: boolean;
+  max_notifications_per_day: number;
+  notification_cooldown_minutes: number;
+  batch_notifications: boolean;
+  batch_interval_hours: number;
+  preferred_delivery_start: string;
+  preferred_delivery_end: string;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+  notification_cooldown_hours: number;
+}
 
 export async function PUT(request: NextRequest) {
   try {
@@ -17,90 +72,159 @@ export async function PUT(request: NextRequest) {
     const user = await getCurrentUser();
     
     if (!user) {
-      console.error('❌ [Preferences API] No authenticated user');
+      console.error('❌ [Preferences API PUT] No authenticated user');
       return NextResponse.json({
         error: 'Authentication required',
         success: false
       }, { status: 401 });
     }
 
-    console.log(`🔐 [Preferences API] Authenticated user: ${user.email} (${user.userId})`);
+    console.log(`🔐 [Preferences API PUT] Authenticated user: ${user.email} (${user.userId})`);
 
-    const { notification_method } = await request.json();
+    const body = await request.json();
+    const errors: string[] = [];
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
 
-    // Validate notification method
-    if (!['email', 'push', 'both'].includes(notification_method)) {
-      console.error('❌ [Preferences API] Invalid notification method:', notification_method);
+    // Validate and add each field if provided
+    
+    // Notification method
+    if (body.notification_method !== undefined) {
+      if (isValidNotificationMethod(body.notification_method)) {
+        updateData.default_notification_method = body.notification_method;
+      } else {
+        errors.push('notification_method must be: email, push, or both');
+      }
+    }
+
+    // Notification type toggles
+    const booleanFields = [
+      'hot_alerts_enabled',
+      'weekly_digest_enabled',
+      'expiry_reminders_enabled',
+      'inactivity_alerts_enabled',
+      'proactive_notifications_enabled',
+      'batch_notifications'
+    ];
+
+    for (const field of booleanFields) {
+      if (body[field] !== undefined) {
+        if (isValidBoolean(body[field])) {
+          updateData[field] = body[field];
+        } else {
+          errors.push(`${field} must be a boolean`);
+        }
+      }
+    }
+
+    // Integer fields with ranges
+    const integerFields = [
+      { name: 'max_notifications_per_day', min: 0, max: 100 },
+      { name: 'notification_cooldown_minutes', min: 0, max: 1440 },
+      { name: 'batch_interval_hours', min: 1, max: 24 },
+      { name: 'notification_cooldown_hours', min: 0, max: 48 }
+    ];
+
+    for (const { name, min, max } of integerFields) {
+      if (body[name] !== undefined) {
+        if (isValidInteger(body[name], min, max)) {
+          updateData[name] = body[name];
+        } else {
+          errors.push(`${name} must be an integer between ${min} and ${max}`);
+        }
+      }
+    }
+
+    // Time fields
+    const timeFields = [
+      'preferred_delivery_start',
+      'preferred_delivery_end',
+      'quiet_hours_start',
+      'quiet_hours_end'
+    ];
+
+    for (const field of timeFields) {
+      if (body[field] !== undefined) {
+        if (body[field] === null || isValidTimeString(body[field])) {
+          updateData[field] = body[field];
+        } else {
+          errors.push(`${field} must be in HH:MM format`);
+        }
+      }
+    }
+
+    // Return validation errors if any
+    if (errors.length > 0) {
+      console.error('❌ [Preferences API PUT] Validation errors:', errors);
       return NextResponse.json({
-        error: 'Invalid notification method. Must be: email, push, or both',
+        error: 'Validation failed',
+        errors,
         success: false
       }, { status: 400 });
     }
 
-    console.log(`📝 [Preferences API] Updating notification method to: ${notification_method} for user: ${user.userId}`);
+    // If no valid fields to update, return error
+    if (Object.keys(updateData).length === 1) { // Only updated_at
+      return NextResponse.json({
+        error: 'No valid fields to update',
+        success: false
+      }, { status: 400 });
+    }
 
-    // ALWAYS store the preference in user_preferences as the source of truth
+    console.log(`📝 [Preferences API PUT] Updating preferences:`, Object.keys(updateData).filter(k => k !== 'updated_at'));
+
+    // Upsert preferences - use user_id as the key
     const { error: upsertError } = await supabase
       .from('user_preferences')
       .upsert({
         user_id: user.userId,
-        default_notification_method: notification_method,
-        updated_at: new Date().toISOString()
+        ...updateData
       }, { onConflict: 'user_id' });
 
     if (upsertError) {
-      console.error('❌ [Preferences API] Error saving to user_preferences:', upsertError);
+      console.error('❌ [Preferences API PUT] Error saving preferences:', upsertError);
       throw upsertError;
     }
-    
-    console.log(`✅ [Preferences API] Preference stored in user_preferences`);
 
-    // Also update any existing active subscriptions
-    const { data: subscriptions, error: fetchError } = await supabase
-      .from('notification_subscriptions')
-      .select('id')
-      .eq('user_id', user.userId)
-      .eq('is_active', true);
+    console.log(`✅ [Preferences API PUT] Preferences saved successfully`);
 
-    if (fetchError) {
-      console.warn('⚠️ [Preferences API] Error fetching subscriptions:', fetchError);
-      // Continue - the main preference is saved
-    }
-
-    let updatedCount = 0;
-
-    if (subscriptions && subscriptions.length > 0) {
-      // Update all active subscriptions for this user
-      const { error: updateError } = await supabase
+    // If notification method was updated, sync to active subscriptions
+    let subscriptionsUpdated = 0;
+    if (updateData.default_notification_method) {
+      const { data: subscriptions, error: subsFetchError } = await supabase
         .from('notification_subscriptions')
-        .update({ 
-          notification_method,
-          updated_at: new Date().toISOString()
-        })
+        .select('id')
         .eq('user_id', user.userId)
         .eq('is_active', true);
 
-      if (updateError) {
-        console.warn('⚠️ [Preferences API] Error updating subscriptions:', updateError);
-        // Continue - the main preference is saved
-      } else {
-        updatedCount = subscriptions.length;
-        console.log(`✅ [Preferences API] Updated ${updatedCount} subscription(s)`);
+      if (!subsFetchError && subscriptions && subscriptions.length > 0) {
+        const { error: subsUpdateError } = await supabase
+          .from('notification_subscriptions')
+          .update({ 
+            notification_method: updateData.default_notification_method,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.userId)
+          .eq('is_active', true);
+
+        if (!subsUpdateError) {
+          subscriptionsUpdated = subscriptions.length;
+          console.log(`✅ [Preferences API PUT] Synced notification method to ${subscriptionsUpdated} subscription(s)`);
+        }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: updatedCount > 0 
-        ? `Notification preferences updated (${updatedCount} subscription(s) synced)`
-        : 'Notification preferences saved',
-      notification_method,
-      subscriptions_updated: updatedCount
+      message: 'Preferences updated successfully',
+      updated_fields: Object.keys(updateData).filter(k => k !== 'updated_at'),
+      subscriptions_synced: subscriptionsUpdated
     });
   } catch (error) {
-    console.error('❌ [Preferences API] Error:', error);
+    console.error('❌ [Preferences API PUT] Error:', error);
     return NextResponse.json({
-      error: 'Failed to update notification preferences',
+      error: 'Failed to update preferences',
       success: false
     }, { status: 500 });
   }
@@ -121,24 +245,18 @@ export async function GET() {
 
     console.log(`🔐 [Preferences API GET] Authenticated user: ${user.email} (${user.userId})`);
 
-    let notification_method = DEFAULT_NOTIFICATION_METHOD;
-    let has_subscriptions = false;
-
-    // First, check user_preferences for the saved preference (source of truth)
+    // Fetch user preferences
     const { data: userPrefs, error: prefsError } = await supabase
       .from('user_preferences')
-      .select('default_notification_method')
+      .select('*')
       .eq('user_id', user.userId)
-      .limit(1);
+      .single();
 
-    if (prefsError) {
+    if (prefsError && prefsError.code !== 'PGRST116') { // PGRST116 = no rows found
       console.warn('⚠️ [Preferences API GET] Error fetching user_preferences:', prefsError);
-    } else if (userPrefs && userPrefs.length > 0 && userPrefs[0].default_notification_method) {
-      notification_method = userPrefs[0].default_notification_method;
-      console.log(`📋 [Preferences API GET] Got preference from user_preferences: ${notification_method}`);
     }
 
-    // Also check if user has active subscriptions (for UI feedback)
+    // Check if user has active subscriptions
     const { data: subscriptions, error: subsError } = await supabase
       .from('notification_subscriptions')
       .select('id, notification_method')
@@ -148,26 +266,46 @@ export async function GET() {
 
     if (subsError) {
       console.warn('⚠️ [Preferences API GET] Error fetching subscriptions:', subsError);
-    } else if (subscriptions && subscriptions.length > 0) {
-      has_subscriptions = true;
-      // If no user_preferences record exists yet, use subscription's method
-      if (!userPrefs || userPrefs.length === 0 || !userPrefs[0].default_notification_method) {
-        notification_method = subscriptions[0].notification_method || DEFAULT_NOTIFICATION_METHOD;
-        console.log(`📋 [Preferences API GET] Got preference from subscription: ${notification_method}`);
-      }
     }
-    
-    console.log(`✅ [Preferences API GET] Returning: ${notification_method}, has_subscriptions: ${has_subscriptions}`);
+
+    const hasSubscriptions = subscriptions && subscriptions.length > 0;
+
+    // Build response with defaults for missing values
+    const preferences: UserPreferences = {
+      default_notification_method: userPrefs?.default_notification_method || 
+        (hasSubscriptions ? subscriptions[0].notification_method : DEFAULT_PREFERENCES.default_notification_method),
+      // Notification types
+      hot_alerts_enabled: userPrefs?.hot_alerts_enabled ?? DEFAULT_PREFERENCES.hot_alerts_enabled,
+      weekly_digest_enabled: userPrefs?.weekly_digest_enabled ?? DEFAULT_PREFERENCES.weekly_digest_enabled,
+      expiry_reminders_enabled: userPrefs?.expiry_reminders_enabled ?? DEFAULT_PREFERENCES.expiry_reminders_enabled,
+      inactivity_alerts_enabled: userPrefs?.inactivity_alerts_enabled ?? DEFAULT_PREFERENCES.inactivity_alerts_enabled,
+      proactive_notifications_enabled: userPrefs?.proactive_notifications_enabled ?? DEFAULT_PREFERENCES.proactive_notifications_enabled,
+      // Frequency control
+      max_notifications_per_day: userPrefs?.max_notifications_per_day ?? DEFAULT_PREFERENCES.max_notifications_per_day,
+      notification_cooldown_minutes: userPrefs?.notification_cooldown_minutes ?? DEFAULT_PREFERENCES.notification_cooldown_minutes,
+      batch_notifications: userPrefs?.batch_notifications ?? DEFAULT_PREFERENCES.batch_notifications,
+      batch_interval_hours: userPrefs?.batch_interval_hours ?? DEFAULT_PREFERENCES.batch_interval_hours,
+      // Delivery schedule
+      preferred_delivery_start: userPrefs?.preferred_delivery_start ?? DEFAULT_PREFERENCES.preferred_delivery_start,
+      preferred_delivery_end: userPrefs?.preferred_delivery_end ?? DEFAULT_PREFERENCES.preferred_delivery_end,
+      quiet_hours_start: userPrefs?.quiet_hours_start ?? DEFAULT_PREFERENCES.quiet_hours_start,
+      quiet_hours_end: userPrefs?.quiet_hours_end ?? DEFAULT_PREFERENCES.quiet_hours_end,
+      notification_cooldown_hours: userPrefs?.notification_cooldown_hours ?? DEFAULT_PREFERENCES.notification_cooldown_hours,
+    };
+
+    console.log(`✅ [Preferences API GET] Returning preferences for ${user.email}`);
 
     return NextResponse.json({
       success: true,
-      notification_method,
-      has_subscriptions
+      preferences,
+      has_subscriptions: hasSubscriptions,
+      // Legacy support - also return notification_method at top level
+      notification_method: preferences.default_notification_method
     });
   } catch (error) {
     console.error('❌ [Preferences API GET] Error:', error);
     return NextResponse.json({
-      error: 'Failed to fetch notification preferences',
+      error: 'Failed to fetch preferences',
       success: false
     }, { status: 500 });
   }

@@ -19,7 +19,8 @@ export default function RegisterPage() {
   const { register } = useAuth()
 
   const validateEmail = (value: string) => {
-    const emailRegex = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i
+    // RFC 5322 compliant email regex (simplified, no unnecessary escapes)
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/i
     
     if (!value) {
       setEmailValid(null)

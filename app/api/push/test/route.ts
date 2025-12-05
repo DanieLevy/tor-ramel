@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pushService } from '@/lib/push-notification-service';
 import { getCurrentUser } from '@/lib/auth/jwt';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Get user from JWT token in cookies
     const user = await getCurrentUser();

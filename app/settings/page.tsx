@@ -1,447 +1,416 @@
-"use client"
+'use client'
 
-import { useEffect, useState } from 'react'
-import { useHeader } from '@/components/header-context'
-import { useAuth } from '@/components/auth-provider'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, Loader2, Save, CheckCircle, AlertCircle, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Bell, 
-  Flame, 
-  Calendar, 
-  UserX, 
-  Clock, 
-  Moon, 
-  Sun,
-  Save,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles
-} from 'lucide-react'
 import { toast } from 'sonner'
-import { cn, pwaFetch } from '@/lib/utils'
-import { motion } from 'framer-motion'
-import { useHaptics } from '@/hooks/use-haptics'
-import Link from 'next/link'
+import { cn } from '@/lib/utils'
+import { usePushNotifications } from '@/hooks/use-push-notifications'
+import {
+  NotificationMethodSelector,
+  NotificationTypesTogles,
+  FrequencySettings,
+  DeliverySchedule,
+  TestNotifications
+} from '@/components/settings'
+
+// Types
+type NotificationMethod = 'email' | 'push' | 'both'
 
 interface UserPreferences {
-  proactive_notifications_enabled: boolean
+  default_notification_method: NotificationMethod
   hot_alerts_enabled: boolean
   weekly_digest_enabled: boolean
-  inactivity_alerts_enabled: boolean
   expiry_reminders_enabled: boolean
+  inactivity_alerts_enabled: boolean
+  proactive_notifications_enabled: boolean
+  max_notifications_per_day: number
+  notification_cooldown_minutes: number
+  batch_notifications: boolean
+  batch_interval_hours: number
+  preferred_delivery_start: string
+  preferred_delivery_end: string
   quiet_hours_start: string
   quiet_hours_end: string
-  preferred_times: Array<{ start: string; end: string }>
-  notification_cooldown_hours: number
 }
 
-interface TimeRange {
-  id: string
-  label: string
-  start: string
-  end: string
+const DEFAULT_PREFERENCES: UserPreferences = {
+  default_notification_method: 'email',
+  hot_alerts_enabled: true,
+  weekly_digest_enabled: true,
+  expiry_reminders_enabled: true,
+  inactivity_alerts_enabled: true,
+  proactive_notifications_enabled: true,
+  max_notifications_per_day: 10,
+  notification_cooldown_minutes: 30,
+  batch_notifications: false,
+  batch_interval_hours: 4,
+  preferred_delivery_start: '08:00',
+  preferred_delivery_end: '21:00',
+  quiet_hours_start: '22:00',
+  quiet_hours_end: '07:00',
 }
 
-const DEFAULT_TIME_RANGES: TimeRange[] = [
-  { id: 'morning', label: 'בוקר', start: '08:00', end: '12:00' },
-  { id: 'afternoon', label: 'צהריים', start: '12:00', end: '16:00' },
-  { id: 'evening', label: 'ערב', start: '16:00', end: '20:00' },
-]
+// Helper function for authenticated fetch
+const authFetch = async (url: string, options: RequestInit = {}) => {
+  const token = localStorage.getItem('token')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  return fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  })
+}
 
 export default function SettingsPage() {
-  const updateHeader = useHeader()
-  const { user, isLoading: authLoading } = useAuth()
-  const haptics = useHaptics()
-  
-  const [preferences, setPreferences] = useState<UserPreferences | null>(null)
+  const router = useRouter()
+  const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
+  const [originalPreferences, setOriginalPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
 
+  // Push notifications hook
+  const { 
+    isSupported: pushSupported, 
+    isSubscribed: isPushSubscribed,
+    subscribe: subscribeToPush,
+    isLoading: pushLoading
+  } = usePushNotifications()
+
+  // Check if PWA (for push availability)
+  const isPWA = typeof window !== 'undefined' && (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as { standalone?: boolean }).standalone === true
+  )
+  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent)
+  const pushAvailable = pushSupported && (isPWA || !isIOS) && isPushSubscribed
+
+  // Load preferences
   useEffect(() => {
-    updateHeader({
-      title: 'הגדרות',
-      showBackButton: true
-    })
-  }, [updateHeader])
-
-  useEffect(() => {
-    if (user) {
-      fetchPreferences()
-    }
-  }, [user])
-
-  const fetchPreferences = async () => {
-    try {
-      setLoading(true)
-      const response = await pwaFetch('/api/user/preferences')
-      
-      if (response.ok) {
-        const data = await response.json()
-        setPreferences(data)
-      } else {
+    const loadPreferences = async () => {
+      try {
+        const response = await authFetch('/api/notifications/preferences')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.preferences) {
+            const prefs = {
+              ...DEFAULT_PREFERENCES,
+              ...data.preferences,
+              default_notification_method: data.preferences.default_notification_method || data.notification_method || 'email'
+            }
+            setPreferences(prefs)
+            setOriginalPreferences(prefs)
+          }
+        } else if (response.status === 401) {
+          router.push('/login?from=/settings')
+          return
+        }
+      } catch (error) {
+        console.error('Failed to load preferences:', error)
         toast.error('שגיאה בטעינת ההגדרות')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error fetching preferences:', error)
-      toast.error('שגיאה בטעינת ההגדרות')
-    } finally {
-      setLoading(false)
     }
+
+    loadPreferences()
+  }, [router])
+
+  // Check for changes
+  useEffect(() => {
+    const changed = JSON.stringify(preferences) !== JSON.stringify(originalPreferences)
+    setHasChanges(changed)
+    if (changed) {
+      setSaveStatus('idle')
+    }
+  }, [preferences, originalPreferences])
+
+  // Handle preference changes
+  const handleChange = useCallback((key: string, value: unknown) => {
+    setPreferences(prev => ({
+      ...prev,
+      [key]: value
+    }))
+  }, [])
+
+  // Handle notification method change (may need to enable push)
+  const handleMethodChange = async (method: NotificationMethod) => {
+    // If switching to push or both, ensure push is enabled
+    if ((method === 'push' || method === 'both') && !isPushSubscribed) {
+      try {
+        await subscribeToPush()
+        toast.success('התראות Push הופעלו בהצלחה!')
+      } catch (error) {
+        toast.error('שגיאה בהפעלת Push: ' + (error as Error).message)
+        return
+      }
+    }
+    
+    handleChange('default_notification_method', method)
   }
 
-  const savePreferences = async () => {
-    if (!preferences) return
-    
-    haptics.medium()
+  // Save preferences
+  const handleSave = async () => {
     setSaving(true)
-    
+    setSaveStatus('idle')
+
     try {
-      const response = await pwaFetch('/api/user/preferences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(preferences)
-      })
+      // Build update object with only changed fields
+      const updates: Record<string, unknown> = {}
       
-      if (response.ok) {
-        haptics.success()
-        toast.success('ההגדרות נשמרו בהצלחה')
+      for (const [key, value] of Object.entries(preferences)) {
+        if (value !== originalPreferences[key as keyof UserPreferences]) {
+          // Map the field names for API
+          if (key === 'default_notification_method') {
+            updates['notification_method'] = value
+          } else {
+            updates[key] = value
+          }
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        toast.info('אין שינויים לשמור')
+        setSaving(false)
+        return
+      }
+
+      const response = await authFetch('/api/notifications/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setOriginalPreferences(preferences)
         setHasChanges(false)
+        setSaveStatus('saved')
+        toast.success('ההגדרות נשמרו בהצלחה!')
+        
+        // Reset saved status after 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000)
       } else {
-        haptics.error()
-        toast.error('שגיאה בשמירת ההגדרות')
+        setSaveStatus('error')
+        toast.error(data.error || 'שגיאה בשמירת ההגדרות')
       }
     } catch (error) {
-      console.error('Error saving preferences:', error)
-      haptics.error()
+      console.error('Save error:', error)
+      setSaveStatus('error')
       toast.error('שגיאה בשמירת ההגדרות')
     } finally {
       setSaving(false)
     }
   }
 
-  const updatePreference = <K extends keyof UserPreferences>(
-    key: K,
-    value: UserPreferences[K]
-  ) => {
-    haptics.light()
-    setPreferences(prev => prev ? { ...prev, [key]: value } : null)
-    setHasChanges(true)
-  }
-
-  const toggleTimeRange = (range: TimeRange) => {
-    if (!preferences) return
-    
-    haptics.light()
-    const currentTimes = preferences.preferred_times || []
-    const exists = currentTimes.some(
-      t => t.start === range.start && t.end === range.end
-    )
-    
-    let newTimes: Array<{ start: string; end: string }>
-    if (exists) {
-      newTimes = currentTimes.filter(
-        t => !(t.start === range.start && t.end === range.end)
-      )
-    } else {
-      newTimes = [...currentTimes, { start: range.start, end: range.end }]
-    }
-    
-    setPreferences(prev => prev ? { ...prev, preferred_times: newTimes } : null)
-    setHasChanges(true)
-  }
-
-  const isTimeRangeSelected = (range: TimeRange) => {
-    if (!preferences?.preferred_times) return false
-    return preferences.preferred_times.some(
-      t => t.start === range.start && t.end === range.end
-    )
-  }
-
-  if (authLoading || loading) {
+  if (loading) {
     return (
-      <div className="container mx-auto px-4 py-6 pb-24 max-w-2xl space-y-4">
-        <Skeleton className="h-48 w-full rounded-2xl" />
-        <Skeleton className="h-32 w-full rounded-2xl" />
-        <Skeleton className="h-48 w-full rounded-2xl" />
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-6 pb-24 max-w-2xl">
-        <Card variant="glass">
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground mb-4">יש להתחבר כדי לגשת להגדרות</p>
-            <Button asChild>
-              <Link href="/login">התחבר</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">טוען הגדרות...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 pb-24 max-w-2xl space-y-4">
-      {/* Smart Notifications Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card variant="glass">
-          <CardHeader className="pb-3">
+    <div className="min-h-screen bg-background pb-32">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.back()}
+                className="rounded-full"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </Button>
               <div>
-                <CardTitle className="text-lg">התראות חכמות</CardTitle>
-                <CardDescription>קבל התראות אוטומטיות על הזדמנויות</CardDescription>
+                <h1 className="text-xl font-bold flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  הגדרות
+                </h1>
+                <p className="text-xs text-muted-foreground">ניהול התראות והעדפות</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Proactive Notifications */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-violet-500" />
-                <div>
-                  <Label className="font-medium">גילוי הזדמנויות</Label>
-                  <p className="text-xs text-muted-foreground">התראה כשיש תור פנוי גם בלי מנוי פעיל</p>
-                </div>
-              </div>
-              <Switch
-                checked={preferences?.proactive_notifications_enabled ?? true}
-                onCheckedChange={(checked) => updatePreference('proactive_notifications_enabled', checked)}
-              />
-            </div>
+            
+            {/* Save button */}
+            <Button
+              onClick={handleSave}
+              disabled={!hasChanges || saving}
+              className={cn(
+                "transition-all",
+                hasChanges && "animate-pulse"
+              )}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                  שומר...
+                </>
+              ) : saveStatus === 'saved' ? (
+                <>
+                  <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+                  נשמר!
+                </>
+              ) : saveStatus === 'error' ? (
+                <>
+                  <AlertCircle className="h-4 w-4 ml-2 text-red-500" />
+                  שגיאה
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 ml-2" />
+                  שמור
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-            {/* Hot Alerts */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                <Flame className="h-5 w-5 text-orange-500" />
-                <div>
-                  <Label className="font-medium">התראות דחופות</Label>
-                  <p className="text-xs text-muted-foreground">התראה על תורים ב-1-3 הימים הקרובים</p>
-                </div>
-              </div>
-              <Switch
-                checked={preferences?.hot_alerts_enabled ?? true}
-                onCheckedChange={(checked) => updatePreference('hot_alerts_enabled', checked)}
-              />
-            </div>
-
-            {/* Weekly Digest */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-blue-500" />
-                <div>
-                  <Label className="font-medium">סיכום שבועי</Label>
-                  <p className="text-xs text-muted-foreground">קבל סיכום כל יום ראשון בבוקר</p>
-                </div>
-              </div>
-              <Switch
-                checked={preferences?.weekly_digest_enabled ?? true}
-                onCheckedChange={(checked) => updatePreference('weekly_digest_enabled', checked)}
-              />
-            </div>
-
-            {/* Expiry Reminders */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-amber-500" />
-                <div>
-                  <Label className="font-medium">תזכורת פקיעה</Label>
-                  <p className="text-xs text-muted-foreground">התראה כשמנוי עומד לפוג</p>
-                </div>
-              </div>
-              <Switch
-                checked={preferences?.expiry_reminders_enabled ?? true}
-                onCheckedChange={(checked) => updatePreference('expiry_reminders_enabled', checked)}
-              />
-            </div>
-
-            {/* Inactivity Alerts */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-3">
-                <UserX className="h-5 w-5 text-rose-500" />
-                <div>
-                  <Label className="font-medium">תזכורת חזרה</Label>
-                  <p className="text-xs text-muted-foreground">התראה אם לא פתחת את האפליקציה זמן רב</p>
-                </div>
-              </div>
-              <Switch
-                checked={preferences?.inactivity_alerts_enabled ?? true}
-                onCheckedChange={(checked) => updatePreference('inactivity_alerts_enabled', checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Quiet Hours Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card variant="glass">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
-                <Moon className="h-5 w-5 text-white" />
-              </div>
+      {/* Content */}
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+        {/* Push status banner */}
+        {!isPushSubscribed && pushSupported && (
+          <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
               <div>
-                <CardTitle className="text-lg">שעות שקט</CardTitle>
-                <CardDescription>לא נשלח התראות בזמנים אלו</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4 p-3 rounded-xl bg-white/50 dark:bg-white/5">
-              <div className="flex items-center gap-2 flex-1">
-                <Moon className="h-4 w-4 text-indigo-400" />
-                <input
-                  type="time"
-                  value={preferences?.quiet_hours_start ?? '22:00'}
-                  onChange={(e) => updatePreference('quiet_hours_start', e.target.value)}
-                  className="flex-1 bg-transparent border rounded-lg px-2 py-1 text-sm"
-                  dir="ltr"
-                />
-              </div>
-              <span className="text-muted-foreground">עד</span>
-              <div className="flex items-center gap-2 flex-1">
-                <Sun className="h-4 w-4 text-amber-400" />
-                <input
-                  type="time"
-                  value={preferences?.quiet_hours_end ?? '07:00'}
-                  onChange={(e) => updatePreference('quiet_hours_end', e.target.value)}
-                  className="flex-1 bg-transparent border rounded-lg px-2 py-1 text-sm"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Preferred Times Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card variant="glass">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-lg">שעות מועדפות</CardTitle>
-                <CardDescription>קבל התראות רק על שעות אלו</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-2">
-              {DEFAULT_TIME_RANGES.map((range) => (
-                <button
-                  key={range.id}
-                  onClick={() => toggleTimeRange(range)}
-                  className={cn(
-                    "p-3 rounded-xl border-2 transition-all touch-manipulation",
-                    "flex flex-col items-center gap-1",
-                    isTimeRangeSelected(range)
-                      ? "bg-emerald-100 dark:bg-emerald-900/30 border-emerald-500 text-emerald-700 dark:text-emerald-300"
-                      : "bg-white/50 dark:bg-white/5 border-transparent hover:border-emerald-300"
-                  )}
+                <div className="font-medium text-sm text-foreground mb-1">
+                  התראות Push לא מופעלות
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {isIOS && !isPWA 
+                    ? 'התקן את האפליקציה מהדפדפן כדי לקבל התראות Push'
+                    : 'הפעל התראות Push כדי לקבל עדכונים ישירות למכשיר'}
+                </p>
+                <Button
+                  size="sm"
+                  onClick={() => subscribeToPush()}
+                  disabled={pushLoading}
                 >
-                  <span className="font-medium text-sm">{range.label}</span>
-                  <span className="text-[10px] text-muted-foreground" dir="ltr">
-                    {range.start}-{range.end}
-                  </span>
-                  {isTimeRangeSelected(range) && (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  {pushLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                      מפעיל...
+                    </>
+                  ) : (
+                    'הפעל התראות Push'
                   )}
-                </button>
-              ))}
+                </Button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-3 text-center">
-              {preferences?.preferred_times?.length === 0 
-                ? 'לא נבחרו שעות - תקבל התראות על כל השעות'
-                : `נבחרו ${preferences?.preferred_times?.length} טווחי זמן`}
-            </p>
-          </CardContent>
-        </Card>
-      </motion.div>
+          </div>
+        )}
 
-      {/* Cooldown Setting */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card variant="glass">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">תדירות התראות</CardTitle>
-            <CardDescription>מינימום שעות בין התראות חכמות</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="1"
-                max="24"
-                value={preferences?.notification_cooldown_hours ?? 4}
-                onChange={(e) => updatePreference('notification_cooldown_hours', parseInt(e.target.value))}
-                className="flex-1"
-              />
-              <Badge variant="secondary" className="min-w-[60px] justify-center">
-                {preferences?.notification_cooldown_hours ?? 4} שעות
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Save Button */}
-      {hasChanges && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fixed bottom-24 left-4 right-4 max-w-2xl mx-auto"
-        >
-          <Button
-            onClick={savePreferences}
+        {/* Section: Notification Method */}
+        <section className="space-y-4">
+          <NotificationMethodSelector
+            value={preferences.default_notification_method}
+            onChange={handleMethodChange}
             disabled={saving}
-            className="w-full h-12 rounded-xl shadow-lg"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                שומר...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 ml-2" />
-                שמור שינויים
-              </>
-            )}
-          </Button>
-        </motion.div>
-      )}
+            pushAvailable={pushAvailable || isPushSubscribed}
+          />
+        </section>
+
+        <hr className="border-black/5 dark:border-white/5" />
+
+        {/* Section: Notification Types */}
+        <section className="space-y-4">
+          <NotificationTypesTogles
+            values={{
+              hot_alerts_enabled: preferences.hot_alerts_enabled,
+              weekly_digest_enabled: preferences.weekly_digest_enabled,
+              expiry_reminders_enabled: preferences.expiry_reminders_enabled,
+              inactivity_alerts_enabled: preferences.inactivity_alerts_enabled,
+              proactive_notifications_enabled: preferences.proactive_notifications_enabled,
+            }}
+            onChange={handleChange}
+            disabled={saving}
+          />
+        </section>
+
+        <hr className="border-black/5 dark:border-white/5" />
+
+        {/* Section: Frequency Settings */}
+        <section className="space-y-4">
+          <FrequencySettings
+            values={{
+              max_notifications_per_day: preferences.max_notifications_per_day,
+              notification_cooldown_minutes: preferences.notification_cooldown_minutes,
+              batch_notifications: preferences.batch_notifications,
+              batch_interval_hours: preferences.batch_interval_hours,
+            }}
+            onChange={handleChange}
+            disabled={saving}
+          />
+        </section>
+
+        <hr className="border-black/5 dark:border-white/5" />
+
+        {/* Section: Delivery Schedule */}
+        <section className="space-y-4">
+          <DeliverySchedule
+            values={{
+              preferred_delivery_start: preferences.preferred_delivery_start,
+              preferred_delivery_end: preferences.preferred_delivery_end,
+              quiet_hours_start: preferences.quiet_hours_start,
+              quiet_hours_end: preferences.quiet_hours_end,
+            }}
+            onChange={handleChange}
+            disabled={saving}
+          />
+        </section>
+
+        <hr className="border-black/5 dark:border-white/5" />
+
+        {/* Section: Test Notifications */}
+        <section className="space-y-4">
+          <TestNotifications
+            notificationMethod={preferences.default_notification_method}
+            pushAvailable={isPushSubscribed}
+          />
+        </section>
+
+        {/* Floating save button for mobile */}
+        {hasChanges && (
+          <div className="fixed bottom-20 left-4 right-4 max-w-2xl mx-auto z-50">
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full shadow-lg"
+              size="lg"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                  שומר שינויים...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 ml-2" />
+                  שמור שינויים
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-

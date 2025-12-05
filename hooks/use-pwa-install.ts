@@ -77,7 +77,7 @@ export function usePWAInstall() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
-  }, [])
+  }, [isIOS])
 
   const promptInstall = async () => {
     if (!deferredPrompt) {

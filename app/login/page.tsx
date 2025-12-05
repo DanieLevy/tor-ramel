@@ -95,7 +95,7 @@ export default function LoginPage() {
       } else {
         toast.error(data.error || 'שגיאה בשליחת קוד אימות')
       }
-    } catch (error) {
+    } catch {
       toast.error('שגיאה בשליחת קוד אימות')
     } finally {
       setIsResetting(false)
@@ -123,7 +123,7 @@ export default function LoginPage() {
       } else {
         toast.error(data.error || 'קוד אימות שגוי')
       }
-    } catch (error) {
+    } catch {
       toast.error('שגיאה באימות הקוד')
     } finally {
       setIsResetting(false)
@@ -159,7 +159,7 @@ export default function LoginPage() {
       } else {
         toast.error(data.error || 'שגיאה בשינוי הסיסמה')
       }
-    } catch (error) {
+    } catch {
       toast.error('שגיאה בשינוי הסיסמה')
     } finally {
       setIsResetting(false)

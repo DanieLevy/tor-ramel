@@ -743,6 +743,101 @@ const PERMANENT_ERROR_CODES = [410, 404, 401]
 // Max consecutive failures before auto-disabling
 const MAX_CONSECUTIVE_FAILURES = 5
 
+/**
+ * Check if user is within frequency limits
+ * Returns { allowed: boolean, reason?: string }
+ */
+async function checkFrequencyLimits(userId) {
+  try {
+    // Get user preferences
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('max_notifications_per_day, notification_cooldown_minutes, quiet_hours_start, quiet_hours_end, preferred_delivery_start, preferred_delivery_end')
+      .eq('user_id', userId)
+      .single()
+    
+    // Default values if no preferences
+    const maxPerDay = prefs?.max_notifications_per_day ?? 10
+    const cooldownMinutes = prefs?.notification_cooldown_minutes ?? 30
+    const quietStart = prefs?.quiet_hours_start
+    const quietEnd = prefs?.quiet_hours_end
+    const deliveryStart = prefs?.preferred_delivery_start || '08:00'
+    const deliveryEnd = prefs?.preferred_delivery_end || '21:00'
+    
+    // Get current Israel time
+    const now = new Date()
+    const israelTime = now.toLocaleTimeString('en-US', { 
+      timeZone: 'Asia/Jerusalem',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
+    
+    // Check quiet hours
+    if (quietStart && quietEnd) {
+      if (quietStart > quietEnd) {
+        // Overnight quiet hours (e.g., 22:00 to 07:00)
+        if (israelTime >= quietStart || israelTime <= quietEnd) {
+          return { allowed: false, reason: 'quiet_hours' }
+        }
+      } else {
+        if (israelTime >= quietStart && israelTime <= quietEnd) {
+          return { allowed: false, reason: 'quiet_hours' }
+        }
+      }
+    }
+    
+    // Check preferred delivery window (optional - for batching)
+    // We allow notifications outside the window but log it
+    if (israelTime < deliveryStart || israelTime > deliveryEnd) {
+      console.log(`[Frequency] User ${userId} outside preferred delivery window (${deliveryStart}-${deliveryEnd})`)
+    }
+    
+    // Check daily limit (0 = unlimited)
+    if (maxPerDay > 0) {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      
+      const { count, error: countError } = await supabase
+        .from('notified_appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('subscription_id', userId) // This should be a user-based check
+        .gte('notification_sent_at', todayStart.toISOString())
+      
+      if (!countError && count !== null && count >= maxPerDay) {
+        console.log(`[Frequency] User ${userId} reached daily limit (${count}/${maxPerDay})`)
+        return { allowed: false, reason: 'daily_limit_reached' }
+      }
+    }
+    
+    // Check cooldown
+    if (cooldownMinutes > 0) {
+      const cooldownTime = new Date(Date.now() - cooldownMinutes * 60 * 1000)
+      
+      const { data: recentNotif } = await supabase
+        .from('notified_appointments')
+        .select('notification_sent_at')
+        .eq('subscription_id', userId) // This should be user-based
+        .gte('notification_sent_at', cooldownTime.toISOString())
+        .order('notification_sent_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (recentNotif) {
+        const minutesSince = Math.round((Date.now() - new Date(recentNotif.notification_sent_at).getTime()) / 60000)
+        console.log(`[Frequency] User ${userId} in cooldown (${minutesSince}min < ${cooldownMinutes}min)`)
+        return { allowed: false, reason: 'cooldown', minutesRemaining: cooldownMinutes - minutesSince }
+      }
+    }
+    
+    return { allowed: true }
+    
+  } catch (error) {
+    console.error('[Frequency] Error checking limits:', error)
+    return { allowed: true } // Allow on error to not block notifications
+  }
+}
+
 // Helper function to send push notification with delivery tracking
 async function sendPushNotification(data) {
   try {
@@ -921,7 +1016,7 @@ export async function processNotificationQueue(limit = 10) {
     // Process each notification
     for (const item of queueItems) {
       try {
-        const { subscription, appointments, appointment_date, available_times, new_times } = item
+        const { subscription, appointments, appointment_date, available_times: _available_times, new_times } = item
         const userEmail = subscription.users.email
 
         // Validate subscription is still active
@@ -933,6 +1028,21 @@ export async function processNotificationQueue(limit = 10) {
               status: 'skipped',
               processed_at: new Date().toISOString(),
               error_message: 'Subscription no longer active'
+            })
+            .eq('id', item.id)
+          continue
+        }
+
+        // Check frequency limits for this user
+        const frequencyCheck = await checkFrequencyLimits(subscription.user_id)
+        if (!frequencyCheck.allowed) {
+          console.log(`[Queue] Skipping notification for user ${subscription.user_id}: ${frequencyCheck.reason}`)
+          await supabase
+            .from('notification_queue')
+            .update({ 
+              status: 'deferred',
+              processed_at: new Date().toISOString(),
+              error_message: `Frequency limit: ${frequencyCheck.reason}${frequencyCheck.minutesRemaining ? ` (${frequencyCheck.minutesRemaining}min remaining)` : ''}`
             })
             .eq('id', item.id)
           continue

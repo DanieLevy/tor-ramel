@@ -71,13 +71,13 @@ export async function GET() {
       .single()
 
     // Get booked appointments count
-    const { count: bookedCount, error: bookedError } = await supabase
+    const { count: bookedCount, error: _bookedError } = await supabase
       .from('booked_appointments')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.userId)
 
     // Get notifications received count
-    const { count: notificationsCount, error: notifError } = await supabase
+    const { count: notificationsCount, error: _notifError } = await supabase
       .from('notified_appointments')
       .select('*', { count: 'exact', head: true })
       .eq('subscription_id', user.userId) // This might need adjustment based on your schema
@@ -101,6 +101,7 @@ export async function GET() {
     )
   }
 }
+
 
 
 

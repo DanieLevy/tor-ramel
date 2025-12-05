@@ -105,7 +105,7 @@ export class AppointmentChecker {
               if (errorText.length < 500) {
                 console.error(`   Server message: ${errorText.substring(0, 200)}...`)
               }
-            } catch (e) {
+            } catch {
               // Ignore decoding errors
             }
           }
@@ -358,6 +358,7 @@ export const getDefaultChecker = () => {
   }
   return defaultChecker
 }
+
 
 
 

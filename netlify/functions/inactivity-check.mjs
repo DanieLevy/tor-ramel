@@ -361,7 +361,7 @@ async function processInactivityCheck() {
 }
 
 // Netlify Function Handler
-export default async (req) => {
+export default async (_req) => {
   const functionStart = Date.now()
   
   try {

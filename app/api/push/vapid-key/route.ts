@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pushService } from '@/lib/push-notification-service';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   console.log('🔑 [VAPID Key API] GET request received');
   
   try {
