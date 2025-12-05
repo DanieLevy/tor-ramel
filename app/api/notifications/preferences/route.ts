@@ -9,6 +9,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Default preferences
+// IMPORTANT: quiet_hours should be null by default - users must explicitly set them
 const DEFAULT_PREFERENCES = {
   default_notification_method: 'email',
   // Notification types
@@ -25,8 +26,8 @@ const DEFAULT_PREFERENCES = {
   // Delivery schedule
   preferred_delivery_start: '08:00',
   preferred_delivery_end: '21:00',
-  quiet_hours_start: '22:00',
-  quiet_hours_end: '07:00',
+  quiet_hours_start: null as string | null,  // No default - user must explicitly set
+  quiet_hours_end: null as string | null,    // No default - user must explicitly set
   notification_cooldown_hours: 4,
 };
 
@@ -61,8 +62,8 @@ interface UserPreferences {
   batch_interval_hours: number;
   preferred_delivery_start: string;
   preferred_delivery_end: string;
-  quiet_hours_start: string;
-  quiet_hours_end: string;
+  quiet_hours_start: string | null;  // null = not set
+  quiet_hours_end: string | null;    // null = not set
   notification_cooldown_hours: number;
 }
 

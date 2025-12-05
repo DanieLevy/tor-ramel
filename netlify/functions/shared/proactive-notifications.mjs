@@ -79,6 +79,7 @@ async function getUserPreferences(userId) {
   }
   
   // Return defaults if no preferences found
+  // IMPORTANT: quiet_hours should be null by default - users must explicitly set them
   return prefs || {
     default_notification_method: 'email',
     hot_alerts_enabled: true,
@@ -86,8 +87,8 @@ async function getUserPreferences(userId) {
     expiry_reminders_enabled: true,
     inactivity_alerts_enabled: true,
     proactive_notifications_enabled: true,
-    quiet_hours_start: '22:00',
-    quiet_hours_end: '07:00',
+    quiet_hours_start: null, // No default quiet hours - user must set explicitly
+    quiet_hours_end: null,   // No default quiet hours - user must set explicitly
     notification_cooldown_hours: 4
   }
 }

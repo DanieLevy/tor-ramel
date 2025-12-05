@@ -31,8 +31,8 @@ interface UserPreferences {
   batch_interval_hours: number
   preferred_delivery_start: string
   preferred_delivery_end: string
-  quiet_hours_start: string
-  quiet_hours_end: string
+  quiet_hours_start: string | null  // null = not set (no quiet hours)
+  quiet_hours_end: string | null    // null = not set (no quiet hours)
 }
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -48,8 +48,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   batch_interval_hours: 4,
   preferred_delivery_start: '08:00',
   preferred_delivery_end: '21:00',
-  quiet_hours_start: '22:00',
-  quiet_hours_end: '07:00',
+  quiet_hours_start: null,  // IMPORTANT: No default - user must explicitly set quiet hours
+  quiet_hours_end: null,    // IMPORTANT: No default - user must explicitly set quiet hours
 }
 
 // Helper function for authenticated fetch
