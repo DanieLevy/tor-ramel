@@ -197,7 +197,7 @@ export function NotificationSettingsDialog() {
         <div className="space-y-4 py-4">
           {/* Notification Method Selection */}
           <div className="space-y-3">
-            <label className="text-sm font-medium">אופן התראה</label>
+            <label className="text-sm font-medium text-muted-foreground">אופן התראה</label>
             
             <div className="grid grid-cols-1 gap-2">
               {[
@@ -213,10 +213,10 @@ export function NotificationSettingsDialog() {
                     onClick={() => method.available && !loading && handleMethodChange(method.value)}
                     disabled={!method.available || loading || pushLoading}
                     className={cn(
-                      "relative p-3 rounded-lg transition-all text-right border-2 flex items-center gap-3",
+                      "relative p-3 rounded-xl transition-all text-right border flex items-center gap-3",
                       isSelected 
-                        ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white border-purple-600" 
-                        : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-600",
+                        ? "bg-black dark:bg-white text-white dark:text-black border-black dark:border-white" 
+                        : "bg-black/5 dark:bg-white/5 border-transparent hover:bg-black/10 dark:hover:bg-white/10",
                       !method.available && "opacity-40 cursor-not-allowed"
                     )}
                   >
@@ -225,10 +225,10 @@ export function NotificationSettingsDialog() {
                         <CheckCircle className="h-3 w-3 text-white" />
                       </div>
                     )}
-                    <Icon className={cn("h-5 w-5 flex-shrink-0", isSelected ? "text-white" : "text-gray-600 dark:text-gray-400")} />
+                    <Icon className={cn("h-5 w-5 flex-shrink-0", isSelected ? "text-white dark:text-black" : "text-muted-foreground")} />
                     <div className="flex-1">
-                      <div className={cn("font-semibold text-sm", isSelected ? "text-white" : "text-gray-900 dark:text-gray-100")}>{method.label}</div>
-                      <div className={cn("text-xs", isSelected ? "text-purple-100" : "text-gray-500 dark:text-gray-400")}>{method.desc}</div>
+                      <div className={cn("font-semibold text-sm", isSelected ? "text-white dark:text-black" : "text-foreground")}>{method.label}</div>
+                      <div className={cn("text-xs", isSelected ? "text-white/70 dark:text-black/70" : "text-muted-foreground")}>{method.desc}</div>
                     </div>
                   </button>
                 )
@@ -240,22 +240,22 @@ export function NotificationSettingsDialog() {
           {pushSupported && (isPWA || !isIOS) && (
             <div className="space-y-2">
               {!isPushSubscribed ? (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="p-3 bg-orange-500/10 dark:bg-orange-500/10 rounded-xl border border-orange-200/50 dark:border-orange-800/50">
                   <div className="flex items-start gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-orange-700 dark:text-orange-300">
                       <span className="font-semibold">התראות Push לא מופעלות</span> - הפעל כדי לקבל התראות למכשיר
                     </p>
                   </div>
                   <Button
                     onClick={handlePushSubscribe}
                     disabled={loading || pushLoading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    className="w-full bg-black dark:bg-white text-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90"
                     size="sm"
                   >
                     {loading || pushLoading ? (
                       <>
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin ml-2" />
+                        <div className="h-4 w-4 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin ml-2" />
                         מפעיל...
                       </>
                     ) : (
@@ -267,7 +267,7 @@ export function NotificationSettingsDialog() {
                   </Button>
                 </div>
               ) : (
-                <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="p-3 bg-green-500/10 dark:bg-green-500/10 rounded-xl border border-green-200/50 dark:border-green-800/50">
                   <div className="flex items-start gap-2">
                     <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-green-700 dark:text-green-300">
@@ -280,10 +280,10 @@ export function NotificationSettingsDialog() {
           )}
 
           {/* Status Message */}
-          <div className="p-3 bg-gray-50 dark:bg-gray-950/20 rounded-lg border border-gray-200 dark:border-gray-800">
+          <div className="p-3 bg-black/5 dark:bg-white/5 rounded-xl">
             <div className="flex items-start gap-2">
-              <CheckCircle className="h-4 w-4 text-gray-600 dark:text-gray-400 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-gray-700 dark:text-gray-300">
+              <CheckCircle className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground">
                 <span className="font-semibold">ההגדרה נשמרת אוטומטית</span> ותחול על כל ההתראות החדשות
               </p>
             </div>
@@ -291,14 +291,14 @@ export function NotificationSettingsDialog() {
 
           {/* iOS PWA Notice */}
           {isIOS && !isPWA && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="p-3 bg-orange-500/10 dark:bg-orange-500/10 rounded-xl border border-orange-200/50 dark:border-orange-800/50">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                 <div className="text-xs">
-                  <p className="font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                  <p className="font-semibold text-foreground mb-1">
                     דרוש התקנת אפליקציה
                   </p>
-                  <p className="text-amber-700 dark:text-amber-300">
+                  <p className="text-muted-foreground">
                     התקן את האפליקציה מהדפדפן כדי לקבל התראות Push
                   </p>
                 </div>
@@ -308,19 +308,19 @@ export function NotificationSettingsDialog() {
 
           {/* Test Push Notification Button */}
           {isPushSubscribed && (
-            <div className="pt-2 border-t space-y-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block">
+            <div className="pt-3 border-t border-black/5 dark:border-white/5 space-y-2">
+              <label className="text-xs font-medium text-muted-foreground block">
                 בדיקת התראות
               </label>
               <Button
                 onClick={handleTestPush}
                 disabled={testingPush}
                 variant="outline"
-                className="w-full"
+                className="w-full rounded-xl"
               >
                 {testingPush ? (
                   <>
-                    <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2" />
+                    <div className="h-4 w-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin ml-2" />
                     שולח התראת בדיקה...
                   </>
                 ) : (
@@ -330,7 +330,7 @@ export function NotificationSettingsDialog() {
                   </>
                 )}
               </Button>
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              <p className="text-xs text-muted-foreground text-center">
                 התראה תופיע על המסך תוך שניות
               </p>
             </div>
@@ -338,8 +338,8 @@ export function NotificationSettingsDialog() {
           
           {/* Show help if push not subscribed */}
           {!isPushSubscribed && pushSupported && (isPWA || !isIOS) && (
-            <div className="pt-2 border-t">
-              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <div className="pt-3 border-t border-black/5 dark:border-white/5">
+              <p className="text-xs text-muted-foreground text-center">
                 הפעל התראות Push למעלה כדי לבדוק אותן
               </p>
             </div>

@@ -360,42 +360,41 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
               onClick={() => setOpen(false)}
             />
             
-            {/* Floating Panel */}
+            {/* Floating Panel - Centered on mobile */}
             <motion.div
               ref={panelRef}
-              initial={{ opacity: 0, scale: 0.95, y: -20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 400 }}
               className={cn(
                 'fixed z-50',
-                // Position: centered on mobile, anchored to top-right on desktop
-                'left-4 right-4 top-20',
-                'sm:left-auto sm:right-4 sm:w-96',
-                // Glass design
-                'bg-white/80 dark:bg-gray-900/80',
+                // Position: vertically centered on mobile, anchored to top-right on desktop
+                'left-4 right-4 top-[50%] -translate-y-1/2',
+                'sm:top-20 sm:translate-y-0 sm:left-auto sm:right-4 sm:w-96',
+                // Glass design - Apple style
+                'bg-white/70 dark:bg-gray-900/70',
                 'backdrop-blur-2xl',
-                'border border-white/30 dark:border-white/10',
+                'border border-white/40 dark:border-white/10',
                 'rounded-2xl',
-                'shadow-2xl shadow-black/10 dark:shadow-black/30',
+                'shadow-2xl shadow-black/15 dark:shadow-black/40',
                 // Safe area for notched devices
-                'max-h-[calc(100vh-120px)] sm:max-h-[70vh]',
+                'max-h-[70vh] sm:max-h-[70vh]',
                 'overflow-hidden',
                 'flex flex-col'
               )}
               style={{
-                // iOS glass effect (private property, graceful fallback)
                 WebkitBackdropFilter: 'blur(40px) saturate(180%)',
               }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-white/20 dark:border-white/5">
+              {/* Header - Clean Apple style */}
+              <div className="flex items-center justify-between p-4 border-b border-black/5 dark:border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
-                    <Bell className="h-4 w-4 text-white" />
+                  <div className="p-2 rounded-xl bg-black/5 dark:bg-white/10">
+                    <Bell className="h-4 w-4 text-foreground" />
                   </div>
                   <div>
-                    <h2 className="font-bold text-base">התראות</h2>
+                    <h2 className="font-semibold text-base">התראות</h2>
                     <p className="text-xs text-muted-foreground">
                       {unreadCount > 0 ? `${unreadCount} חדשות` : 'אין התראות חדשות'}
                     </p>

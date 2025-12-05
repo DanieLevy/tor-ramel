@@ -26,15 +26,15 @@ export function Footer() {
   if (!version) return null
 
   return (
-    <footer className="w-full mt-auto py-4 border-t border-border/50 bg-background">
+    <footer className="w-full py-2 pb-20 sm:pb-2">
       <div className="container mx-auto px-4 flex justify-center">
-        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-          <Code className="h-3 w-3" />
+        <div className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <Code className="h-2.5 w-2.5" />
           <span className="font-mono">{version}</span>
           {buildTime && (
             <>
-              <span className="opacity-50">•</span>
-              <span>{format(new Date(buildTime), 'dd/MM/yy HH:mm', { locale: he })}</span>
+              <span className="opacity-40">•</span>
+              <span>{format(new Date(buildTime), 'dd/MM HH:mm', { locale: he })}</span>
             </>
           )}
         </div>

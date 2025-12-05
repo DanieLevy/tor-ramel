@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react'
-import { Menu, Sun, Moon, Search, Bell, Info, Home, Trash2, LogOut, User } from 'lucide-react'
+import { Menu, Sun, Moon, Search, Bell, Info, Home, Trash2, LogOut, User, Settings } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -13,18 +13,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useHeaderContext } from './header-context'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth-provider'
 import { NotificationCenter } from '@/components/notification-center'
+import { NotificationSettingsContent } from '@/components/notification-settings-content'
 
 export function Header() {
   const { config } = useHeaderContext()
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
   const [mounted, setMounted] = React.useState(false)
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = React.useState(false)
   const { user, logout } = useAuth()
 
   // Avoid hydration mismatch
@@ -310,6 +319,13 @@ export function Header() {
                       <span className="flex-1">התראות</span>
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl"
+                    onClick={() => setNotificationSettingsOpen(true)}
+                  >
+                    <Settings className="h-4 w-4 opacity-60" />
+                    <span className="flex-1">הגדרות התראות</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
                     <Link href="/notifications">
                       <Trash2 className="h-4 w-4 opacity-60" />
@@ -337,6 +353,22 @@ export function Header() {
           </div>
         </div>
       </div>
+      
+      {/* Notification Settings Dialog */}
+      <Dialog open={notificationSettingsOpen} onOpenChange={setNotificationSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              הגדרות התראות
+            </DialogTitle>
+            <DialogDescription>
+              בחר איך תרצה לקבל עדכונים על תורים פנויים
+            </DialogDescription>
+          </DialogHeader>
+          <NotificationSettingsContent isOpen={notificationSettingsOpen} />
+        </DialogContent>
+      </Dialog>
     </header>
   )
 } 

@@ -182,9 +182,6 @@ export function BottomNav() {
 
   return (
     <>
-      {/* Spacer to prevent content from being hidden behind nav */}
-      <div className="h-24" />
-      
       {/* Floating navbar container - no background, just positions the pill */}
       <motion.nav 
         className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none"
