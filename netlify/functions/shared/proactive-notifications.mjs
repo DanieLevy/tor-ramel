@@ -80,8 +80,9 @@ async function getUserPreferences(userId) {
   
   // Return defaults if no preferences found
   // IMPORTANT: quiet_hours should be null by default - users must explicitly set them
+  // IMPORTANT: Default to 'both' for proactive notifications to ensure push is always attempted
   return prefs || {
-    default_notification_method: 'email',
+    default_notification_method: 'both',  // Changed from 'email' to 'both' for proactive notifications
     hot_alerts_enabled: true,
     weekly_digest_enabled: true,
     expiry_reminders_enabled: true,
@@ -292,9 +293,13 @@ async function isEligibleForProactive(userId, notificationType, prefs = null) {
 
 /**
  * Send notification to user based on their method preference
+ * NOTE: For proactive notifications (hot_alert, opportunity), default to 'both' to ensure 
+ * users don't miss time-sensitive opportunities even if they haven't set preferences
  */
 async function sendNotificationToUser(userId, userEmail, prefs, notificationType, emailData, pushPayload) {
-  const method = prefs?.default_notification_method || 'email'
+  // For proactive notifications, default to 'both' instead of just 'email'
+  // This ensures push is always attempted for time-sensitive alerts
+  const method = prefs?.default_notification_method || 'both'
   let emailSent = false
   let pushSent = false
   
@@ -413,11 +418,13 @@ export async function processHotAlerts(availableAppointments) {
     }
     
     // Build optimized push payload using centralized builder
+    // IMPORTANT: Include times array for notification-action page display
     const pushPayload = buildHotAlertPayload({
       date: hottestApt.date,
       dayName,
       daysUntil,
       timesCount: hottestApt.times.length,
+      times: hottestApt.times,  // Include times for action page
       bookingUrl: hottestApt.booking_url
     })
     
@@ -567,10 +574,13 @@ export async function processOpportunityDiscovery(availableAppointments) {
     }
     
     // Build optimized push payload using centralized builder
+    // IMPORTANT: Include times array for notification-action page display
     const pushPayload = buildOpportunityPayload({
       date: bestApt.date,
       dayName,
-      timesCount: bestApt.times.length
+      timesCount: bestApt.times.length,
+      times: bestApt.times,  // Include times for action page
+      bookingUrl: bestApt.booking_url
     })
     
     // Send notification based on user's preference

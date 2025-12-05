@@ -1,6 +1,6 @@
 'use client'
 
-import { Mail, Smartphone, Bell, CheckCircle } from 'lucide-react'
+import { Mail, Smartphone, Bell, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type NotificationMethod = 'email' | 'push' | 'both'
@@ -10,6 +10,7 @@ interface NotificationMethodSelectorProps {
   onChange: (method: NotificationMethod) => void
   disabled?: boolean
   pushAvailable?: boolean
+  status?: 'idle' | 'saving' | 'saved' | 'error'
 }
 
 const methodOptions: {
@@ -46,12 +47,18 @@ export function NotificationMethodSelector({
   value,
   onChange,
   disabled = false,
-  pushAvailable = true
+  pushAvailable = true,
+  status = 'idle'
 }: NotificationMethodSelectorProps) {
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <h3 className="text-sm font-medium text-foreground">אופן קבלת התראות</h3>
+        <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+          אופן קבלת התראות
+          {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+          {status === 'saved' && <CheckCircle className="h-3 w-3 text-green-500" />}
+          {status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" />}
+        </h3>
         <p className="text-xs text-muted-foreground">בחר איך תרצה לקבל עדכונים על תורים פנויים</p>
       </div>
       

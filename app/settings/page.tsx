@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2, Save, CheckCircle, AlertCircle, Settings } from 'lucide-react'
+import { ArrowRight, Loader2, CheckCircle, AlertCircle, Settings, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { usePushNotifications } from '@/hooks/use-push-notifications'
 import {
   NotificationMethodSelector,
   NotificationTypesTogles,
   FrequencySettings,
-  DeliverySchedule,
+  QuietHoursSettings,
   TestNotifications
 } from '@/components/settings'
 
@@ -29,8 +28,6 @@ interface UserPreferences {
   notification_cooldown_minutes: number
   batch_notifications: boolean
   batch_interval_hours: number
-  preferred_delivery_start: string
-  preferred_delivery_end: string
   quiet_hours_start: string | null  // null = not set (no quiet hours)
   quiet_hours_end: string | null    // null = not set (no quiet hours)
 }
@@ -46,10 +43,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   notification_cooldown_minutes: 30,
   batch_notifications: false,
   batch_interval_hours: 4,
-  preferred_delivery_start: '08:00',
-  preferred_delivery_end: '21:00',
-  quiet_hours_start: null,  // IMPORTANT: No default - user must explicitly set quiet hours
-  quiet_hours_end: null,    // IMPORTANT: No default - user must explicitly set quiet hours
+  quiet_hours_start: null,  // No quiet hours by default
+  quiet_hours_end: null,    // No quiet hours by default
 }
 
 // Helper function for authenticated fetch
@@ -73,11 +68,13 @@ const authFetch = async (url: string, options: RequestInit = {}) => {
 export default function SettingsPage() {
   const router = useRouter()
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
-  const [originalPreferences, setOriginalPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [savingFields, setSavingFields] = useState<Set<string>>(new Set())
+  const [savedFields, setSavedFields] = useState<Set<string>>(new Set())
+  const [errorFields, setErrorFields] = useState<Set<string>>(new Set())
+  
+  // Debounce timer refs
+  const saveTimers = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
   // Push notifications hook
   const { 
@@ -109,7 +106,6 @@ export default function SettingsPage() {
               default_notification_method: data.preferences.default_notification_method || data.notification_method || 'email'
             }
             setPreferences(prefs)
-            setOriginalPreferences(prefs)
           }
         } else if (response.status === 401) {
           router.push('/login?from=/settings')
@@ -117,7 +113,13 @@ export default function SettingsPage() {
         }
       } catch (error) {
         console.error('Failed to load preferences:', error)
-        toast.error('שגיאה בטעינת ההגדרות')
+        toast.error('שגיאה בטעינת ההגדרות', {
+          description: 'נסה לרענן את הדף',
+          action: {
+            label: 'רענן',
+            onClick: () => window.location.reload()
+          }
+        })
       } finally {
         setLoading(false)
       }
@@ -126,63 +128,34 @@ export default function SettingsPage() {
     loadPreferences()
   }, [router])
 
-  // Check for changes
-  useEffect(() => {
-    const changed = JSON.stringify(preferences) !== JSON.stringify(originalPreferences)
-    setHasChanges(changed)
-    if (changed) {
-      setSaveStatus('idle')
+  // Auto-save a single field
+  const saveField = useCallback(async (key: string, value: unknown) => {
+    // Clear any existing timer for this field
+    const existingTimer = saveTimers.current.get(key)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
     }
-  }, [preferences, originalPreferences])
 
-  // Handle preference changes
-  const handleChange = useCallback((key: string, value: unknown) => {
-    setPreferences(prev => ({
-      ...prev,
-      [key]: value
-    }))
-  }, [])
-
-  // Handle notification method change (may need to enable push)
-  const handleMethodChange = async (method: NotificationMethod) => {
-    // If switching to push or both, ensure push is enabled
-    if ((method === 'push' || method === 'both') && !isPushSubscribed) {
-      try {
-        await subscribeToPush()
-        toast.success('התראות Push הופעלו בהצלחה!')
-      } catch (error) {
-        toast.error('שגיאה בהפעלת Push: ' + (error as Error).message)
-        return
-      }
-    }
-    
-    handleChange('default_notification_method', method)
-  }
-
-  // Save preferences
-  const handleSave = async () => {
-    setSaving(true)
-    setSaveStatus('idle')
+    // Set saving state
+    setSavingFields(prev => new Set(prev).add(key))
+    setSavedFields(prev => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+    setErrorFields(prev => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
 
     try {
-      // Build update object with only changed fields
+      // Map field name for API
       const updates: Record<string, unknown> = {}
-      
-      for (const [key, value] of Object.entries(preferences)) {
-        if (value !== originalPreferences[key as keyof UserPreferences]) {
-          // Map the field names for API
-          if (key === 'default_notification_method') {
-            updates['notification_method'] = value
-          } else {
-            updates[key] = value
-          }
-        }
-      }
-
-      if (Object.keys(updates).length === 0) {
-        toast.info('אין שינויים לשמור')
-        setSaving(false)
-        return
+      if (key === 'default_notification_method') {
+        updates['notification_method'] = value
+      } else {
+        updates[key] = value
       }
 
       const response = await authFetch('/api/notifications/preferences', {
@@ -193,24 +166,106 @@ export default function SettingsPage() {
       const data = await response.json()
 
       if (response.ok && data.success) {
-        setOriginalPreferences(preferences)
-        setHasChanges(false)
-        setSaveStatus('saved')
-        toast.success('ההגדרות נשמרו בהצלחה!')
+        // Show success feedback
+        setSavedFields(prev => new Set(prev).add(key))
         
-        // Reset saved status after 3 seconds
-        setTimeout(() => setSaveStatus('idle'), 3000)
+        // Clear success indicator after 2 seconds
+        setTimeout(() => {
+          setSavedFields(prev => {
+            const next = new Set(prev)
+            next.delete(key)
+            return next
+          })
+        }, 2000)
       } else {
-        setSaveStatus('error')
-        toast.error(data.error || 'שגיאה בשמירת ההגדרות')
+        // Show error
+        setErrorFields(prev => new Set(prev).add(key))
+        toast.error('שגיאה בשמירה', {
+          description: data.error || 'לא ניתן לשמור את השינוי',
+          action: {
+            label: 'נסה שוב',
+            onClick: () => saveField(key, value)
+          }
+        })
       }
     } catch (error) {
       console.error('Save error:', error)
-      setSaveStatus('error')
-      toast.error('שגיאה בשמירת ההגדרות')
+      setErrorFields(prev => new Set(prev).add(key))
+      toast.error('שגיאה בשמירה', {
+        description: 'בדוק את החיבור לאינטרנט',
+        action: {
+          label: 'נסה שוב',
+          onClick: () => saveField(key, value)
+        }
+      })
     } finally {
-      setSaving(false)
+      setSavingFields(prev => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
     }
+  }, [])
+
+  // Handle preference changes with debounced auto-save
+  const handleChange = useCallback((key: string, value: unknown) => {
+    // Update state immediately for responsive UI
+    setPreferences(prev => ({
+      ...prev,
+      [key]: value
+    }))
+
+    // Clear any existing timer for this field
+    const existingTimer = saveTimers.current.get(key)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
+
+    // Set new timer for debounced save (300ms delay)
+    const timer = setTimeout(() => {
+      saveField(key, value)
+    }, 300)
+    
+    saveTimers.current.set(key, timer)
+  }, [saveField])
+
+  // Handle notification method change (may need to enable push)
+  const handleMethodChange = async (method: NotificationMethod) => {
+    // If switching to push or both, ensure push is enabled
+    if ((method === 'push' || method === 'both') && !isPushSubscribed) {
+      try {
+        await subscribeToPush()
+        toast.success('התראות Push הופעלו בהצלחה!')
+      } catch (error) {
+        toast.error('שגיאה בהפעלת Push', {
+          description: (error as Error).message
+        })
+        return
+      }
+    }
+    
+    // Update and save immediately (no debounce for method change)
+    setPreferences(prev => ({
+      ...prev,
+      default_notification_method: method
+    }))
+    saveField('default_notification_method', method)
+  }
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    const timersRef = saveTimers.current
+    return () => {
+      timersRef.forEach(timer => clearTimeout(timer))
+    }
+  }, [])
+
+  // Get field status for visual feedback
+  const getFieldStatus = (key: string): 'idle' | 'saving' | 'saved' | 'error' => {
+    if (savingFields.has(key)) return 'saving'
+    if (savedFields.has(key)) return 'saved'
+    if (errorFields.has(key)) return 'error'
+    return 'idle'
   }
 
   if (loading) {
@@ -244,41 +299,25 @@ export default function SettingsPage() {
                   <Settings className="h-5 w-5" />
                   הגדרות
                 </h1>
-                <p className="text-xs text-muted-foreground">ניהול התראות והעדפות</p>
+                <p className="text-xs text-muted-foreground">שינויים נשמרים אוטומטית</p>
               </div>
             </div>
             
-            {/* Save button */}
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || saving}
-              className={cn(
-                "transition-all",
-                hasChanges && "animate-pulse"
+            {/* Auto-save indicator */}
+            <div className="flex items-center gap-2">
+              {savingFields.size > 0 && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  <span>שומר...</span>
+                </div>
               )}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                  שומר...
-                </>
-              ) : saveStatus === 'saved' ? (
-                <>
-                  <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-                  נשמר!
-                </>
-              ) : saveStatus === 'error' ? (
-                <>
-                  <AlertCircle className="h-4 w-4 ml-2 text-red-500" />
-                  שגיאה
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 ml-2" />
-                  שמור
-                </>
+              {savedFields.size > 0 && savingFields.size === 0 && (
+                <div className="flex items-center gap-1 text-xs text-green-600">
+                  <CheckCircle className="h-3 w-3" />
+                  <span>נשמר</span>
+                </div>
               )}
-            </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -323,8 +362,9 @@ export default function SettingsPage() {
           <NotificationMethodSelector
             value={preferences.default_notification_method}
             onChange={handleMethodChange}
-            disabled={saving}
+            disabled={savingFields.has('default_notification_method')}
             pushAvailable={pushAvailable || isPushSubscribed}
+            status={getFieldStatus('default_notification_method')}
           />
         </section>
 
@@ -341,7 +381,7 @@ export default function SettingsPage() {
               proactive_notifications_enabled: preferences.proactive_notifications_enabled,
             }}
             onChange={handleChange}
-            disabled={saving}
+            getFieldStatus={getFieldStatus}
           />
         </section>
 
@@ -357,23 +397,21 @@ export default function SettingsPage() {
               batch_interval_hours: preferences.batch_interval_hours,
             }}
             onChange={handleChange}
-            disabled={saving}
+            getFieldStatus={getFieldStatus}
           />
         </section>
 
         <hr className="border-black/5 dark:border-white/5" />
 
-        {/* Section: Delivery Schedule */}
+        {/* Section: Quiet Hours Only (removed preferred hours) */}
         <section className="space-y-4">
-          <DeliverySchedule
+          <QuietHoursSettings
             values={{
-              preferred_delivery_start: preferences.preferred_delivery_start,
-              preferred_delivery_end: preferences.preferred_delivery_end,
               quiet_hours_start: preferences.quiet_hours_start,
               quiet_hours_end: preferences.quiet_hours_end,
             }}
             onChange={handleChange}
-            disabled={saving}
+            getFieldStatus={getFieldStatus}
           />
         </section>
 
@@ -386,30 +424,6 @@ export default function SettingsPage() {
             pushAvailable={isPushSubscribed}
           />
         </section>
-
-        {/* Floating save button for mobile */}
-        {hasChanges && (
-          <div className="fixed bottom-20 left-4 right-4 max-w-2xl mx-auto z-50">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full shadow-lg"
-              size="lg"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                  שומר שינויים...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 ml-2" />
-                  שמור שינויים
-                </>
-              )}
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   )

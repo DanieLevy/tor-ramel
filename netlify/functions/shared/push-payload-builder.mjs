@@ -78,17 +78,34 @@ export function buildAppointmentPayload({
       : dateList
   }
   
-  // Build lightweight data - NO full appointment arrays!
+  // Build URL for notification-action page with minimal appointment data
+  const appointmentData = appointments?.slice(0, 5).map(apt => ({
+    date: apt.date,
+    times: (apt.newTimes || apt.times || []).slice(0, 6)
+  })) || []
+  
+  // Build URL - redirect to notification-action page
+  let actionUrl = `/notification-action?subscription=${subscriptionId}`
+  
+  // Add compact appointments data
+  if (appointmentData.length > 0) {
+    const compactAppts = encodeURIComponent(JSON.stringify(appointmentData))
+    actionUrl += `&appointments=${compactAppts}`
+  }
+  
+  // Build lightweight data
   const data = {
     type: 'appointment',
-    url: '/',
-    sid: subscriptionId, // Shortened key
-    cnt: count          // Shortened key
+    url: actionUrl,
+    subscription_id: subscriptionId,
+    cnt: count
   }
   
   // Only include booking URL if available
   if (bookingUrl) {
-    data.book = bookingUrl
+    data.booking_url = bookingUrl
+    actionUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`
+    data.url = actionUrl
   }
   
   // Build actions (Book Now only if we have booking URL)
@@ -112,7 +129,9 @@ export function buildHotAlertPayload({
   dayName, 
   daysUntil, 
   timesCount,
-  bookingUrl 
+  times,
+  bookingUrl,
+  subscriptionId
 }) {
   const dateShort = formatDateShort(date)
   
@@ -128,15 +147,29 @@ export function buildHotAlertPayload({
     ? `${timesCount} שעות פנויות - מהר!`
     : `${dateShort} - ${timesCount} שעות`
   
+  // Build action URL that includes appointment data for decision page
+  const appointmentData = [{ date, times: (times || []).slice(0, 6) }]
+  let actionUrl = `/notification-action?type=hot-alert`
+  
+  if (subscriptionId) {
+    actionUrl += `&subscription=${subscriptionId}`
+  }
+  actionUrl += `&appointments=${encodeURIComponent(JSON.stringify(appointmentData))}`
+  
+  if (bookingUrl) {
+    actionUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`
+  }
+  
   const data = {
     type: 'hot-alert',
-    url: '/',
+    url: actionUrl,
     date,
-    urgent: daysUntil <= 1
+    urgent: daysUntil <= 1,
+    subscription_id: subscriptionId
   }
   
   if (bookingUrl) {
-    data.book = bookingUrl
+    data.booking_url = bookingUrl
   }
   
   const actions = bookingUrl
@@ -254,12 +287,28 @@ export function buildSubscriptionConfirmPayload({
 export function buildOpportunityPayload({ 
   date, 
   dayName, 
-  timesCount 
+  timesCount,
+  times,
+  bookingUrl,
+  subscriptionId
 }) {
   const dateShort = formatDateShort(date)
   
   const title = `הזדמנות ב${dayName}`
   const body = `${dateShort} - ${timesCount} שעות נפתחו`
+  
+  // Build action URL that redirects to notification-action page
+  const appointmentData = [{ date, times: (times || []).slice(0, 6) }]
+  let actionUrl = `/notification-action?type=opportunity`
+  
+  if (subscriptionId) {
+    actionUrl += `&subscription=${subscriptionId}`
+  }
+  actionUrl += `&appointments=${encodeURIComponent(JSON.stringify(appointmentData))}`
+  
+  if (bookingUrl) {
+    actionUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`
+  }
   
   return buildPayload({
     title,
@@ -271,8 +320,10 @@ export function buildOpportunityPayload({
     ],
     data: {
       type: 'opportunity',
-      url: '/',
-      date
+      url: actionUrl,
+      date,
+      subscription_id: subscriptionId,
+      booking_url: bookingUrl
     },
     requireInteraction: false
   })

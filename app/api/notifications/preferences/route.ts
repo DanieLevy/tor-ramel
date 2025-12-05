@@ -10,6 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Default preferences
 // IMPORTANT: quiet_hours should be null by default - users must explicitly set them
+// NOTE: preferred_delivery_start/end removed - notifications are immediate except during quiet hours
 const DEFAULT_PREFERENCES = {
   default_notification_method: 'email',
   // Notification types
@@ -23,9 +24,7 @@ const DEFAULT_PREFERENCES = {
   notification_cooldown_minutes: 30,
   batch_notifications: false,
   batch_interval_hours: 4,
-  // Delivery schedule
-  preferred_delivery_start: '08:00',
-  preferred_delivery_end: '21:00',
+  // Quiet hours only - no preferred delivery window (notifications are immediate)
   quiet_hours_start: null as string | null,  // No default - user must explicitly set
   quiet_hours_end: null as string | null,    // No default - user must explicitly set
   notification_cooldown_hours: 4,
@@ -60,10 +59,8 @@ interface UserPreferences {
   notification_cooldown_minutes: number;
   batch_notifications: boolean;
   batch_interval_hours: number;
-  preferred_delivery_start: string;
-  preferred_delivery_end: string;
-  quiet_hours_start: string | null;  // null = not set
-  quiet_hours_end: string | null;    // null = not set
+  quiet_hours_start: string | null;  // null = not set (no quiet hours)
+  quiet_hours_end: string | null;    // null = not set (no quiet hours)
   notification_cooldown_hours: number;
 }
 
@@ -286,9 +283,7 @@ export async function GET() {
       notification_cooldown_minutes: userPrefs?.notification_cooldown_minutes ?? DEFAULT_PREFERENCES.notification_cooldown_minutes,
       batch_notifications: userPrefs?.batch_notifications ?? DEFAULT_PREFERENCES.batch_notifications,
       batch_interval_hours: userPrefs?.batch_interval_hours ?? DEFAULT_PREFERENCES.batch_interval_hours,
-      // Delivery schedule
-      preferred_delivery_start: userPrefs?.preferred_delivery_start ?? DEFAULT_PREFERENCES.preferred_delivery_start,
-      preferred_delivery_end: userPrefs?.preferred_delivery_end ?? DEFAULT_PREFERENCES.preferred_delivery_end,
+      // Quiet hours only (no preferred delivery window)
       quiet_hours_start: userPrefs?.quiet_hours_start ?? DEFAULT_PREFERENCES.quiet_hours_start,
       quiet_hours_end: userPrefs?.quiet_hours_end ?? DEFAULT_PREFERENCES.quiet_hours_end,
       notification_cooldown_hours: userPrefs?.notification_cooldown_hours ?? DEFAULT_PREFERENCES.notification_cooldown_hours,

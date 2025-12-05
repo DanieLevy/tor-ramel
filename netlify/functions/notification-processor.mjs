@@ -762,20 +762,18 @@ const MAX_CONSECUTIVE_FAILURES = 5
  */
 async function checkFrequencyLimits(userId) {
   try {
-    // Get user preferences
+    // Get user preferences - only quiet_hours and frequency limits matter now
     const { data: prefs } = await supabase
       .from('user_preferences')
-      .select('max_notifications_per_day, notification_cooldown_minutes, quiet_hours_start, quiet_hours_end, preferred_delivery_start, preferred_delivery_end')
+      .select('max_notifications_per_day, notification_cooldown_minutes, quiet_hours_start, quiet_hours_end')
       .eq('user_id', userId)
       .single()
     
     // Default values if no preferences
     const maxPerDay = prefs?.max_notifications_per_day ?? 10
     const cooldownMinutes = prefs?.notification_cooldown_minutes ?? 30
-    const quietStart = prefs?.quiet_hours_start
-    const quietEnd = prefs?.quiet_hours_end
-    const deliveryStart = prefs?.preferred_delivery_start || '08:00'
-    const deliveryEnd = prefs?.preferred_delivery_end || '21:00'
+    const quietStart = prefs?.quiet_hours_start  // null = no quiet hours (send 24/7)
+    const quietEnd = prefs?.quiet_hours_end      // null = no quiet hours (send 24/7)
     
     // Get current Israel time
     const now = new Date()
@@ -786,7 +784,8 @@ async function checkFrequencyLimits(userId) {
       hour12: false
     })
     
-    // Check quiet hours
+    // Check quiet hours - ONLY if user has explicitly set both start and end
+    // If either is null, notifications are allowed 24/7
     if (quietStart && quietEnd) {
       if (quietStart > quietEnd) {
         // Overnight quiet hours (e.g., 22:00 to 07:00)
@@ -794,17 +793,13 @@ async function checkFrequencyLimits(userId) {
           return { allowed: false, reason: 'quiet_hours' }
         }
       } else {
+        // Same-day quiet hours (e.g., 14:00 to 16:00)
         if (israelTime >= quietStart && israelTime <= quietEnd) {
           return { allowed: false, reason: 'quiet_hours' }
         }
       }
     }
-    
-    // Check preferred delivery window (optional - for batching)
-    // We allow notifications outside the window but log it
-    if (israelTime < deliveryStart || israelTime > deliveryEnd) {
-      console.log(`[Frequency] User ${userId} outside preferred delivery window (${deliveryStart}-${deliveryEnd})`)
-    }
+    // NOTE: If quiet hours not set, notifications are sent immediately (no preferred delivery window)
     
     // Check daily limit (0 = unlimited)
     if (maxPerDay > 0) {

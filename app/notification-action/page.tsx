@@ -3,363 +3,85 @@
 import { Suspense } from 'react'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, XCircle, Loader2, Home, Bell, Clock, AlertCircle } from 'lucide-react'
+import { 
+  CheckCircle, 
+  XCircle, 
+  Loader2, 
+  Home, 
+  Bell, 
+  Clock, 
+  AlertCircle,
+  Calendar,
+  ExternalLink,
+  Sparkles,
+  ArrowRight,
+  Flame
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
+
+interface AppointmentData {
+  date: string
+  times: string[]
+}
 
 function NotificationActionContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [processing, setProcessing] = useState(true)
-  const [showDialog, setShowDialog] = useState(false)
+  const [processing, setProcessing] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [actionComplete, setActionComplete] = useState(false)
   const [result, setResult] = useState<{
     success: boolean
     message: string
     action?: string
   } | null>(null)
 
-  // Get times from URL params if available
-  const times = searchParams.get('times')
-  const date = searchParams.get('date')
+  // Parse URL params
+  const subscriptionId = searchParams.get('subscription')
+  const bookingUrl = searchParams.get('booking_url')
+  const notificationType = searchParams.get('type') || 'appointment'
   const appointmentsParam = searchParams.get('appointments')
+  const dateParam = searchParams.get('date')
+  const timesParam = searchParams.get('times')
   
-  // Parse appointments data if available - wrapped in useMemo to prevent dependency changes
-  const appointments = useMemo(() => {
-    let parsed: Array<{ date: string; times: string[] }> = []
+  // Parse appointments data
+  const appointments = useMemo<AppointmentData[]>(() => {
     if (appointmentsParam) {
       try {
-        parsed = JSON.parse(decodeURIComponent(appointmentsParam))
+        return JSON.parse(decodeURIComponent(appointmentsParam))
       } catch (e) {
         console.error('Failed to parse appointments:', e)
       }
     }
-    return parsed
-  }, [appointmentsParam])
-  
-  const timesList = times ? times.split(',') : []
-
-  const handleAction = useCallback(async () => {
-    const action = searchParams.get('action')
-    const subscriptionId = searchParams.get('subscription')
-    const bookingUrl = searchParams.get('booking_url')
-
-    // Handle "book" action - redirect to booking URL
-    if (action === 'book') {
-      // Track the click event
-      try {
-        await fetch('/api/notifications/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event_type: 'action_taken',
-            subscription_id: subscriptionId,
-            metadata: {
-              action: 'book',
-              booking_url: bookingUrl,
-              date: date
-            }
-          })
-        })
-      } catch {
-        // Silent fail for tracking
-      }
-
-      if (bookingUrl) {
-        // Show brief confirmation then redirect
-        setResult({
-          success: true,
-          message: 'מעביר לאתר ההזמנות...',
-          action: 'book'
-        })
-        setProcessing(false)
-        
-        // Brief delay to show feedback, then redirect
-        setTimeout(() => {
-          window.location.href = decodeURIComponent(bookingUrl)
-        }, 1000)
-        return
-      }
-      
-      // No booking URL - show appointments instead
-      setProcessing(false)
-      return
+    
+    // Fallback to single date/times params
+    if (dateParam && timesParam) {
+      return [{
+        date: dateParam,
+        times: timesParam.split(',')
+      }]
     }
+    
+    return []
+  }, [appointmentsParam, dateParam, timesParam])
 
-    // If no action, just show appointments (view mode from push notification)
-    if (!action) {
-      if (!subscriptionId) {
-        setResult({
-          success: false,
-          message: 'פרמטרים חסרים בקישור'
-        })
-        setProcessing(false)
-        setShowDialog(true)
-        return
-      }
-      
-      // View mode - show appointments without processing any action
-      setProcessing(false)
-      return
-    }
-
-    if (!subscriptionId) {
-      setResult({
-        success: false,
-        message: 'פרמטרים חסרים בקישור'
-      })
-      setProcessing(false)
-      setShowDialog(true)
-      return
-    }
-
-    try {
-      if (action === 'approve') {
-        // Handle approve action
-        const response = await fetch('/api/notifications/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            action: 'approve',
-            subscriptionId
-          })
-        })
-
-        if (response.ok) {
-          setResult({
-            success: true,
-            message: 'מצוין! המנוי שלך סומן כהושלם.',
-            action: 'approve'
-          })
-        } else {
-          const error = await response.json()
-          setResult({
-            success: false,
-            message: error.message || 'אירעה שגיאה בעדכון המנוי'
-          })
-        }
-      } else if (action === 'decline') {
-        // Handle decline action
-        const bodyData: Record<string, unknown> = {
-          action: 'decline',
-          subscriptionId
-        }
-        
-        // Check if we have multi-date appointments
-        if (appointments.length > 0) {
-          bodyData.appointments = appointments
-        } else if (times && date) {
-          // Backward compatibility for single date
-          bodyData.times = times.split(',')
-          bodyData.date = date
-        } else {
-          setResult({
-            success: false,
-            message: 'חסרים פרטי השעות שנדחו'
-          })
-          setProcessing(false)
-          setShowDialog(true)
-          return
-        }
-
-        const response = await fetch('/api/notifications/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(bodyData)
-        })
-
-        if (response.ok) {
-          setResult({
-            success: true,
-            message: 'השעות שנדחו נשמרו. תמשיך לקבל התראות.',
-            action: 'decline'
-          })
-        } else {
-          const error = await response.json()
-          setResult({
-            success: false,
-            message: error.message || 'אירעה שגיאה בשמירת השעות שנדחו'
-          })
-        }
-      } else if (action === 'unsubscribe') {
-        // Handle unsubscribe action
-        const response = await fetch('/api/notifications/action', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            action: 'unsubscribe',
-            subscriptionId
-          })
-        })
-
-        if (response.ok) {
-          setResult({
-            success: true,
-            message: 'ההרשמה בוטלה בהצלחה.',
-            action: 'unsubscribe'
-          })
-        } else {
-          const error = await response.json()
-          setResult({
-            success: false,
-            message: error.message || 'אירעה שגיאה בביטול ההרשמה'
-          })
-        }
-      } else {
-        setResult({
-          success: false,
-          message: 'פעולה לא מזוהה'
-        })
-      }
-    } catch (error) {
-      console.error('Error processing action:', error)
-      setResult({
-        success: false,
-        message: 'אירעה שגיאה בתקשורת עם השרת'
-      })
-    } finally {
-      setProcessing(false)
-      setShowDialog(true)
-    }
-  }, [searchParams, times, date, appointments])
-
+  // Initialize page
   useEffect(() => {
-    handleAction()
-  }, [handleAction])
+    // Short delay to show loading state
+    const timer = setTimeout(() => setInitialLoading(false), 500)
+    return () => clearTimeout(timer)
+  }, [])
 
-  const getDialogContent = () => {
-    if (!result) return null
-
-    if (result.success && result.action === 'approve') {
-      return (
-        <>
-          <DialogHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <DialogTitle className="text-center text-xl">מעולה! 🎉</DialogTitle>
-            <DialogDescription className="text-center">
-              אנחנו שמחים שמצאת תור מתאים
-            </DialogDescription>
-          </DialogHeader>
-          {/* Show appointment details if available */}
-          {appointments.length > 0 ? (
-            <div className="space-y-4 pt-4 max-h-[300px] overflow-y-auto">
-              {appointments.map((apt, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="text-center">
-                    <Badge variant="outline" className="text-sm px-3 py-1">
-                      {apt.date}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {apt.times.slice(0, 6).map((time, timeIndex) => (
-                      <div 
-                        key={timeIndex}
-                        className="text-center p-2 rounded-lg bg-muted/50 border border-border"
-                      >
-                        <span className="text-sm font-medium">{time}</span>
-                      </div>
-                    ))}
-                    {apt.times.length > 6 && (
-                      <div className="text-center p-2 rounded-lg bg-muted/50 border border-border">
-                        <span className="text-sm text-muted-foreground">+{apt.times.length - 6}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                בהצלחה בתור שלך!
-              </p>
-            </div>
-          ) : date && timesList.length > 0 ? (
-            <div className="space-y-4 pt-4">
-              <div className="text-center">
-                <Badge variant="outline" className="text-sm px-3 py-1">
-                  {date}
-                </Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {timesList.map((time, index) => (
-                  <div 
-                    key={index}
-                    className="text-center p-2 rounded-lg bg-muted/50 border border-border"
-                  >
-                    <Clock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <span className="font-medium">{time}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                בהצלחה בתור שלך!
-              </p>
-            </div>
-          ) : null}
-        </>
-      )
+  // Handle approve action - user found a suitable appointment
+  const handleApprove = useCallback(async () => {
+    if (!subscriptionId) {
+      toast.error('חסר מזהה התראה')
+      return
     }
-
-    if (result.success && result.action === 'decline') {
-      return (
-        <>
-          <DialogHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-              <Bell className="h-8 w-8 text-blue-600" />
-            </div>
-            <DialogTitle className="text-center text-xl">הבנו 👍</DialogTitle>
-            <DialogDescription className="text-center">
-              נמשיך לחפש עבורך ונודיע לך כשיתפנו שעות חדשות
-            </DialogDescription>
-          </DialogHeader>
-        </>
-      )
-    }
-
-    if (result.success && result.action === 'unsubscribe') {
-      return (
-        <>
-          <DialogHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <DialogTitle className="text-center text-xl">ההרשמה בוטלה</DialogTitle>
-            <DialogDescription className="text-center">
-              לא תקבל יותר התראות. תוכל להירשם מחדש בכל עת.
-            </DialogDescription>
-          </DialogHeader>
-        </>
-      )
-    }
-
-    // Error state
-    return (
-      <>
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-            <XCircle className="h-8 w-8 text-destructive" />
-          </div>
-          <DialogTitle className="text-center text-xl">שגיאה</DialogTitle>
-          <DialogDescription className="text-center">
-            {result.message}
-          </DialogDescription>
-        </DialogHeader>
-      </>
-    )
-  }
-
-  const handleApprove = async () => {
-    const subscriptionId = searchParams.get('subscription')
+    
     setProcessing(true)
     
     try {
@@ -376,214 +98,352 @@ function NotificationActionContent() {
       if (response.ok) {
         setResult({
           success: true,
-          message: 'מצוין! המנוי שלך סומן כהושלם.',
+          message: 'מעולה! המעקב סומן כהושלם בהצלחה.',
           action: 'approve'
         })
-      } else {
-        const error = await response.json()
-        setResult({
-          success: false,
-          message: error.message || 'אירעה שגיאה בעדכון המנוי'
-        })
-      }
-    } catch {
-      setResult({
-        success: false,
-        message: 'אירעה שגיאה בתקשורת עם השרת'
-      })
-    } finally {
-      setProcessing(false)
-      setShowDialog(true)
-    }
-  }
-
-  const handleDecline = async () => {
-    const subscriptionId = searchParams.get('subscription')
-    setProcessing(true)
-    
-    try {
-      const bodyData: Record<string, unknown> = {
-        action: 'decline',
-        subscriptionId
-      }
-      
-      if (appointments.length > 0) {
-        bodyData.appointments = appointments
-      } else if (times && date) {
-        bodyData.date = date
-        bodyData.times = timesList
-      }
-
-      const response = await fetch('/api/notifications/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(bodyData)
-      })
-
-      if (response.ok) {
-        setResult({
-          success: true,
-          message: 'הבנו! נמשיך לחפש ונודיע לך על שעות חדשות.',
-          action: 'decline'
-        })
+        setActionComplete(true)
+        toast.success('מצוין! מצאת תור מתאים 🎉')
       } else {
         const error = await response.json()
         setResult({
           success: false,
           message: error.message || 'אירעה שגיאה'
         })
+        toast.error(error.message || 'אירעה שגיאה')
       }
     } catch {
       setResult({
         success: false,
-        message: 'אירעה שגיאה בתקשורת עם השרת'
+        message: 'אירעה שגיאה בתקשורת'
       })
+      toast.error('שגיאה בתקשורת עם השרת')
     } finally {
       setProcessing(false)
-      setShowDialog(true)
+    }
+  }, [subscriptionId])
+
+  // Handle decline action - ignore these times
+  const handleDecline = useCallback(async () => {
+    if (!subscriptionId) {
+      toast.error('חסר מזהה התראה')
+      return
+    }
+    
+    if (appointments.length === 0) {
+      toast.error('חסרים פרטי השעות')
+      return
+    }
+    
+    setProcessing(true)
+    
+    try {
+      const response = await fetch('/api/notifications/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'decline',
+          subscriptionId,
+          appointments
+        })
+      })
+
+      if (response.ok) {
+        setResult({
+          success: true,
+          message: 'השעות נשמרו לרשימת ההתעלמות. נמשיך לחפש עבורך!',
+          action: 'decline'
+        })
+        setActionComplete(true)
+        toast.success('השעות נשמרו - נמשיך לעדכן אותך!')
+      } else {
+        const error = await response.json()
+        setResult({
+          success: false,
+          message: error.message || 'אירעה שגיאה'
+        })
+        toast.error(error.message || 'אירעה שגיאה')
+      }
+    } catch {
+      setResult({
+        success: false,
+        message: 'אירעה שגיאה בתקשורת'
+      })
+      toast.error('שגיאה בתקשורת עם השרת')
+    } finally {
+      setProcessing(false)
+    }
+  }, [subscriptionId, appointments])
+
+  // Handle book action - redirect to external booking
+  const handleBook = useCallback(() => {
+    if (bookingUrl) {
+      window.open(decodeURIComponent(bookingUrl), '_blank')
+    }
+  }, [bookingUrl])
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr)
+      const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
+      const dayName = dayNames[date.getDay()]
+      const day = date.getDate()
+      const month = date.getMonth() + 1
+      return { dayName, formatted: `${day}/${month}`, full: `יום ${dayName}, ${day}/${month}` }
+    } catch {
+      return { dayName: '', formatted: dateStr, full: dateStr }
     }
   }
 
-  return (
-    <div className="container py-8 px-4 max-w-xl mx-auto">
-      <div className="space-y-6">
-        {/* Loading State */}
-        {processing && (
-          <Card>
-            <CardContent className="py-12">
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-muted-foreground">מעבד את הבקשה שלך...</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+  // Get total times count
+  const totalTimes = appointments.reduce((sum, apt) => sum + apt.times.length, 0)
 
-        {/* View Mode - Show Appointments */}
-        {!processing && !showDialog && (appointments.length > 0 || (date && timesList.length > 0)) && (
-          <Card>
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
-                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+  // Loading state
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-blue-500 flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="h-8 w-8 text-white animate-spin" />
+          </div>
+          <p className="text-muted-foreground">טוען פרטי התראה...</p>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // No appointments state
+  if (appointments.length === 0 && !actionComplete) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="max-w-md w-full bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-lg text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2">חסרים פרטים</h1>
+          <p className="text-muted-foreground mb-6">לא ניתן לטעון את פרטי ההתראה</p>
+          <Button onClick={() => router.push('/')} className="w-full">
+            <Home className="ml-2 h-4 w-4" />
+            לדף הבית
+          </Button>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Action complete state
+  if (actionComplete && result) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-md w-full bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-lg text-center"
+        >
+          {result.success ? (
+            <>
+              <div className={`w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center ${
+                result.action === 'approve' 
+                  ? 'bg-green-100 dark:bg-green-900/30' 
+                  : 'bg-blue-100 dark:bg-blue-900/30'
+              }`}>
+                {result.action === 'approve' ? (
+                  <Sparkles className="h-10 w-10 text-green-600 dark:text-green-400" />
+                ) : (
+                  <Bell className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                )}
               </div>
-              <CardTitle className="text-2xl">🎉 תורים פנויים!</CardTitle>
-              <CardDescription className="text-base">
-                נמצאו תורים זמינים עבורך
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Show Multiple Dates */}
-              {appointments.length > 0 ? (
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                  {appointments.map((apt, index) => (
-                    <div key={index} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="text-sm px-3 py-1.5 font-semibold">
-                          {apt.date}
-                        </Badge>
-                        <Badge variant="secondary" className="text-xs">
-                          {apt.times.length} שעות
-                        </Badge>
+              <h1 className="text-2xl font-bold text-foreground mb-2">
+                {result.action === 'approve' ? 'מעולה! 🎉' : 'הבנו 👍'}
+              </h1>
+              <p className="text-muted-foreground mb-8">{result.message}</p>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 mx-auto mb-6 flex items-center justify-center">
+                <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground mb-2">שגיאה</h1>
+              <p className="text-muted-foreground mb-8">{result.message}</p>
+            </>
+          )}
+          
+          <div className="space-y-3">
+            <Button onClick={() => router.push('/')} className="w-full" size="lg">
+              <Home className="ml-2 h-4 w-4" />
+              לדף הבית
+            </Button>
+            <Button onClick={() => router.push('/subscribe')} variant="outline" className="w-full" size="lg">
+              <Bell className="ml-2 h-4 w-4" />
+              ניהול התראות
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // Main view - show appointments and actions
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 safe-area-padding">
+        <div className="max-w-lg mx-auto px-4 py-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="rounded-full"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
+                {notificationType === 'hot-alert' && <Flame className="h-5 w-5 text-red-500" />}
+                {notificationType === 'hot-alert' ? 'תור חם!' : 'תורים פנויים'}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {appointments.length} תאריכים • {totalTimes} שעות זמינות
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* Appointments List */}
+        <div className="space-y-4">
+          <AnimatePresence>
+            {appointments.map((apt, index) => {
+              const dateInfo = formatDate(apt.date)
+              return (
+                <motion.div
+                  key={apt.date}
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm"
+                >
+                  {/* Date Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {apt.times.slice(0, 9).map((time, timeIndex) => (
-                          <div 
-                            key={timeIndex}
-                            className="text-center p-2 rounded-lg bg-white dark:bg-gray-900 border-2 border-black dark:border-white"
-                          >
-                            <span className="text-sm font-bold">{time}</span>
-                          </div>
-                        ))}
-                        {apt.times.length > 9 && (
-                          <div className="text-center p-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700">
-                            <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                              +{apt.times.length - 9}
-                            </span>
-                          </div>
-                        )}
+                      <div>
+                        <div className="font-bold text-foreground">{dateInfo.full}</div>
+                        <div className="text-xs text-muted-foreground">{apt.times.length} שעות פנויות</div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : date && timesList.length > 0 ? (
-                /* Show Single Date */
-                <div className="p-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 space-y-3">
-                  <div className="text-center">
-                    <Badge variant="outline" className="text-base px-4 py-2 font-semibold">
-                      {date}
+                    <Badge variant="secondary" className="text-xs">
+                      {dateInfo.formatted}
                     </Badge>
                   </div>
+                  
+                  {/* Times Grid */}
                   <div className="grid grid-cols-3 gap-2">
-                    {timesList.map((time, index) => (
+                    {apt.times.slice(0, 9).map((time, timeIndex) => (
                       <div 
-                        key={index}
-                        className="text-center p-3 rounded-lg bg-white dark:bg-gray-900 border-2 border-black dark:border-white"
+                        key={timeIndex}
+                        className="text-center py-2.5 px-2 rounded-xl bg-gray-100 dark:bg-gray-800 border-2 border-transparent hover:border-blue-500 transition-colors cursor-default"
                       >
-                        <Clock className="h-4 w-4 mx-auto mb-1 text-gray-600 dark:text-gray-400" />
-                        <span className="font-bold text-sm">{time}</span>
+                        <Clock className="h-4 w-4 mx-auto mb-1 text-gray-500 dark:text-gray-400" />
+                        <span className="text-sm font-bold text-foreground">{time}</span>
                       </div>
                     ))}
+                    {apt.times.length > 9 && (
+                      <div className="text-center py-2.5 px-2 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                        <span className="text-sm text-muted-foreground font-medium">
+                          +{apt.times.length - 9}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : null}
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-3 pt-4">
-                <Button
-                  onClick={handleApprove}
-                  size="lg"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
-                >
-                  <CheckCircle className="ml-2 h-5 w-5" />
-                  מצאתי תור מתאים
-                </Button>
-                <Button
-                  onClick={handleDecline}
-                  variant="outline"
-                  size="lg"
-                  className="w-full border-2"
-                >
-                  <XCircle className="ml-2 h-5 w-5" />
-                  אף תור לא מתאים
-                </Button>
-              </div>
-
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800">
-                <p className="text-xs text-blue-700 dark:text-blue-300 text-center">
-                  <span className="font-semibold">לתשומת לבך:</span> בחירת &quot;אף תור לא מתאים&quot; תמנע התראות עתידיות על השעות הללו בלבד
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Book Now Button (if booking URL available) */}
+        {bookingUrl && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Button
+              onClick={handleBook}
+              size="lg"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-14 text-base font-semibold rounded-xl"
+            >
+              <ExternalLink className="ml-2 h-5 w-5" />
+              פתח אתר הזמנות
+            </Button>
+          </motion.div>
         )}
 
-        {/* Result Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="sm:max-w-md">
-            {getDialogContent()}
-            <div className="flex flex-col gap-3 pt-6">
-              <Button
-                onClick={() => router.push('/')}
-                variant="default"
-                size="lg"
-                className="w-full"
-              >
-                <Home className="ml-2 h-4 w-4" />
-                לדף הבית
-              </Button>
-              <Button
-                onClick={() => router.push('/subscribe')}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              >
-                <Bell className="ml-2 h-4 w-4" />
-                ניהול התראות
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Info Card */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800"
+        >
+          <p className="text-sm text-blue-800 dark:text-blue-200 text-center">
+            <span className="font-semibold">מצאת תור מתאים?</span> לחץ על &quot;מצאתי תור&quot; והמעקב יסתיים.
+            <br />
+            <span className="text-xs opacity-80">לחיצה על &quot;לא מתאים&quot; תמנע התראות עתידיות על שעות אלו בלבד.</span>
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Fixed Bottom Action Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 safe-area-padding-bottom">
+        <div className="max-w-lg mx-auto flex gap-3">
+          <Button
+            onClick={handleDecline}
+            disabled={processing}
+            variant="outline"
+            size="lg"
+            className="flex-1 h-14 text-base border-2 rounded-xl"
+          >
+            {processing ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <XCircle className="ml-2 h-5 w-5" />
+                לא מתאים
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleApprove}
+            disabled={processing}
+            size="lg"
+            className="flex-1 h-14 text-base bg-green-600 hover:bg-green-700 text-white rounded-xl"
+          >
+            {processing ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <>
+                <CheckCircle className="ml-2 h-5 w-5" />
+                מצאתי תור
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -592,18 +452,16 @@ function NotificationActionContent() {
 export default function NotificationActionPage() {
   return (
     <Suspense fallback={
-      <div className="container py-8 px-4 max-w-xl mx-auto">
-        <Card>
-          <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">טוען...</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-blue-500 flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="h-8 w-8 text-white animate-spin" />
+          </div>
+          <p className="text-muted-foreground">טוען...</p>
+        </div>
       </div>
     }>
       <NotificationActionContent />
     </Suspense>
   )
-} 
+}

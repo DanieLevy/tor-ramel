@@ -1,6 +1,6 @@
 'use client'
 
-import { Gauge, Timer, Layers } from 'lucide-react'
+import { Gauge, Timer, Layers, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -14,12 +14,22 @@ interface FrequencySettingsProps {
   }
   onChange: (key: string, value: number | boolean) => void
   disabled?: boolean
+  getFieldStatus?: (key: string) => 'idle' | 'saving' | 'saved' | 'error'
+}
+
+// Status indicator component
+const StatusIndicator = ({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) => {
+  if (status === 'saving') return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+  if (status === 'saved') return <CheckCircle className="h-3 w-3 text-green-500" />
+  if (status === 'error') return <AlertCircle className="h-3 w-3 text-red-500" />
+  return null
 }
 
 export function FrequencySettings({
   values,
   onChange,
-  disabled = false
+  disabled = false,
+  getFieldStatus = () => 'idle'
 }: FrequencySettingsProps) {
   const getMaxNotificationsLabel = (value: number) => {
     if (value === 0) return 'ללא הגבלה'
@@ -57,7 +67,10 @@ export function FrequencySettings({
             <Gauge className="h-5 w-5 text-blue-500" />
           </div>
           <div className="flex-1">
-            <div className="font-medium text-sm text-foreground">התראות ליום</div>
+            <div className="font-medium text-sm text-foreground flex items-center gap-2">
+              התראות ליום
+              <StatusIndicator status={getFieldStatus('max_notifications_per_day')} />
+            </div>
             <div className="text-xs text-muted-foreground">מקסימום התראות ביום אחד</div>
           </div>
           <div className="text-sm font-semibold text-foreground px-3 py-1 bg-black/5 dark:bg-white/5 rounded-full">
@@ -86,7 +99,10 @@ export function FrequencySettings({
             <Timer className="h-5 w-5 text-orange-500" />
           </div>
           <div className="flex-1">
-            <div className="font-medium text-sm text-foreground">זמן המתנה</div>
+            <div className="font-medium text-sm text-foreground flex items-center gap-2">
+              זמן המתנה
+              <StatusIndicator status={getFieldStatus('notification_cooldown_minutes')} />
+            </div>
             <div className="text-xs text-muted-foreground">מינימום זמן בין התראות</div>
           </div>
           <div className="text-sm font-semibold text-foreground px-3 py-1 bg-black/5 dark:bg-white/5 rounded-full">
@@ -122,7 +138,10 @@ export function FrequencySettings({
           <div className="flex-1">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="font-medium text-sm text-foreground">איחוד התראות</div>
+                <div className="font-medium text-sm text-foreground flex items-center gap-2">
+                  איחוד התראות
+                  <StatusIndicator status={getFieldStatus('batch_notifications')} />
+                </div>
                 <div className="text-xs text-muted-foreground">
                   אסוף כמה התראות ושלח ביחד
                 </div>
@@ -130,14 +149,17 @@ export function FrequencySettings({
               <Switch
                 checked={values.batch_notifications}
                 onCheckedChange={(checked) => onChange('batch_notifications', checked)}
-                disabled={disabled}
+                disabled={disabled || getFieldStatus('batch_notifications') === 'saving'}
               />
             </div>
             
             {values.batch_notifications && (
               <div className="mt-4 pt-4 border-t border-black/5 dark:border-white/5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">מרווח בין איחודים</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-2">
+                    מרווח בין איחודים
+                    <StatusIndicator status={getFieldStatus('batch_interval_hours')} />
+                  </span>
                   <span className="text-sm font-semibold text-foreground px-2 py-0.5 bg-black/10 dark:bg-white/10 rounded-full">
                     {getBatchIntervalLabel(values.batch_interval_hours)}
                   </span>

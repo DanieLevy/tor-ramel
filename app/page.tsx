@@ -6,10 +6,11 @@ import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Bell, Loader2, Trash2, CalendarDays, Pause, Play, Mail, BellRing, Search, History, AlertTriangle, Plus, ChevronLeft, Zap, CalendarClock, CheckCircle2, XCircle } from 'lucide-react'
+import { Bell, Loader2, Trash2, CalendarDays, Pause, Play, Mail, BellRing, Search, History, Plus, Zap, CalendarClock, CheckCircle2, XCircle } from 'lucide-react'
 import { AppointmentBanner } from '@/components/appointment-banner'
 import { QuickActionCard, QuickActionGrid } from '@/components/quick-action-card'
 import { QuickSubscribe } from '@/components/quick-subscribe'
+import { IgnoredTimesCard } from '@/components/ignored-times-card'
 import { useHaptics } from '@/hooks/use-haptics'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { PullToRefreshIndicator } from '@/components/pull-to-refresh'
@@ -485,36 +486,8 @@ export default function HomePage() {
         )}
       </motion.div>
 
-      {/* Ignored Times - Only show if count > 0 */}
-      {homeStats && homeStats.ignoredTimesCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Link href="/notifications" onClick={() => haptics.light()}>
-            <div className={cn(
-              "glass-card rounded-xl p-3 flex items-center gap-3",
-              "bg-amber-50/60 dark:bg-amber-950/20",
-              "border-amber-200/50 dark:border-amber-800/30",
-              "hover:shadow-md transition-all"
-            )}>
-              <div className="flex-shrink-0 p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                  {homeStats.ignoredTimesCount} זמנים שהתעלמת מהם
-                </p>
-                <p className="text-xs text-amber-700 dark:text-amber-300">
-                  לחץ לצפייה ושחזור
-                </p>
-              </div>
-              <ChevronLeft className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            </div>
-          </Link>
-        </motion.div>
-      )}
+      {/* Ignored Times Card - Shows expandable list with clear options */}
+      <IgnoredTimesCard />
 
       {/* Minimal Status Footer */}
       {homeStats && (

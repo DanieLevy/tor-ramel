@@ -1,6 +1,6 @@
 'use client'
 
-import { Flame, Calendar, Clock, Eye, Bell, Info } from 'lucide-react'
+import { Flame, Calendar, Clock, Eye, Bell, Info, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,7 @@ interface NotificationTypesProps {
   }
   onChange: (key: string, value: boolean) => void
   disabled?: boolean
+  getFieldStatus?: (key: string) => 'idle' | 'saving' | 'saved' | 'error'
 }
 
 const notificationTypes = [
@@ -62,7 +63,8 @@ const notificationTypes = [
 export function NotificationTypesTogles({
   values,
   onChange,
-  disabled = false
+  disabled = false,
+  getFieldStatus = () => 'idle'
 }: NotificationTypesProps) {
   return (
     <div className="space-y-3">
@@ -75,6 +77,7 @@ export function NotificationTypesTogles({
         {notificationTypes.map((type) => {
           const Icon = type.icon
           const isEnabled = values[type.key as keyof typeof values]
+          const status = getFieldStatus(type.key)
           
           return (
             <div
@@ -97,8 +100,11 @@ export function NotificationTypesTogles({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <div className="font-medium text-sm text-foreground">
+                      <div className="font-medium text-sm text-foreground flex items-center gap-2">
                         {type.label}
+                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                        {status === 'saved' && <CheckCircle className="h-3 w-3 text-green-500" />}
+                        {status === 'error' && <AlertCircle className="h-3 w-3 text-red-500" />}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {type.description}
@@ -108,7 +114,7 @@ export function NotificationTypesTogles({
                     <Switch
                       checked={isEnabled}
                       onCheckedChange={(checked) => onChange(type.key, checked)}
-                      disabled={disabled}
+                      disabled={disabled || status === 'saving'}
                       aria-label={type.label}
                     />
                   </div>
