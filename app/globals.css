@@ -773,25 +773,39 @@ body.fonts-failed {
   }
 }
 
-/* iOS Pull-to-Refresh prevention for PWA */
+/* iOS PWA Scrolling - Fixed for iOS 17+ */
 @media (display-mode: standalone) {
-  body {
-    overscroll-behavior-y: none;
-  }
-  
-  /* Prevent rubber band effect at boundaries */
-  html, body {
-    position: fixed;
-    width: 100%;
+  /* Enable smooth scrolling behavior */
+  html {
+    /* Don't use position: fixed - it breaks scrolling! */
     height: 100%;
     overflow: hidden;
   }
   
-  /* Allow scrolling in main content */
-  main, .scrollable {
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: none;
+  }
+  
+  /* Main scrollable container */
+  #__next,
+  .scroll-container,
+  main {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    /* Enable touch scrolling */
+    touch-action: pan-y;
+  }
+  
+  /* Allow scrolling in any scrollable element */
+  .scrollable {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    height: 100%;
+    touch-action: pan-y;
   }
 }
 

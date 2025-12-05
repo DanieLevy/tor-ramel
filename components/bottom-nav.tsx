@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { haptics } from '@/hooks/use-haptics'
+import { useTheme } from 'next-themes'
 
 interface NavItem {
   href: string
@@ -34,6 +35,8 @@ const IDLE_TIMEOUT = 2000 // ms
 
 export function BottomNav() {
   const pathname = usePathname()
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [isVisible, setIsVisible] = useState(true)
   const [isScrolling, setIsScrolling] = useState(false)
@@ -182,8 +185,9 @@ export function BottomNav() {
       {/* Spacer to prevent content from being hidden behind nav */}
       <div className="h-24" />
       
+      {/* Floating navbar container - no background, just positions the pill */}
       <motion.nav 
-        className="fixed bottom-0 left-0 right-0 z-50"
+        className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none"
         initial={{ y: 0, scale: 1 }}
         animate={{ 
           y: isVisible ? 0 : 120,
@@ -195,45 +199,33 @@ export function BottomNav() {
         }}
         style={{ scale }}
       >
-        {/* iOS 26 Liquid Glass Background - Uses Apple's native effect when available */}
-        <div 
-          className="absolute inset-0 glass-nav"
-          style={{
-            /* Fallback for non-Apple environments */
-            background: 'var(--glass-bg-strong)',
-            backdropFilter: `blur(${isScrolling ? '28px' : '36px'}) saturate(200%)`,
-            WebkitBackdropFilter: `blur(${isScrolling ? '28px' : '36px'}) saturate(200%)`,
-            transition: 'backdrop-filter 0.3s ease',
-          }}
-        />
-        
-        {/* Gradient overlay for depth */}
-        <div 
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(to top, rgba(0,0,0,0.02), transparent 50%)',
-          }}
-        />
-        
-        {/* Container with safe area padding for mixed devices */}
+        {/* Container with safe area padding - no background */}
         <div 
           className="relative"
           style={{
-            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 20px)'
+            paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)'
           }}
         >
           <div className="flex items-center justify-center h-16 px-6">
-            {/* Navigation pill container with glass effect */}
+            {/* Floating glass pill - Apple iOS 18 style */}
             <motion.div 
-              className="flex items-center gap-1 px-2 py-1.5 rounded-[22px] border"
+              className="flex items-center gap-1 px-2.5 py-2 rounded-[26px] pointer-events-auto"
               style={{
-                background: 'var(--glass-bg-subtle)',
-                borderColor: 'var(--glass-border)',
-                backdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
-                WebkitBackdropFilter: 'blur(var(--glass-blur)) saturate(180%)',
-                boxShadow: isScrolling 
-                  ? '0 4px 20px rgba(0, 0, 0, 0.08)' 
-                  : '0 8px 32px rgba(0, 0, 0, 0.12)',
+                background: isDark 
+                  ? 'rgba(40, 40, 45, 0.75)' 
+                  : 'rgba(255, 255, 255, 0.65)',
+                backdropFilter: 'blur(40px) saturate(200%)',
+                WebkitBackdropFilter: 'blur(40px) saturate(200%)',
+                boxShadow: isDark
+                  ? (isScrolling 
+                      ? '0 4px 24px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(255, 255, 255, 0.1) inset' 
+                      : '0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.15) inset')
+                  : (isScrolling 
+                      ? '0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(255, 255, 255, 0.5) inset' 
+                      : '0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(255, 255, 255, 0.6) inset'),
+                border: isDark 
+                  ? '1px solid rgba(255, 255, 255, 0.1)' 
+                  : '1px solid rgba(255, 255, 255, 0.3)',
               }}
               layout
               transition={{ type: "spring", ...springConfig }}
@@ -346,25 +338,8 @@ export function BottomNav() {
               })}
             </motion.div>
           </div>
-          
-          {/* iOS home indicator line - subtle visual cue */}
-          <motion.div 
-            className="flex justify-center pb-2"
-            animate={{
-              opacity: isScrolling ? 0.3 : 0.6,
-            }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.div 
-              className="h-1 rounded-full bg-foreground/20"
-              animate={{
-                width: isScrolling ? 100 : 128,
-              }}
-              transition={{ type: "spring", ...springConfig }}
-            />
-          </motion.div>
         </div>
       </motion.nav>
     </>
   )
-}
+} 

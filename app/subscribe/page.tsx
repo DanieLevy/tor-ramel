@@ -528,7 +528,7 @@ function SubscribePage() {
               <div className="flex items-center justify-between py-1">
                 <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                   <PhoneIcon className="h-3 w-3" />
-                  בחירת תאריך מקורית
+                  לוח שנה של המכשיר
                 </span>
                 <button
                   type="button"
@@ -539,7 +539,7 @@ function SubscribePage() {
                   )}
                   role="switch"
                   aria-checked={useNativePicker}
-                  aria-label="שימוש בבחירת תאריך מקורית"
+                  aria-label="השתמש בלוח שנה של המכשיר"
                 >
                   <span
                     className={cn(

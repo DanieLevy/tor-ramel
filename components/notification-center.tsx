@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Bell, Check, CheckCheck, Trash2, X, Sparkles, BellOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -11,6 +11,7 @@ import { he } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useHaptics } from '@/hooks/use-haptics'
+import { setAppBadge, clearAppBadge, isBadgeSupported } from '@/hooks/use-push-notifications'
 
 interface InAppNotification {
   id: string
@@ -34,6 +35,17 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   const [hasMore, setHasMore] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const haptics = useHaptics()
+
+  // Sync app badge with unread count
+  const syncBadge = useCallback(async (count: number) => {
+    if (!isBadgeSupported()) return
+    
+    if (count > 0) {
+      await setAppBadge(count)
+    } else {
+      await clearAppBadge()
+    }
+  }, [])
 
   // Close when clicking outside
   useEffect(() => {
@@ -152,6 +164,10 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
       // Update local state
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       setUnreadCount(0)
+      
+      // Clear app badge
+      await clearAppBadge()
+      
       haptics.success()
       toast.success('כל ההתראות סומנו כנקראו')
     } catch (error) {
@@ -244,6 +260,11 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     fetchUnreadCount()
   }, [])
 
+  // Sync app badge whenever unread count changes
+  useEffect(() => {
+    syncBadge(unreadCount)
+  }, [unreadCount, syncBadge])
+
   // Poll for unread count every 30 seconds in background
   useEffect(() => {
     const interval = setInterval(() => {
@@ -257,6 +278,11 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   useEffect(() => {
     if (open) {
       fetchNotifications()
+      
+      // Also tell service worker to clear badge (in case it's out of sync)
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_BADGE' })
+      }
     }
   }, [open])
 

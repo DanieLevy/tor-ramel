@@ -206,18 +206,41 @@ const NativeDateRangePicker = React.forwardRef<HTMLDivElement, NativeDateRangePi
     disabled = false,
     className,
   }, ref) => {
+    // Track if we're intentionally clearing vs iOS glitch
+    const [internalFrom, setInternalFrom] = React.useState<Date | undefined>(value.from)
+    const [internalTo, setInternalTo] = React.useState<Date | undefined>(value.to)
+    
+    // Sync internal state with external value
+    React.useEffect(() => {
+      setInternalFrom(value.from)
+      setInternalTo(value.to)
+    }, [value.from, value.to])
+    
     const handleFromChange = (date: Date | undefined) => {
-      onChange?.({ 
-        from: date, 
-        to: value.to && date && date > value.to ? undefined : value.to 
-      })
+      // Only clear if user explicitly cleared (date is undefined but was set before)
+      // If date is undefined and internal was also undefined, ignore
+      if (date === undefined && internalFrom === undefined) {
+        return // Ignore false triggers from iOS
+      }
+      
+      setInternalFrom(date)
+      const newTo = internalTo && date && date > internalTo ? undefined : internalTo
+      if (newTo !== internalTo) {
+        setInternalTo(newTo)
+      }
+      onChange?.({ from: date, to: newTo })
     }
     
     const handleToChange = (date: Date | undefined) => {
-      onChange?.({ 
-        from: value.from && date && date < value.from ? undefined : value.from, 
-        to: date 
-      })
+      // Only clear if user explicitly cleared
+      if (date === undefined && internalTo === undefined) {
+        return // Ignore false triggers from iOS
+      }
+      
+      setInternalTo(date)
+      // Don't clear from date when selecting to date - keep the from date
+      const newFrom = internalFrom
+      onChange?.({ from: newFrom, to: date })
     }
 
     return (
@@ -225,10 +248,10 @@ const NativeDateRangePicker = React.forwardRef<HTMLDivElement, NativeDateRangePi
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-muted-foreground">מתאריך</label>
           <NativeDatePicker
-            value={value.from}
+            value={internalFrom}
             onChange={handleFromChange}
             minDate={minDate}
-            maxDate={value.to || maxDate}
+            maxDate={internalTo || maxDate}
             disabled={disabled}
             placeholder="בחר תאריך התחלה"
             label="תאריך התחלה"
@@ -238,9 +261,9 @@ const NativeDateRangePicker = React.forwardRef<HTMLDivElement, NativeDateRangePi
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-muted-foreground">עד תאריך</label>
           <NativeDatePicker
-            value={value.to}
+            value={internalTo}
             onChange={handleToChange}
-            minDate={value.from || minDate}
+            minDate={internalFrom || minDate}
             maxDate={maxDate}
             disabled={disabled}
             placeholder="בחר תאריך סיום"

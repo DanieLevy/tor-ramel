@@ -106,7 +106,9 @@ export default function RootLayout({
               <HeaderProvider>
                 <div className="relative flex min-h-screen flex-col">
                   <Header />
-                  <main className="flex-1 pb-20">{children}</main>
+                  <main className="flex-1 overflow-y-auto overflow-x-hidden pb-24" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+                    {children}
+                  </main>
                   <Footer />
                   <BottomNav />
                   <SwUpdateBanner />
