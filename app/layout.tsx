@@ -104,9 +104,9 @@ export default function RootLayout({
               <FontLoader />
               <DynamicThemeColor />
               <HeaderProvider>
-                <div className="relative flex min-h-screen flex-col">
+                <div className="pwa-scroll-container relative flex min-h-screen min-h-dvh flex-col">
                   <Header />
-                  <main className="flex-1 overflow-y-auto overflow-x-hidden pb-24" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+                  <main className="flex-1 overflow-x-hidden">
                     {children}
                   </main>
                   <Footer />

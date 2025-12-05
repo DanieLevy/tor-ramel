@@ -52,8 +52,8 @@ const TimeSelect = ({ value, onChange, disabled, label }: TimeSelectProps) => (
       disabled={disabled}
       className={cn(
         "px-3 py-2 rounded-lg text-sm font-medium",
-        "bg-black/5 dark:bg-white/5 border-0",
-        "focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white",
+        "bg-gray-100 dark:bg-gray-800 border-0",
+        "focus:outline-none focus:ring-2 focus:ring-blue-500",
         "disabled:opacity-50 disabled:cursor-not-allowed"
       )}
     >
@@ -79,10 +79,10 @@ export function DeliverySchedule({
       </div>
 
       {/* Preferred delivery hours */}
-      <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20">
+      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-            <Sun className="h-5 w-5 text-amber-600" />
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center">
+            <Sun className="h-5 w-5 text-white" />
           </div>
           <div>
             <div className="font-medium text-sm text-foreground">שעות מועדפות</div>
@@ -111,10 +111,10 @@ export function DeliverySchedule({
       </div>
 
       {/* Quiet hours */}
-      <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
+      <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-            <Moon className="h-5 w-5 text-indigo-600" />
+          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-500 flex items-center justify-center">
+            <Moon className="h-5 w-5 text-white" />
           </div>
           <div>
             <div className="font-medium text-sm text-foreground">שעות שקט</div>
@@ -143,12 +143,12 @@ export function DeliverySchedule({
       </div>
 
       {/* Visual schedule */}
-      <div className="p-4 rounded-xl bg-black/5 dark:bg-white/5">
+      <div className="p-4 rounded-xl bg-gray-100 dark:bg-gray-800">
         <div className="text-xs font-medium text-foreground mb-3">סקירת לוח הזמנים שלך</div>
-        <div className="relative h-8 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+        <div className="relative h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
           {/* Quiet hours */}
           <div
-            className="absolute h-full bg-indigo-500/30"
+            className="absolute h-full bg-indigo-400/50"
             style={{
               left: `${(parseInt(values.quiet_hours_start?.split(':')[0] || '22') / 24) * 100}%`,
               width: values.quiet_hours_start && values.quiet_hours_end ? 
@@ -160,7 +160,7 @@ export function DeliverySchedule({
           />
           {/* Preferred hours */}
           <div
-            className="absolute h-full bg-amber-500/40"
+            className="absolute h-full bg-amber-400/60"
             style={{
               left: `${(parseInt(values.preferred_delivery_start?.split(':')[0] || '8') / 24) * 100}%`,
               width: values.preferred_delivery_start && values.preferred_delivery_end ?
@@ -178,11 +178,11 @@ export function DeliverySchedule({
         </div>
         <div className="flex items-center gap-4 mt-3 text-xs">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-amber-500/40" />
+            <div className="w-3 h-3 rounded bg-amber-400/60" />
             <span className="text-muted-foreground">מועדף</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-indigo-500/30" />
+            <div className="w-3 h-3 rounded bg-indigo-400/50" />
             <span className="text-muted-foreground">שקט</span>
           </div>
         </div>
@@ -190,6 +190,3 @@ export function DeliverySchedule({
     </div>
   )
 }
-
-
-

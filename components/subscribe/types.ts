@@ -7,8 +7,11 @@ export interface Subscription {
   date_range_end: string | null
   is_active: boolean
   notification_method: NotificationMethod
+  subscription_status?: 'active' | 'paused' | 'completed'
   created_at: string
   completed_at: string | null
+  paused_at?: string | null
+  paused_until?: string | null
 }
 
 export type NotificationMethod = 'email' | 'push' | 'both'

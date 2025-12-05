@@ -208,12 +208,10 @@ export function Header() {
                 alt="תור רם-אל" 
                 width={36}
                 height={36}
-                className="rounded-xl shadow-md ring-1 ring-white/20"
+                className="rounded-xl shadow-md ring-1 ring-black/5 dark:ring-white/10"
               />
-              {/* Subtle glow effect */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
             </div>
-            <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">{config.title}</h1>
+            <h1 className="text-lg font-semibold text-foreground">{config.title}</h1>
           </div>
 
           {/* Center section - empty for spacing */}
@@ -260,11 +258,11 @@ export function Header() {
                   align="end" 
                   className="w-52 glass-modal p-1.5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
                 >
-                  <div className="px-3 py-2.5 mb-1 rounded-xl bg-muted/30">
+                  <div className="px-3 py-2.5 mb-1 rounded-xl bg-muted/50">
                     <p className="text-sm font-medium truncate">{user.email}</p>
                   </div>
                   <DropdownMenuItem 
-                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl"
+                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl"
                     onClick={logout}
                   >
                     <LogOut className="h-4 w-4 opacity-60" />
@@ -291,46 +289,46 @@ export function Header() {
                   align="end" 
                   className="w-52 glass-modal p-1.5 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
                 >
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/">
                       <Home className="h-4 w-4 opacity-60" />
                       <span className="flex-1">דף הבית</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/search">
                       <Search className="h-4 w-4 opacity-60" />
                       <span className="flex-1">חיפוש תורים</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/subscribe">
                       <Bell className="h-4 w-4 opacity-60" />
                       <span className="flex-1">התראות</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/settings">
                       <Settings className="h-4 w-4 opacity-60" />
                       <span className="flex-1">הגדרות</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/notifications">
                       <Trash2 className="h-4 w-4 opacity-60" />
                       <span className="flex-1">זמנים שהתעלמתי</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1.5 bg-white/10" />
-                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-white/10 dark:hover:bg-white/5 focus:bg-white/10 dark:focus:bg-white/5 transition-colors rounded-xl" asChild>
+                  <DropdownMenuSeparator className="my-1.5 bg-border" />
+                  <DropdownMenuItem className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-muted focus:bg-muted transition-colors rounded-xl" asChild>
                     <Link href="/about">
                       <Info className="h-4 w-4 opacity-60" />
                       <span className="flex-1">אודות</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-1.5 bg-white/10" />
+                  <DropdownMenuSeparator className="my-1.5 bg-border" />
                   <DropdownMenuItem 
-                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-destructive/20 focus:bg-destructive/20 transition-colors rounded-xl text-destructive"
+                    className="flex flex-row-reverse text-right gap-3 py-2.5 px-3 cursor-pointer hover:bg-red-50 dark:hover:bg-red-950/30 focus:bg-red-50 dark:focus:bg-red-950/30 transition-colors rounded-xl text-red-600 dark:text-red-400"
                     onClick={clearAllCache}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -345,4 +343,4 @@ export function Header() {
       
     </header>
   )
-} 
+}

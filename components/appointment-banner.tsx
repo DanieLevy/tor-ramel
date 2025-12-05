@@ -99,7 +99,7 @@ export function AppointmentBanner() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full"
       >
-        <div className="glass-elevated rounded-2xl p-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
           <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </motion.div>
@@ -119,26 +119,21 @@ export function AppointmentBanner() {
       className="w-full"
     >
       {stats.nearestAppointment ? (
-        /* Available Appointment - Glass Hero Card */
+        /* Available Appointment - Clean Card */
         <div className={cn(
-          "glass-elevated rounded-2xl overflow-hidden",
+          "rounded-2xl overflow-hidden border shadow-sm",
           urgency === 'urgent' 
-            ? "bg-gradient-to-br from-orange-500/15 via-red-500/10 to-rose-500/15 dark:from-orange-500/20 dark:via-red-500/15 dark:to-rose-500/20 border-orange-500/25 dark:border-orange-400/25"
-            : "bg-gradient-to-br from-green-500/10 via-emerald-500/8 to-teal-500/10 dark:from-green-500/15 dark:via-emerald-500/10 dark:to-teal-500/15 border-green-500/20 dark:border-green-400/20",
-          "border shadow-lg",
-          urgency === 'urgent' ? "shadow-orange-500/10" : "shadow-green-500/5"
+            ? "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800"
+            : "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
         )}>
-          {/* Glass shine overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent pointer-events-none" />
-          
-          <div className="relative p-4 space-y-3">
+          <div className="p-4 space-y-3">
             {/* Nearest Opportunity Badge */}
             <div className="flex items-center justify-between">
               <div className={cn(
                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide",
                 urgency === 'urgent'
-                  ? "bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30"
-                  : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                  ? "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300"
+                  : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
               )}>
                 {urgency === 'urgent' ? (
                   <>
@@ -162,15 +157,11 @@ export function AppointmentBanner() {
             <div className="flex items-start gap-3">
               <div className={cn(
                 "flex h-12 w-12 items-center justify-center rounded-xl",
-                "backdrop-blur-sm ring-1",
                 urgency === 'urgent'
-                  ? "bg-gradient-to-br from-orange-500/20 to-red-500/20 ring-orange-500/30 dark:ring-orange-400/30"
-                  : "bg-gradient-to-br from-green-500/20 to-emerald-500/20 ring-green-500/30 dark:ring-green-400/30"
+                  ? "bg-orange-500"
+                  : "bg-green-500"
               )}>
-                <CalendarCheck className={cn(
-                  "h-6 w-6",
-                  urgency === 'urgent' ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"
-                )} />
+                <CalendarCheck className="h-6 w-6 text-white" />
               </div>
               
               <div className="flex-1 min-w-0">
@@ -182,7 +173,7 @@ export function AppointmentBanner() {
                 </h3>
                 <p className={cn(
                   "text-sm",
-                  urgency === 'urgent' ? "text-orange-700/80 dark:text-orange-300/80" : "text-green-700/80 dark:text-green-300/80"
+                  urgency === 'urgent' ? "text-orange-700 dark:text-orange-300" : "text-green-700 dark:text-green-300"
                 )}>
                   {stats.nearestAppointment.dayName}, {formatDate(stats.nearestAppointment.date)}
                 </p>
@@ -193,7 +184,7 @@ export function AppointmentBanner() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn(
                 "text-xs font-medium",
-                urgency === 'urgent' ? "text-orange-700/70 dark:text-orange-300/70" : "text-green-700/70 dark:text-green-300/70"
+                urgency === 'urgent' ? "text-orange-700 dark:text-orange-300" : "text-green-700 dark:text-green-300"
               )}>
                 שעות:
               </span>
@@ -202,11 +193,10 @@ export function AppointmentBanner() {
                   key={idx} 
                   className={cn(
                     "text-xs font-semibold px-2.5 py-1 rounded-lg",
-                    "bg-white/60 dark:bg-white/10",
-                    "backdrop-blur-sm",
+                    "bg-white dark:bg-gray-900 border",
                     urgency === 'urgent'
-                      ? "border border-orange-500/20 dark:border-orange-400/20 text-orange-800 dark:text-orange-200"
-                      : "border border-green-500/20 dark:border-green-400/20 text-green-800 dark:text-green-200"
+                      ? "border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200"
+                      : "border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
                   )}
                 >
                   {time}
@@ -215,7 +205,7 @@ export function AppointmentBanner() {
               {stats.nearestAppointment.times.length > 4 && (
                 <span className={cn(
                   "text-xs font-medium",
-                  urgency === 'urgent' ? "text-orange-600/70 dark:text-orange-400/70" : "text-green-600/70 dark:text-green-400/70"
+                  urgency === 'urgent' ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"
                 )}>
                   +{stats.nearestAppointment.times.length - 4}
                 </span>
@@ -227,12 +217,12 @@ export function AppointmentBanner() {
               size="lg"
               className={cn(
                 "w-full rounded-xl font-semibold text-base h-12",
-                "text-white shadow-lg",
+                "text-white shadow-sm",
                 "active:scale-[0.98] transition-all duration-200",
                 "touch-manipulation",
                 urgency === 'urgent'
-                  ? "bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-orange-600/25"
-                  : "bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 shadow-green-600/25"
+                  ? "bg-orange-600 hover:bg-orange-700"
+                  : "bg-green-600 hover:bg-green-700"
               )}
               onClick={handleBookingClick}
               asChild
@@ -251,7 +241,7 @@ export function AppointmentBanner() {
             {stats.availableAppointments > 1 && (
               <p className={cn(
                 "text-center text-xs",
-                urgency === 'urgent' ? "text-orange-600/70 dark:text-orange-400/70" : "text-green-600/70 dark:text-green-400/70"
+                urgency === 'urgent' ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"
               )}>
                 {stats.availableAppointments} תאריכים זמינים סה״כ
               </p>
@@ -259,18 +249,10 @@ export function AppointmentBanner() {
           </div>
         </div>
       ) : (
-        /* No Appointments - Subtle Glass Card */
-        <div className={cn(
-          "glass rounded-2xl p-4",
-          "bg-gray-50/60 dark:bg-gray-900/40",
-          "border border-gray-200/50 dark:border-gray-700/30"
-        )}>
+        /* No Appointments - Subtle Card */
+        <div className="rounded-2xl p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-xl",
-              "bg-gray-100 dark:bg-gray-800/50",
-              "ring-1 ring-gray-200 dark:ring-gray-700"
-            )}>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-800">
               <AlertCircle className="h-5 w-5 text-muted-foreground" />
             </div>
             <div className="flex-1">

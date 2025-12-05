@@ -41,7 +41,7 @@ export const ActiveSubscriptionsList = ({
         </h3>
         <Badge 
           variant="default" 
-          className="h-6 px-3 text-xs font-bold bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 dark:from-green-500 dark:via-emerald-500 dark:to-teal-500 text-white border-0 shadow-lg shadow-green-500/30 dark:shadow-green-500/20"
+          className="h-6 px-3 text-xs font-bold bg-green-500 text-white border-0 shadow-sm"
         >
           <Sparkles className="h-3 w-3 mr-1" />
           {subscriptions.length}
@@ -67,8 +67,8 @@ export const ActiveSubscriptionsList = ({
                 <div
                   className={cn(
                     "rounded-xl p-3 border transition-all hover:shadow-md",
-                    daysInfo.bgColor || "bg-gradient-to-br from-gray-50 to-gray-50/50 dark:from-gray-950/20 dark:to-gray-950/10",
-                    daysInfo.borderColor || "border-gray-200/50 dark:border-gray-800/30"
+                    daysInfo.bgColor || "bg-gray-50 dark:bg-gray-900",
+                    daysInfo.borderColor || "border-gray-200 dark:border-gray-800"
                   )}
                 >
                   {/* Duplicate Warning Banner */}

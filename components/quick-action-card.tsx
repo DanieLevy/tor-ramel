@@ -28,97 +28,88 @@ interface QuickActionCardProps {
   delay?: number
 }
 
-// Distinct color variants for each card
+// Clean, solid color variants - Apple-style
 const variantStyles = {
   default: {
-    bg: 'bg-slate-100/80 dark:bg-slate-800/50',
-    border: 'border-slate-200/60 dark:border-slate-700/40',
-    iconBg: 'bg-slate-200/80 dark:bg-slate-700/60',
-    iconColor: 'text-slate-600 dark:text-slate-300',
-    titleColor: 'text-slate-800 dark:text-slate-100',
-    subtitleColor: 'text-slate-500 dark:text-slate-400',
-    ring: 'ring-slate-300/50 dark:ring-slate-600/50',
-    gradient: 'from-slate-500/5 via-transparent to-transparent',
+    bg: 'bg-gray-50 dark:bg-gray-900',
+    border: 'border-gray-200 dark:border-gray-800',
+    iconBg: 'bg-gray-500',
+    iconColor: 'text-white',
+    titleColor: 'text-gray-900 dark:text-gray-100',
+    subtitleColor: 'text-gray-500 dark:text-gray-400',
+    ring: 'ring-gray-300 dark:ring-gray-700',
   },
   primary: {
-    bg: 'bg-blue-50/90 dark:bg-blue-950/40',
-    border: 'border-blue-200/60 dark:border-blue-800/40',
-    iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
+    bg: 'bg-blue-50 dark:bg-blue-950/40',
+    border: 'border-blue-200 dark:border-blue-800',
+    iconBg: 'bg-blue-500',
     iconColor: 'text-white',
     titleColor: 'text-blue-900 dark:text-blue-100',
-    subtitleColor: 'text-blue-600/80 dark:text-blue-300/80',
-    ring: 'ring-blue-400/40 dark:ring-blue-500/40',
-    gradient: 'from-blue-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-blue-600 dark:text-blue-400',
+    ring: 'ring-blue-300 dark:ring-blue-700',
   },
   success: {
-    bg: 'bg-emerald-50/90 dark:bg-emerald-950/40',
-    border: 'border-emerald-200/60 dark:border-emerald-800/40',
-    iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-600',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    border: 'border-emerald-200 dark:border-emerald-800',
+    iconBg: 'bg-emerald-500',
     iconColor: 'text-white',
     titleColor: 'text-emerald-900 dark:text-emerald-100',
-    subtitleColor: 'text-emerald-600/80 dark:text-emerald-300/80',
-    ring: 'ring-emerald-400/40 dark:ring-emerald-500/40',
-    gradient: 'from-emerald-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-emerald-600 dark:text-emerald-400',
+    ring: 'ring-emerald-300 dark:ring-emerald-700',
   },
   warning: {
-    bg: 'bg-amber-50/90 dark:bg-amber-950/40',
-    border: 'border-amber-200/60 dark:border-amber-800/40',
-    iconBg: 'bg-gradient-to-br from-amber-500 to-orange-500',
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    border: 'border-amber-200 dark:border-amber-800',
+    iconBg: 'bg-amber-500',
     iconColor: 'text-white',
     titleColor: 'text-amber-900 dark:text-amber-100',
-    subtitleColor: 'text-amber-600/80 dark:text-amber-300/80',
-    ring: 'ring-amber-400/40 dark:ring-amber-500/40',
-    gradient: 'from-amber-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-amber-600 dark:text-amber-400',
+    ring: 'ring-amber-300 dark:ring-amber-700',
   },
   purple: {
-    bg: 'bg-violet-50/90 dark:bg-violet-950/40',
-    border: 'border-violet-200/60 dark:border-violet-800/40',
-    iconBg: 'bg-gradient-to-br from-violet-500 to-purple-600',
+    bg: 'bg-violet-50 dark:bg-violet-950/40',
+    border: 'border-violet-200 dark:border-violet-800',
+    iconBg: 'bg-violet-500',
     iconColor: 'text-white',
     titleColor: 'text-violet-900 dark:text-violet-100',
-    subtitleColor: 'text-violet-600/80 dark:text-violet-300/80',
-    ring: 'ring-violet-400/40 dark:ring-violet-500/40',
-    gradient: 'from-violet-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-violet-600 dark:text-violet-400',
+    ring: 'ring-violet-300 dark:ring-violet-700',
   },
   indigo: {
-    bg: 'bg-indigo-50/90 dark:bg-indigo-950/40',
-    border: 'border-indigo-200/60 dark:border-indigo-800/40',
-    iconBg: 'bg-gradient-to-br from-indigo-500 to-blue-600',
+    bg: 'bg-indigo-50 dark:bg-indigo-950/40',
+    border: 'border-indigo-200 dark:border-indigo-800',
+    iconBg: 'bg-indigo-500',
     iconColor: 'text-white',
     titleColor: 'text-indigo-900 dark:text-indigo-100',
-    subtitleColor: 'text-indigo-600/80 dark:text-indigo-300/80',
-    ring: 'ring-indigo-400/40 dark:ring-indigo-500/40',
-    gradient: 'from-indigo-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-indigo-600 dark:text-indigo-400',
+    ring: 'ring-indigo-300 dark:ring-indigo-700',
   },
   rose: {
-    bg: 'bg-rose-50/90 dark:bg-rose-950/40',
-    border: 'border-rose-200/60 dark:border-rose-800/40',
-    iconBg: 'bg-gradient-to-br from-rose-500 to-pink-600',
+    bg: 'bg-rose-50 dark:bg-rose-950/40',
+    border: 'border-rose-200 dark:border-rose-800',
+    iconBg: 'bg-rose-500',
     iconColor: 'text-white',
     titleColor: 'text-rose-900 dark:text-rose-100',
-    subtitleColor: 'text-rose-600/80 dark:text-rose-300/80',
-    ring: 'ring-rose-400/40 dark:ring-rose-500/40',
-    gradient: 'from-rose-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-rose-600 dark:text-rose-400',
+    ring: 'ring-rose-300 dark:ring-rose-700',
   },
   teal: {
-    bg: 'bg-teal-50/90 dark:bg-teal-950/40',
-    border: 'border-teal-200/60 dark:border-teal-800/40',
-    iconBg: 'bg-gradient-to-br from-teal-500 to-cyan-600',
+    bg: 'bg-teal-50 dark:bg-teal-950/40',
+    border: 'border-teal-200 dark:border-teal-800',
+    iconBg: 'bg-teal-500',
     iconColor: 'text-white',
     titleColor: 'text-teal-900 dark:text-teal-100',
-    subtitleColor: 'text-teal-600/80 dark:text-teal-300/80',
-    ring: 'ring-teal-400/40 dark:ring-teal-500/40',
-    gradient: 'from-teal-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-teal-600 dark:text-teal-400',
+    ring: 'ring-teal-300 dark:ring-teal-700',
   },
   orange: {
-    bg: 'bg-orange-50/90 dark:bg-orange-950/40',
-    border: 'border-orange-200/60 dark:border-orange-800/40',
-    iconBg: 'bg-gradient-to-br from-orange-500 to-red-500',
+    bg: 'bg-orange-50 dark:bg-orange-950/40',
+    border: 'border-orange-200 dark:border-orange-800',
+    iconBg: 'bg-orange-500',
     iconColor: 'text-white',
     titleColor: 'text-orange-900 dark:text-orange-100',
-    subtitleColor: 'text-orange-600/80 dark:text-orange-300/80',
-    ring: 'ring-orange-400/40 dark:ring-orange-500/40',
-    gradient: 'from-orange-500/10 via-transparent to-transparent',
+    subtitleColor: 'text-orange-600 dark:text-orange-400',
+    ring: 'ring-orange-300 dark:ring-orange-700',
   },
 }
 
@@ -143,10 +134,9 @@ export const QuickActionCard = React.forwardRef<HTMLDivElement, QuickActionCardP
         whileHover={isClickable ? { scale: 1.02 } : undefined}
         onClick={!href ? handleClick : undefined}
         className={cn(
-          // Base glass styling
+          // Base styling
           'relative overflow-hidden rounded-2xl p-4',
-          'backdrop-blur-xl border',
-          'transition-all duration-200 ease-out',
+          'border transition-all duration-200 ease-out',
           'touch-manipulation',
           // Variant colors
           styles.bg,
@@ -154,30 +144,19 @@ export const QuickActionCard = React.forwardRef<HTMLDivElement, QuickActionCardP
           // Interactive states for clickable cards
           isClickable && [
             'cursor-pointer',
-            'shadow-sm hover:shadow-lg',
+            'shadow-sm hover:shadow-md',
             `hover:ring-2 ${styles.ring}`,
-            'active:shadow-inner',
           ],
           className
         )}
       >
-        {/* Gradient overlay for glass effect */}
-        <div className={cn(
-          'absolute inset-0 bg-gradient-to-br pointer-events-none',
-          styles.gradient
-        )} />
-        
-        {/* Glass shine */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent pointer-events-none" />
-        
         <div className="relative flex items-center gap-3">
-          {/* Icon with gradient background */}
+          {/* Icon with solid background */}
           <div className={cn(
             'flex h-11 w-11 items-center justify-center rounded-xl',
-            'shadow-lg',
+            'shadow-sm',
             'transition-all duration-200',
-            styles.iconBg,
-            isClickable && 'group-hover:shadow-xl'
+            styles.iconBg
           )}>
             <Icon className={cn('h-5 w-5', styles.iconColor)} />
           </div>

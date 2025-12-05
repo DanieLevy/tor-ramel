@@ -464,7 +464,7 @@ function NotificationActionContent() {
         {!processing && !showDialog && (appointments.length > 0 || (date && timesList.length > 0)) && (
           <Card>
             <CardHeader className="text-center pb-4">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 flex items-center justify-center">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
                 <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
               <CardTitle className="text-2xl">🎉 תורים פנויים!</CardTitle>
@@ -477,7 +477,7 @@ function NotificationActionContent() {
               {appointments.length > 0 ? (
                 <div className="space-y-4 max-h-[400px] overflow-y-auto">
                   {appointments.map((apt, index) => (
-                    <div key={index} className="p-4 rounded-xl bg-gradient-to-br from-gray-50 to-gray-50/50 dark:from-gray-950/20 dark:to-gray-950/10 border border-gray-200/50 dark:border-gray-800/30 space-y-3">
+                    <div key={index} className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 space-y-3">
                       <div className="flex items-center justify-between">
                         <Badge variant="outline" className="text-sm px-3 py-1.5 font-semibold">
                           {apt.date}
@@ -508,7 +508,7 @@ function NotificationActionContent() {
                 </div>
               ) : date && timesList.length > 0 ? (
                 /* Show Single Date */
-                <div className="p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/10 border border-green-200/50 dark:border-green-800/30 space-y-3">
+                <div className="p-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 space-y-3">
                   <div className="text-center">
                     <Badge variant="outline" className="text-base px-4 py-2 font-semibold">
                       {date}
@@ -533,7 +533,7 @@ function NotificationActionContent() {
                 <Button
                   onClick={handleApprove}
                   size="lg"
-                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
                 >
                   <CheckCircle className="ml-2 h-5 w-5" />
                   מצאתי תור מתאים
@@ -549,7 +549,7 @@ function NotificationActionContent() {
                 </Button>
               </div>
 
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-xs text-blue-700 dark:text-blue-300 text-center">
                   <span className="font-semibold">לתשומת לבך:</span> בחירת &quot;אף תור לא מתאים&quot; תמנע התראות עתידיות על השעות הללו בלבד
                 </p>

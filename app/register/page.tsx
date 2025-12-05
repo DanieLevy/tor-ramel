@@ -56,7 +56,7 @@ export default function RegisterPage() {
   const passwordError = password && confirmPassword && !passwordsMatch
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-50 dark:bg-gray-950">
       <div className="w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -70,7 +70,7 @@ export default function RegisterPage() {
               className="rounded-3xl mx-auto transform hover:scale-105 transition-transform duration-300 shadow-lg"
             />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold text-foreground">
             הרשמה למערכת
           </h1>
           <p className="text-muted-foreground mt-2">צור חשבון חדש או הגדר סיסמה לחשבון קיים</p>
@@ -88,10 +88,10 @@ export default function RegisterPage() {
               value={email}
               onChange={handleEmailChange}
               className={cn(
-                "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
-                "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+                "w-full px-4 py-3 rounded-xl border bg-white dark:bg-gray-900",
+                "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
                 "transition-all duration-200",
-                emailValid === false && "border-destructive focus:ring-destructive/50"
+                emailValid === false && "border-red-500 focus:ring-red-500/50"
               )}
               placeholder="your@email.com"
               dir="ltr"
@@ -99,7 +99,7 @@ export default function RegisterPage() {
               required
             />
             {emailValid === false && (
-              <p className="text-xs text-destructive mt-1">כתובת אימייל לא תקינה</p>
+              <p className="text-xs text-red-500 mt-1">כתובת אימייל לא תקינה</p>
             )}
           </div>
 
@@ -114,8 +114,8 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={cn(
-                  "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+                  "w-full px-4 py-3 rounded-xl border bg-white dark:bg-gray-900",
+                  "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
                   "transition-all duration-200"
                 )}
                 placeholder="לפחות 6 תווים, אות וספרה"
@@ -145,16 +145,16 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={cn(
-                "w-full px-4 py-3 rounded-xl border bg-background/50 backdrop-blur-sm",
-                "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
+                "w-full px-4 py-3 rounded-xl border bg-white dark:bg-gray-900",
+                "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500",
                 "transition-all duration-200",
-                passwordError && "border-destructive focus:ring-destructive/50"
+                passwordError && "border-red-500 focus:ring-red-500/50"
               )}
               placeholder="הזן שוב את הסיסמה"
               required
             />
             {passwordError && (
-              <p className="text-xs text-destructive mt-1">הסיסמאות אינן תואמות</p>
+              <p className="text-xs text-red-500 mt-1">הסיסמאות אינן תואמות</p>
             )}
             {passwordsMatch && (
               <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-1">הסיסמאות תואמות ✓</p>
@@ -164,7 +164,7 @@ export default function RegisterPage() {
           <Button
             type="submit"
             disabled={!emailValid || password.length < 6 || !passwordsMatch || isLoading}
-            className="w-full py-6 rounded-xl text-base font-medium shadow-lg"
+            className="w-full py-6 rounded-xl text-base font-medium shadow-lg bg-blue-600 hover:bg-blue-700"
           >
             {isLoading ? (
               <>
@@ -181,7 +181,7 @@ export default function RegisterPage() {
         <div className="mt-6 text-center space-y-3">
           <Link 
             href="/login" 
-            className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+            className="text-sm text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 transition-colors block"
           >
             יש לך כבר חשבון? התחבר כאן
           </Link>
@@ -193,4 +193,4 @@ export default function RegisterPage() {
       </div>
     </div>
   )
-} 
+}

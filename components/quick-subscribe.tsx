@@ -67,13 +67,13 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
       const startDateStr = today.toISOString().split('T')[0]
       const endDateStr = endDate.toISOString().split('T')[0]
 
-      const response = await pwaFetch('/api/notifications/subscriptions', {
+      const response = await pwaFetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date_range_start: startDateStr,
           date_range_end: endDateStr,
-          notification_method: 'push', // Default to push for quick subscribe
+          notification_method: 'push',
         }),
       })
 
@@ -99,11 +99,11 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn('glass rounded-2xl p-4', className)}
+      className={cn('rounded-2xl border border-border bg-card p-4', className)}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
+        <div className="p-1.5 rounded-lg bg-amber-500">
           <Zap className="h-4 w-4 text-white" />
         </div>
         <h3 className="font-semibold text-sm">התראה מהירה</h3>
@@ -124,9 +124,9 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
               onClick={() => handleQuickSubscribe(preset)}
               className={cn(
                 'h-auto flex-col gap-1 py-3 touch-manipulation',
-                preset.variant === 'default' && 'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white',
-                preset.variant === 'secondary' && 'bg-gradient-to-br from-violet-500/20 to-purple-500/20 border-violet-300/30 hover:border-violet-400/50',
-                preset.variant === 'outline' && 'bg-white/50 dark:bg-white/5'
+                preset.variant === 'default' && 'bg-blue-500 hover:bg-blue-600 text-white',
+                preset.variant === 'secondary' && 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200 dark:hover:bg-indigo-900/60',
+                preset.variant === 'outline' && 'bg-gray-50 dark:bg-gray-800/50'
               )}
             >
               {isLoading ? (
@@ -171,4 +171,3 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
     </motion.div>
   )
 }
-

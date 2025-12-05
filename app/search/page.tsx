@@ -399,7 +399,7 @@ function SearchPage() {
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
           <Search className="h-10 w-10 text-primary" />
         </div>
-        <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+        <h1 className="text-2xl font-bold mb-2 text-foreground">
           חיפוש חכם
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -429,9 +429,9 @@ function SearchPage() {
               
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { value: 'week', label: 'שבוע', icon: '7', color: 'from-blue-500 to-blue-600' },
-                  { value: 'two-weeks', label: 'שבועיים', icon: '14', color: 'from-purple-500 to-purple-600' },
-                  { value: 'month', label: 'חודש', icon: '30', color: 'from-green-500 to-green-600' }
+                  { value: 'week', label: 'שבוע', icon: '7', bg: 'bg-blue-500' },
+                  { value: 'two-weeks', label: 'שבועיים', icon: '14', bg: 'bg-indigo-500' },
+                  { value: 'month', label: 'חודש', icon: '30', bg: 'bg-green-500' }
                 ].map((option) => (
                   <motion.button
                     key={option.value}
@@ -441,17 +441,10 @@ function SearchPage() {
                     className={cn(
                       "relative py-3 px-3 rounded-xl text-sm font-medium transition-all overflow-hidden",
                       searchType === option.value
-                        ? "text-white shadow-lg"
+                        ? `text-white shadow-lg ${option.bg}`
                         : "bg-muted/50 hover:bg-muted"
                     )}
                   >
-                    {searchType === option.value && (
-                      <motion.div 
-                        layoutId="activeTab"
-                        className={`absolute inset-0 bg-gradient-to-r ${option.color}`}
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
                     <span className="relative">
                       {option.label}
                       <span className="block text-xs mt-0.5 opacity-80">
@@ -497,10 +490,10 @@ function SearchPage() {
 
                 {/* View Toggle */}
                 {results.length > 0 && !isSearching && (
-                  <div className="grid grid-cols-2 gap-2 p-2 bg-gradient-to-r from-background to-muted/20 rounded-xl border shadow-sm">
+                  <div className="grid grid-cols-2 gap-2 p-2 bg-muted/30 rounded-xl border shadow-sm">
                     {[
-                      { value: 'list', label: 'רשימה', icon: List, color: 'from-blue-500 to-blue-600' },
-                      { value: 'calendar', label: 'לוח שנה', icon: Grid, color: 'from-purple-500 to-purple-600' }
+                      { value: 'list', label: 'רשימה', icon: List, bg: 'bg-blue-500' },
+                      { value: 'calendar', label: 'לוח שנה', icon: Grid, bg: 'bg-indigo-500' }
                     ].map((option) => (
                       <motion.button
                         key={option.value}
@@ -508,20 +501,13 @@ function SearchPage() {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setViewType(option.value as any)}
                         className={cn(
-                          "relative py-2.5 px-3 rounded-lg text-sm font-medium transition-all overflow-hidden border",
+                          "py-2.5 px-3 rounded-lg text-sm font-medium transition-all border",
                           viewType === option.value
-                            ? "text-white shadow-lg border-transparent"
+                            ? `text-white shadow-lg border-transparent ${option.bg}`
                             : "bg-background/50 hover:bg-background border-border/50 text-foreground hover:shadow-sm"
                         )}
                       >
-                        {viewType === option.value && (
-                          <motion.div 
-                            layoutId="activeViewTab"
-                            className={`absolute inset-0 bg-gradient-to-r ${option.color}`}
-                            transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                          />
-                        )}
-                        <span className="relative flex items-center justify-center gap-1.5">
+                        <span className="flex items-center justify-center gap-1.5">
                           <option.icon className="h-4 w-4" />
                           {option.label}
                         </span>
@@ -581,7 +567,7 @@ function SearchPage() {
                     <CardContent className="p-6">
                       <div className="space-y-4">
                         <div className="text-center">
-                          <h3 className="text-lg font-semibold mb-4 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                          <h3 className="text-lg font-semibold mb-4 text-foreground">
                             לוח שנה - מצב תורים
                           </h3>
                           <div className="flex items-center justify-center gap-6 mb-4">
@@ -689,10 +675,10 @@ function SearchPage() {
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between p-4 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm"
+                className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 shadow-sm">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-amber-500 shadow-sm">
                     <Zap className="h-4 w-4 text-white" />
                   </div>
                   <div className="text-sm">
@@ -738,7 +724,7 @@ function SearchPage() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Card className="border-green-500/50 bg-gradient-to-r from-green-50 to-green-50/50 dark:from-green-950/20 dark:to-green-950/10 hover:shadow-md transition-all">
+                        <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 hover:shadow-md transition-all">
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-4">
@@ -803,10 +789,10 @@ function SearchPage() {
                 animate={{ opacity: 1 }}
                 className="space-y-4"
               >
-                <Card className="border-blue-200 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500">
                         <Clock className="h-4 w-4 text-white animate-spin" />
                       </div>
                       <div className="text-sm">
@@ -823,7 +809,7 @@ function SearchPage() {
                           transition={{ delay: index * 0.1 }}
                         >
                           <Skeleton 
-                            className="h-16 w-full rounded-xl bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30"
+                            className="h-16 w-full rounded-xl bg-blue-100 dark:bg-blue-900/40"
                             style={{ 
                               animationDelay: `${index * 100}ms`,
                             }}
@@ -844,11 +830,11 @@ function SearchPage() {
                 transition={{ delay: 0.2 }}
                 className="space-y-4"
               >
-                <Card className="border-orange-200 bg-gradient-to-r from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20">
+                <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500">
                           <X className="h-3 w-3 text-white" />
                         </div>
                         <span className="text-sm font-medium text-orange-800 dark:text-orange-200">
@@ -895,7 +881,7 @@ function SearchPage() {
 
             {/* No results message */}
             {!isSearching && !loadingResults.length && availableResults.length === 0 && unavailableResults.length > 0 && (
-              <Alert className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+              <Alert className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40">
                 <AlertCircle className="h-4 w-4 text-orange-600" />
                 <AlertDescription className="text-orange-700 dark:text-orange-300">
                   לא נמצאו תורים פנויים בתאריכים שנבדקו. 

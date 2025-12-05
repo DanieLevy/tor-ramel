@@ -58,7 +58,7 @@ export default function AboutPage() {
           <CardContent>
             <div className="grid gap-4">
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
                   <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
@@ -70,7 +70,7 @@ export default function AboutPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg">
                   <Bell className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
@@ -82,7 +82,7 @@ export default function AboutPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg">
                   <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
@@ -94,7 +94,7 @@ export default function AboutPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg">
                   <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
@@ -106,7 +106,7 @@ export default function AboutPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-lg">
                   <Shield className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
@@ -118,7 +118,7 @@ export default function AboutPage() {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-lg">
+                <div className="p-2 bg-teal-100 dark:bg-teal-900/40 rounded-lg">
                   <Users className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                 </div>
                 <div>
@@ -155,19 +155,19 @@ export default function AboutPage() {
         </Card>
 
         {/* Stats */}
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10">
+        <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold">5 דקות</div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">5 דקות</div>
                 <div className="text-xs text-muted-foreground">תדירות בדיקה</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">24/7</div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">24/7</div>
                 <div className="text-xs text-muted-foreground">זמינות</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">מיידי</div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">מיידי</div>
                 <div className="text-xs text-muted-foreground">זמן התראה</div>
               </div>
             </div>
@@ -187,4 +187,3 @@ export default function AboutPage() {
     </div>
   )
 }
-

@@ -47,7 +47,7 @@ export const CompletedSubscriptionsList = ({
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ delay: mounted ? index * 0.05 : 0 }}
               >
-                <div className="bg-gradient-to-br from-gray-50 to-gray-50/50 dark:from-gray-950/20 dark:to-gray-950/10 rounded-lg p-2.5 border border-gray-200/50 dark:border-gray-800/30">
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-2.5 border border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />

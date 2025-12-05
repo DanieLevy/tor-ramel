@@ -314,14 +314,9 @@ input[type="text"] {
   }
 }
 
-/* Smooth gradient backgrounds */
-.bg-gradient-smooth {
-  background-image: linear-gradient(
-    to bottom right,
-    var(--background),
-    var(--background),
-    hsl(var(--muted) / 0.2)
-  );
+/* Smooth background */
+.bg-smooth {
+  background-color: var(--background);
 }
 
 /* Tabular numbers for countdown */
@@ -428,24 +423,15 @@ input[type="text"] {
 /* Apply safe area padding to html for PWA */
 @media (display-mode: standalone) {
   html {
-    /* Remove top padding - it causes empty space above header */
+    /* Safe area horizontal padding */
     padding-left: var(--safe-area-inset-left, 0);
     padding-right: var(--safe-area-inset-right, 0);
-    /* Don't add any vertical padding to html */
-    min-height: 100vh;
   }
   
-  /* Ensure body fills the viewport */
-  body {
-    min-height: 100vh;
-    /* Remove the grid layout that was causing issues */
-    display: block;
-  }
-  
-  /* Main content area should have proper bottom spacing */
+  /* Main content area bottom spacing for fixed nav */
   main {
     /* Add padding at bottom for nav bar + safe area */
-    padding-bottom: calc(5rem + var(--safe-area-inset-bottom, 0));
+    padding-bottom: calc(5.5rem + var(--safe-area-inset-bottom, 0));
   }
 }
 
@@ -773,39 +759,57 @@ body.fonts-failed {
   }
 }
 
-/* iOS PWA Scrolling - Fixed for iOS 17+ */
+/* ============================================
+   iOS PWA Scrolling - Fixed for iOS 17+ / iOS 18
+   Modern approach: Let the body scroll naturally
+   ============================================ */
 @media (display-mode: standalone) {
-  /* Enable smooth scrolling behavior */
+  /* Root element - use dvh for dynamic viewport handling */
   html {
-    /* Don't use position: fixed - it breaks scrolling! */
     height: 100%;
-    overflow: hidden;
+    height: 100dvh; /* Dynamic viewport height - handles iOS Safari bar */
+    overflow-x: hidden;
+    /* Allow vertical scrolling on html */
+    overflow-y: auto;
   }
   
   body {
-    height: 100%;
-    overflow: hidden;
+    /* Use min-height instead of height to allow content growth */
+    min-height: 100%;
+    min-height: 100dvh;
+    /* Allow body to scroll - this is the key fix! */
+    overflow-x: hidden;
+    overflow-y: auto;
+    /* Smooth iOS scrolling */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent overscroll bounce at edges only */
     overscroll-behavior-y: none;
   }
   
-  /* Main scrollable container */
-  #__next,
-  .scroll-container,
-  main {
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior-y: contain;
-    /* Enable touch scrolling */
-    touch-action: pan-y;
+  /* App wrapper - let it grow with content */
+  .pwa-scroll-container {
+    min-height: 100%;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
   }
   
-  /* Allow scrolling in any scrollable element */
-  .scrollable {
+  /* Main content area - grows to fill space, scrolls internally if needed */
+  main {
+    flex: 1;
+    overflow-x: hidden;
+    /* Enable touch scrolling on main content */
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
+  }
+  
+  /* Generic scrollable containers */
+  .scrollable,
+  .scroll-container {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
+    overscroll-behavior-y: contain;
   }
 }
 

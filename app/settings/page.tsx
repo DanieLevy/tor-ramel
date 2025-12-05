@@ -225,9 +225,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-full bg-background pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
+      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

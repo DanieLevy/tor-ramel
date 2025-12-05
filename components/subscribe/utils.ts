@@ -61,7 +61,7 @@ export const getNotificationMethodLabel = (method: NotificationMethod): string =
 }
 
 /**
- * Get days info with styling for subscription status
+ * Get days info with styling for subscription status - clean solid colors
  */
 export const getDaysInfo = (sub: Subscription): DaysInfo => {
   if (typeof window === 'undefined') return { text: '', color: '', bgColor: '', borderColor: '' }
@@ -77,32 +77,32 @@ export const getDaysInfo = (sub: Subscription): DaysInfo => {
     if (diffDays < 0) return { 
       text: 'עבר', 
       color: 'text-red-700 dark:text-red-300',
-      bgColor: 'bg-gradient-to-br from-red-50 to-red-50/50 dark:from-red-950/20 dark:to-red-950/10',
-      borderColor: 'border-red-200/50 dark:border-red-800/30'
+      bgColor: 'bg-red-50 dark:bg-red-950/40',
+      borderColor: 'border-red-200 dark:border-red-800'
     }
     if (diffDays === 0) return { 
       text: 'היום', 
       color: 'text-green-700 dark:text-green-300',
-      bgColor: 'bg-gradient-to-br from-green-50 to-green-50/50 dark:from-green-950/20 dark:to-green-950/10',
-      borderColor: 'border-green-200/50 dark:border-green-800/30'
+      bgColor: 'bg-green-50 dark:bg-green-950/40',
+      borderColor: 'border-green-200 dark:border-green-800'
     }
     if (diffDays === 1) return { 
       text: 'מחר', 
       color: 'text-blue-700 dark:text-blue-300',
-      bgColor: 'bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/20 dark:to-blue-950/10',
-      borderColor: 'border-blue-200/50 dark:border-blue-800/30'
+      bgColor: 'bg-blue-50 dark:bg-blue-950/40',
+      borderColor: 'border-blue-200 dark:border-blue-800'
     }
     if (diffDays <= 7) return { 
       text: `בעוד ${diffDays} ימים`, 
       color: 'text-orange-700 dark:text-orange-300',
-      bgColor: 'bg-gradient-to-br from-orange-50 to-orange-50/50 dark:from-orange-950/20 dark:to-orange-950/10',
-      borderColor: 'border-orange-200/50 dark:border-orange-800/30'
+      bgColor: 'bg-orange-50 dark:bg-orange-950/40',
+      borderColor: 'border-orange-200 dark:border-orange-800'
     }
     return {
       text: `בעוד ${diffDays} ימים`, 
       color: 'text-purple-700 dark:text-purple-300',
-      bgColor: 'bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/20 dark:to-purple-950/10',
-      borderColor: 'border-purple-200/50 dark:border-purple-800/30'
+      bgColor: 'bg-purple-50 dark:bg-purple-950/40',
+      borderColor: 'border-purple-200 dark:border-purple-800'
     }
   }
   
@@ -114,26 +114,26 @@ export const getDaysInfo = (sub: Subscription): DaysInfo => {
     if (diffDays < 0) return { 
       text: 'הסתיים', 
       color: 'text-red-700 dark:text-red-300',
-      bgColor: 'bg-gradient-to-br from-red-50 to-red-50/50 dark:from-red-950/20 dark:to-red-950/10',
-      borderColor: 'border-red-200/50 dark:border-red-800/30'
+      bgColor: 'bg-red-50 dark:bg-red-950/40',
+      borderColor: 'border-red-200 dark:border-red-800'
     }
     if (diffDays === 0) return { 
       text: 'נגמר היום', 
       color: 'text-orange-700 dark:text-orange-300',
-      bgColor: 'bg-gradient-to-br from-orange-50 to-orange-50/50 dark:from-orange-950/20 dark:to-orange-950/10',
-      borderColor: 'border-orange-200/50 dark:border-orange-800/30'
+      bgColor: 'bg-orange-50 dark:bg-orange-950/40',
+      borderColor: 'border-orange-200 dark:border-orange-800'
     }
     if (diffDays <= 7) return { 
       text: `נגמר בעוד ${diffDays} ימים`, 
       color: 'text-orange-700 dark:text-orange-300',
-      bgColor: 'bg-gradient-to-br from-orange-50 to-orange-50/50 dark:from-orange-950/20 dark:to-orange-950/10',
-      borderColor: 'border-orange-200/50 dark:border-orange-800/30'
+      bgColor: 'bg-orange-50 dark:bg-orange-950/40',
+      borderColor: 'border-orange-200 dark:border-orange-800'
     }
     return { 
       text: `נגמר בעוד ${diffDays} ימים`, 
       color: 'text-purple-700 dark:text-purple-300',
-      bgColor: 'bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/20 dark:to-purple-950/10',
-      borderColor: 'border-purple-200/50 dark:border-purple-800/30'
+      bgColor: 'bg-purple-50 dark:bg-purple-950/40',
+      borderColor: 'border-purple-200 dark:border-purple-800'
     }
   }
   
@@ -159,6 +159,3 @@ export const hasDuplicateDates = (sub: Subscription, allSubs: Subscription[]): b
     return false
   })
 }
-
-
-
