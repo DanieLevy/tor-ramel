@@ -16,6 +16,7 @@ import {
   processHotAlerts, 
   processOpportunityDiscovery 
 } from './shared/proactive-notifications.mjs'
+import { logFunctionError } from './shared/error-logger.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -307,6 +308,17 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
         }
       } catch (error) {
         console.error(`Error processing subscription ${subscription.id}:`, error)
+        // Log subscription processing error
+        await logFunctionError(error, 'auto-check', {
+          operation: 'process_subscription',
+          subscription_id: subscription.id,
+          user_id: subscription.user_id,
+          metadata: {
+            notification_method: subscription.notification_method,
+            date_range_start: subscription.date_range_start,
+            date_range_end: subscription.date_range_end
+          }
+        })
       }
     }
     
@@ -316,6 +328,11 @@ async function checkSubscriptionsAndQueueNotifications(appointmentResults) {
     
   } catch (error) {
     console.error('Error in notification system:', error)
+    // Log notification system error
+    await logFunctionError(error, 'auto-check', {
+      operation: 'notification_system',
+      metadata: { timestamp: new Date().toISOString() }
+    })
     return 0
   }
 }
@@ -527,6 +544,15 @@ export default async (req) => {
     const totalTime = Math.round((Date.now() - functionStart) / 1000)
     console.error(`❌ FUNCTION FAILED in ${totalTime}s:`, error.message)
     console.error(error.stack)
+    
+    // Log critical function failure to database
+    await logFunctionError(error, 'auto-check', {
+      operation: 'scheduled_check',
+      metadata: {
+        execution_time_seconds: totalTime,
+        timestamp: new Date().toISOString()
+      }
+    })
     
     return new Response(JSON.stringify({
       success: false,

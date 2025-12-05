@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import webpush from 'web-push'
+import { logPushError, logEmailError, logNotificationError } from './shared/error-logger.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -734,6 +735,17 @@ ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notificat
     return true
   } catch (error) {
     console.error('Error sending notification email:', error)
+    // Log email error to database
+    await logEmailError(error, {
+      user_email: data.to,
+      subscription_id: data.subscriptionId,
+      email_type: 'notification_email',
+      source: 'notification-processor',
+      metadata: {
+        appointment_count: data.appointments?.length,
+        appointment_date: data.date
+      }
+    })
     return false
   }
 }
@@ -931,6 +943,21 @@ async function sendPushNotification(data) {
         
         const statusCode = error.statusCode || 0
 
+        // Log push error to database
+        await logPushError(error, {
+          user_id: sub.user_id,
+          user_email: sub.email,
+          push_subscription_id: sub.id,
+          endpoint: sub.endpoint,
+          status_code: statusCode,
+          device_type: sub.device_type,
+          operation: 'webpush.sendNotification',
+          metadata: {
+            consecutive_failures: (sub.consecutive_failures || 0) + 1,
+            notification_title: title
+          }
+        })
+
         // Get current failure count
         const currentFailures = sub.consecutive_failures || 0
         const newFailureCount = currentFailures + 1
@@ -966,6 +993,12 @@ async function sendPushNotification(data) {
 
   } catch (error) {
     console.error('❌ [Push] Error sending push notification:', error)
+    // Log critical push service error
+    await logPushError(error, {
+      user_id: userId,
+      operation: 'sendPushNotification',
+      metadata: { title, body }
+    })
     return false
   }
 }
@@ -1424,6 +1457,22 @@ export async function processNotificationQueue(limit = 10) {
           queueId: item.id,
           error: errorMessage,
           email: item.subscription?.users?.email
+        })
+        
+        // Log notification processing error to database
+        await logNotificationError(error, {
+          source: 'notification-processor',
+          operation: 'processNotificationQueue',
+          user_id: item.subscription?.user_id,
+          user_email: item.subscription?.users?.email,
+          subscription_id: item.subscription_id,
+          notification_id: item.id,
+          notification_method: item.subscription?.notification_method,
+          appointment_date: item.appointment_date,
+          metadata: {
+            new_times: item.new_times,
+            queue_item_id: item.id
+          }
         })
         
         // Mark as failed

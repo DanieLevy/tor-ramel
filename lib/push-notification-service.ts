@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
+import { logPushError } from '@/lib/error-logger';
 
 // Initialize Supabase client for server-side operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -240,6 +241,21 @@ class PushNotificationService {
 
           // Check error type
           const statusCode = pushError.statusCode || 0;
+
+          // Log push error to database
+          await logPushError(error, {
+            user_id: sub.user_id || undefined,
+            user_email: sub.email || undefined,
+            push_subscription_id: sub.id,
+            endpoint: sub.endpoint,
+            status_code: statusCode,
+            operation: 'webpush.sendNotification',
+            metadata: {
+              device_type: sub.device_type,
+              username: sub.username,
+              notification_title: payload?.title
+            }
+          });
 
           if (isPermanentError(statusCode)) {
             // Subscription expired or gone - deactivate it

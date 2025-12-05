@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/jwt'
 import { validateSubscriptionData } from '@/lib/notification-helpers'
 import { sendSubscriptionConfirmationEmail } from '@/lib/email-sender'
 import { pushService } from '@/lib/push-notification-service'
+import { logApiError, logDatabaseError } from '@/lib/error-logger'
 
 // Use consistent env var naming
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
@@ -181,6 +182,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in subscribe API:', error)
+    // Log API error to database
+    await logApiError(error, 'api/notifications/subscribe', {
+      operation: 'create_subscription'
+    })
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 })
@@ -205,6 +210,12 @@ export async function GET(_request: NextRequest) {
     
     if (error) {
       console.error('Error fetching subscriptions:', error)
+      // Log database error
+      await logDatabaseError(error, 'api/notifications/subscribe', {
+        operation: 'fetch_subscriptions',
+        table: 'notification_subscriptions',
+        user_id: user.userId
+      })
       return NextResponse.json({ 
         error: 'Failed to fetch subscriptions' 
       }, { status: 500 })
@@ -214,6 +225,10 @@ export async function GET(_request: NextRequest) {
     
   } catch (error) {
     console.error('Error in GET subscriptions:', error)
+    // Log API error to database
+    await logApiError(error, 'api/notifications/subscribe', {
+      operation: 'get_subscriptions'
+    })
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 })
