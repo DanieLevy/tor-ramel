@@ -67,13 +67,13 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
       const startDateStr = today.toISOString().split('T')[0]
       const endDateStr = endDate.toISOString().split('T')[0]
 
+      // Don't pass notification_method - let API use user's default preference
       const response = await pwaFetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date_range_start: startDateStr,
           date_range_end: endDateStr,
-          notification_method: 'push',
         }),
       })
 
