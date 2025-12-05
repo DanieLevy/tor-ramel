@@ -360,31 +360,34 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
               onClick={() => setOpen(false)}
             />
             
-            {/* Floating Panel - Centered on mobile */}
+            {/* Floating Panel - iOS PWA safe positioning */}
             <motion.div
               ref={panelRef}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 400 }}
               className={cn(
                 'fixed z-50',
-                // Position: vertically centered on mobile, anchored to top-right on desktop
-                'left-4 right-4 top-[50%] -translate-y-1/2',
-                'sm:top-20 sm:translate-y-0 sm:left-auto sm:right-4 sm:w-96',
+                // Position: Below header with safe area margin on mobile
+                'left-3 right-3',
+                'sm:left-auto sm:right-4 sm:w-96',
                 // Glass design - Apple style
-                'bg-white/70 dark:bg-gray-900/70',
+                'bg-white/90 dark:bg-gray-900/90',
                 'backdrop-blur-2xl',
-                'border border-white/40 dark:border-white/10',
+                'border border-black/5 dark:border-white/10',
                 'rounded-2xl',
-                'shadow-2xl shadow-black/15 dark:shadow-black/40',
-                // Safe area for notched devices
-                'max-h-[70vh] sm:max-h-[70vh]',
+                'shadow-2xl shadow-black/20 dark:shadow-black/50',
+                // Proper overflow handling
                 'overflow-hidden',
                 'flex flex-col'
               )}
               style={{
                 WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                // Position below header with safe area consideration
+                top: 'calc(env(safe-area-inset-top, 0px) + 70px)',
+                // Max height accounting for both safe areas
+                maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 160px)',
               }}
             >
               {/* Header - Clean Apple style */}
@@ -411,29 +414,31 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
                 </Button>
               </div>
 
-              {/* Quick Actions */}
-              {(unreadCount > 0 || notifications.some(n => n.is_read)) && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-white/30 dark:bg-white/5 border-b border-white/10">
-                  {unreadCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={markAllAsRead}
-                      className="text-xs h-7 px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300"
-                    >
-                      <CheckCheck className="h-3.5 w-3.5 ml-1" />
-                      סמן הכל
-                    </Button>
-                  )}
+              {/* Quick Actions - Always visible when there are notifications */}
+              {notifications.length > 0 && (
+                <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50/80 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={markAllAsRead}
+                        className="text-xs h-8 px-3 gap-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-lg font-medium"
+                      >
+                        <CheckCheck className="h-4 w-4" />
+                        סמן הכל כנקרא
+                      </Button>
+                    )}
+                  </div>
                   {notifications.some(n => n.is_read) && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={clearAllRead}
-                      className="text-xs h-7 px-2 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-300"
+                      className="text-xs h-8 px-3 gap-1.5 text-muted-foreground hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 rounded-lg"
                     >
-                      <Trash2 className="h-3.5 w-3.5 ml-1" />
-                      מחק נקראות
+                      <Trash2 className="h-3.5 w-3.5" />
+                      נקה
                     </Button>
                   )}
                 </div>

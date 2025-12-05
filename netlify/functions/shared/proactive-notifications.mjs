@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { ISRAEL_TIMEZONE, getDayNameHebrew } from './date-utils.mjs'
 import { sendHotAlertEmail, sendOpportunityEmail } from './email-service.mjs'
+import { buildHotAlertPayload, buildOpportunityPayload } from './push-payload-builder.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -92,10 +93,9 @@ async function getUserPreferences(userId) {
 }
 
 /**
- * Send a push notification to a user
- * Payload structure matches sw.js expectations: { notification: {...}, badgeCount: number }
+ * Send a push notification to a user with pre-built payload
  */
-async function sendPushToUser(userId, title, body, data = {}) {
+async function sendPushToUser(userId, payload) {
   try {
     // Get user's push subscriptions
     const { data: pushSubs, error } = await supabase
@@ -108,24 +108,6 @@ async function sendPushToUser(userId, title, body, data = {}) {
       console.log(`[Proactive] No active push subscriptions for user ${userId}`)
       return { sent: 0, failed: 0 }
     }
-    
-    // Build payload matching sw.js structure
-    const payload = JSON.stringify({
-      notification: {
-        title,
-        body,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        tag: data.type || 'proactive-notification',
-        requireInteraction: true,
-        data: {
-          ...data,
-          url: data.url || '/',
-          timestamp: new Date().toISOString()
-        }
-      },
-      badgeCount: 1
-    })
     
     let sent = 0
     let failed = 0
@@ -310,7 +292,7 @@ async function isEligibleForProactive(userId, notificationType, prefs = null) {
 /**
  * Send notification to user based on their method preference
  */
-async function sendNotificationToUser(userId, userEmail, prefs, title, body, notificationType, emailData, pushData) {
+async function sendNotificationToUser(userId, userEmail, prefs, notificationType, emailData, pushPayload) {
   const method = prefs?.default_notification_method || 'email'
   let emailSent = false
   let pushSent = false
@@ -336,7 +318,7 @@ async function sendNotificationToUser(userId, userEmail, prefs, title, body, not
   
   // Send push if method is 'push' or 'both'
   if (method === 'push' || method === 'both') {
-    const pushResult = await sendPushToUser(userId, title, body, pushData)
+    const pushResult = await sendPushToUser(userId, pushPayload)
     pushSent = pushResult.sent > 0
     
     if (pushSent) {
@@ -395,19 +377,6 @@ export async function processHotAlerts(availableAppointments) {
   const daysUntil = getDaysUntil(hottestApt.date)
   const dayName = getDayNameHebrew(hottestApt.date)
   
-  // Build notification content
-  let title, body
-  if (daysUntil === 0) {
-    title = '🔥 תור היום!'
-    body = `הזדמנות נדירה! תור פנוי היום בשעה ${hottestApt.times[0]} - לחץ להזמנה מיידית`
-  } else if (daysUntil === 1) {
-    title = '🔥 תור מחר!'
-    body = `תור פנוי מחר (${dayName}) בשעה ${hottestApt.times[0]} - הזדמנות אחרונה!`
-  } else {
-    title = `🔥 תור חם! עוד ${daysUntil} ימים`
-    body = `תור פנוי ב${dayName} בשעה ${hottestApt.times[0]} - כדאי למהר!`
-  }
-  
   const relatedDates = [hottestApt.date]
   
   for (const user of users) {
@@ -442,32 +411,41 @@ export async function processHotAlerts(availableAppointments) {
       bookingUrl: hottestApt.booking_url
     }
     
-    // Prepare push data
-    const pushData = {
-      type: 'hot_alert',
-      appointment_date: hottestApt.date,
-      times: hottestApt.times,
-      booking_url: hottestApt.booking_url,
-      url: hottestApt.booking_url 
-        ? `/notification-action?action=book&date=${hottestApt.date}&booking_url=${encodeURIComponent(hottestApt.booking_url)}` 
-        : '/'
-    }
+    // Build optimized push payload using centralized builder
+    const pushPayload = buildHotAlertPayload({
+      date: hottestApt.date,
+      dayName,
+      daysUntil,
+      timesCount: hottestApt.times.length,
+      bookingUrl: hottestApt.booking_url
+    })
     
     // Send notification based on user's preference
     const result = await sendNotificationToUser(
       user.id, 
       user.email, 
       prefs, 
-      title, 
-      body, 
       'hot_alert', 
       emailData, 
-      pushData
+      pushPayload
     )
     
     if (result.success) {
+      // Build in-app notification content
+      let inAppTitle, inAppBody
+      if (daysUntil === 0) {
+        inAppTitle = 'תור היום!'
+        inAppBody = `${hottestApt.times.length} שעות פנויות - הזדמנות אחרונה!`
+      } else if (daysUntil === 1) {
+        inAppTitle = 'תור מחר!'
+        inAppBody = `${dayName} - ${hottestApt.times.length} שעות פנויות`
+      } else {
+        inAppTitle = `תור חם ב${dayName}`
+        inAppBody = `עוד ${daysUntil} ימים - ${hottestApt.times.length} שעות`
+      }
+      
       // Create in-app notification
-      await createInAppNotification(user.id, title, body, 'hot_alert', {
+      await createInAppNotification(user.id, inAppTitle, inAppBody, 'hot_alert', {
         appointment_date: hottestApt.date,
         times: hottestApt.times,
         booking_url: hottestApt.booking_url
@@ -554,17 +532,6 @@ export async function processOpportunityDiscovery(availableAppointments) {
   // Calculate total slots
   const totalSlots = upcomingAppointments.reduce((sum, apt) => sum + (apt.times?.length || 0), 0)
   
-  // Build notification content
-  const title = '💡 מצאנו תור בשבילך!'
-  let body
-  if (daysUntil === 0) {
-    body = `יש תור פנוי היום בשעה ${bestApt.times[0]} - לחץ להזמנה`
-  } else if (daysUntil === 1) {
-    body = `יש תור פנוי מחר (${dayName}) בשעה ${bestApt.times[0]}`
-  } else {
-    body = `יש תור פנוי ב${dayName} הבא בשעה ${bestApt.times[0]}`
-  }
-  
   for (const user of usersWithoutSubs) {
     // Check if already notified about opportunity recently
     const { data: existingLog } = await supabase
@@ -598,32 +565,39 @@ export async function processOpportunityDiscovery(availableAppointments) {
       totalSlots
     }
     
-    // Prepare push data
-    const pushData = {
-      type: 'opportunity',
-      appointment_date: bestApt.date,
-      times: bestApt.times,
-      booking_url: bestApt.booking_url,
-      url: bestApt.booking_url 
-        ? `/notification-action?action=book&date=${bestApt.date}&booking_url=${encodeURIComponent(bestApt.booking_url)}` 
-        : '/'
-    }
+    // Build optimized push payload using centralized builder
+    const pushPayload = buildOpportunityPayload({
+      date: bestApt.date,
+      dayName,
+      timesCount: bestApt.times.length
+    })
     
     // Send notification based on user's preference
     const result = await sendNotificationToUser(
       user.id, 
       user.email, 
       prefs, 
-      title, 
-      body, 
       'opportunity', 
       emailData, 
-      pushData
+      pushPayload
     )
     
     if (result.success) {
+      // Build in-app notification content
+      let inAppTitle, inAppBody
+      if (daysUntil === 0) {
+        inAppTitle = 'מצאנו תור היום!'
+        inAppBody = `${bestApt.times.length} שעות זמינות`
+      } else if (daysUntil === 1) {
+        inAppTitle = 'תור מחר!'
+        inAppBody = `${dayName} - ${bestApt.times.length} שעות`
+      } else {
+        inAppTitle = `תור ב${dayName}`
+        inAppBody = `${bestApt.times.length} שעות פנויות`
+      }
+      
       // Create in-app notification
-      await createInAppNotification(user.id, title, body, 'proactive', {
+      await createInAppNotification(user.id, inAppTitle, inAppBody, 'proactive', {
         appointment_date: bestApt.date,
         times: bestApt.times,
         booking_url: bestApt.booking_url,

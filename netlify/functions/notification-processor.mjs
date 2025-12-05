@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import webpush from 'web-push'
 import { logPushError, logEmailError, logNotificationError } from './shared/error-logger.mjs'
+import { buildAppointmentPayload } from './shared/push-payload-builder.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -853,7 +854,7 @@ async function checkFrequencyLimits(userId) {
 // Helper function to send push notification with delivery tracking
 async function sendPushNotification(data) {
   try {
-    const { userId, title, body, url, appointments, subscriptionId, bookingUrl } = data
+    const { userId, title: _title, body: _body, url: _url, appointments, subscriptionId, bookingUrl } = data
     
     // Get active push subscriptions for this user
     const { data: pushSubscriptions, error: pushError } = await supabase
@@ -874,47 +875,11 @@ async function sendPushNotification(data) {
 
     console.log(`📱 [Push] Found ${pushSubscriptions.length} active push subscriptions`)
 
-    // Build actions - include Book Now if booking URL is available
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'
-    const defaultActions = bookingUrl
-      ? [
-          { action: 'book', title: '🗓 הזמן עכשיו' },
-          { action: 'view', title: 'צפה בפרטים' },
-          { action: 'dismiss', title: 'סגור' }
-        ]
-      : [
-          { action: 'view', title: 'צפה בתור' },
-          { action: 'dismiss', title: 'סגור' }
-        ]
-
-    // Prepare LIGHTWEIGHT notification payload for push (Apple 4KB limit!)
-    // Only include essential data - full details are in email
-    const lightweightAppointments = appointments 
-      ? appointments.slice(0, 3).map(apt => ({
-          date: apt.date,
-          count: apt.newTimes?.length || 0
-        }))
-      : []
-    
-    const notificationPayload = JSON.stringify({
-      notification: {
-        title,
-        body,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        tag: 'appointment-notification',
-        requireInteraction: true,
-        actions: defaultActions,
-        data: {
-          url: url || baseUrl,
-          booking_url: bookingUrl,
-          subscription_id: subscriptionId,
-          appointment_count: appointments?.length || 0,
-          appointments: lightweightAppointments,
-          timestamp: Date.now()
-        }
-      },
-      badgeCount: 1
+    // Build optimized payload using centralized builder (Apple 4KB limit!)
+    const notificationPayload = buildAppointmentPayload({
+      appointments: appointments || [],
+      subscriptionId,
+      bookingUrl
     })
 
     // Send to each subscription with delivery tracking
