@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useHeader } from '@/components/header-context'
 import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,8 @@ import { AppointmentBanner } from '@/components/appointment-banner'
 import { QuickActionCard, QuickActionGrid } from '@/components/quick-action-card'
 import { QuickSubscribe } from '@/components/quick-subscribe'
 import { useHaptics } from '@/hooks/use-haptics'
+import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { PullToRefreshIndicator } from '@/components/pull-to-refresh'
 import Link from 'next/link'
 import { format, isPast } from 'date-fns'
 import { cn, pwaFetch } from '@/lib/utils'
@@ -52,6 +54,23 @@ export default function HomePage() {
   const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
   const [homeStats, setHomeStats] = useState<HomeStats | null>(null)
   const [nextCheckCountdown, setNextCheckCountdown] = useState(300)
+
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    toast.info('מרענן נתונים...')
+    await Promise.all([
+      fetchHomeStats(),
+      fetchSubscriptions()
+    ])
+    toast.success('הנתונים עודכנו')
+  }, [])
+
+  // Pull-to-refresh hook
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+    disabled: isLoading
+  })
 
   useEffect(() => {
     updateHeader({
@@ -238,9 +257,19 @@ export default function HomePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 pt-4 pb-4 max-w-2xl space-y-4">
-      {/* Hero: Appointment Banner */}
-      <AppointmentBanner />
+    <>
+      {/* Pull to Refresh Indicator */}
+      <PullToRefreshIndicator
+        pullDistance={pullToRefresh.pullDistance}
+        pullProgress={pullToRefresh.pullProgress}
+        isRefreshing={pullToRefresh.isRefreshing}
+        isPulling={pullToRefresh.isPulling}
+        threshold={pullToRefresh.threshold}
+      />
+      
+      <div className="container mx-auto px-4 pt-4 pb-4 max-w-2xl space-y-4">
+        {/* Hero: Appointment Banner */}
+        <AppointmentBanner />
       
       {/* Quick Actions Grid */}
       <QuickActionGrid>
@@ -504,5 +533,6 @@ export default function HomePage() {
         </motion.div>
       )}
     </div>
+    </>
   )
 }
