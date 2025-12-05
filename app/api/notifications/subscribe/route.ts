@@ -102,7 +102,8 @@ export async function POST(request: NextRequest) {
         date_range_start,
         date_range_end,
         notification_method,
-        is_active: true
+        is_active: true,
+        subscription_status: 'active'  // CRITICAL: Set status so auto-check can find it
       })
       .select()
       .single()
