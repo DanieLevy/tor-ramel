@@ -21,7 +21,12 @@ function Switch({
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0"
+          // Fixed for RTL: Use transform with proper direction handling
+          "bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform",
+          // RTL-aware transforms: checked state moves to LEFT in RTL (which is visually right)
+          "data-[state=checked]:-translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0",
+          // LTR fallback (if dir=ltr is set on parent)
+          "[html:not([dir='rtl'])_&]:data-[state=checked]:translate-x-[calc(100%-2px)] [html:not([dir='rtl'])_&]:data-[state=unchecked]:translate-x-0"
         )}
       />
     </SwitchPrimitive.Root>

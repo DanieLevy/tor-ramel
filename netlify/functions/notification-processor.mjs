@@ -752,9 +752,10 @@ ${process.env.NEXT_PUBLIC_BASE_URL || 'https://tor-ramel.netlify.app'}/notificat
 }
 
 // Permanent error codes that should deactivate subscription
-const PERMANENT_ERROR_CODES = [410, 404, 401]
-// Max consecutive failures before auto-disabling
-const MAX_CONSECUTIVE_FAILURES = 5
+// Error code constants
+const PERMANENT_ERROR_CODES = [410, 404, 401]  // Subscription invalid/expired
+const PAYLOAD_TOO_LARGE_CODE = 413  // Payload exceeds APNS limit - retry with smaller payload
+const MAX_CONSECUTIVE_FAILURES = 5  // Max consecutive failures before auto-disabling
 
 /**
  * Check if user is within frequency limits
@@ -912,7 +913,47 @@ async function sendPushNotification(data) {
         
         const statusCode = error.statusCode || 0
 
-        // Log push error to database
+        // Special handling for HTTP 413 (Payload Too Large)
+        if (statusCode === PAYLOAD_TOO_LARGE_CODE) {
+          console.error(`🚨 [Push] HTTP 413 - Payload too large for ${sub.username} (${sub.device_type})`)
+          console.error(`🚨 [Push] Appointments count: ${appointments?.length || 0}`)
+          
+          // Log payload size error with details
+          await logPushError(error, {
+            user_id: sub.user_id,
+            user_email: sub.email,
+            push_subscription_id: sub.id,
+            endpoint: sub.endpoint,
+            status_code: statusCode,
+            device_type: sub.device_type,
+            operation: 'webpush.sendNotification',
+            metadata: {
+              error_type: 'payload_too_large',
+              appointments_count: appointments?.length || 0,
+              notification_title: _title,
+              solution: 'Payload builder should have prevented this - investigate size calculation'
+            }
+          })
+          
+          // For 413 errors, don't deactivate immediately - the issue is with our payload size
+          // Update failure count but don't deactivate unless it happens repeatedly
+          const currentFailures = sub.consecutive_failures || 0
+          const newFailureCount = currentFailures + 1
+          
+          await supabase
+            .from('push_subscriptions')
+            .update({ 
+              last_delivery_status: 'failed',
+              consecutive_failures: newFailureCount,
+              last_failure_reason: `Payload too large (${statusCode}) - ${error.message}`
+            })
+            .eq('id', sub.id)
+          
+          // Continue to next subscription
+          continue
+        }
+
+        // Log push error to database (for non-413 errors)
         await logPushError(error, {
           user_id: sub.user_id,
           user_email: sub.email,
@@ -923,7 +964,7 @@ async function sendPushNotification(data) {
           operation: 'webpush.sendNotification',
           metadata: {
             consecutive_failures: (sub.consecutive_failures || 0) + 1,
-            notification_title: title
+            notification_title: _title
           }
         })
 

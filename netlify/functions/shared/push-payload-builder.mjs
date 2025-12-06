@@ -4,10 +4,18 @@
  * Builds lightweight, optimized payloads that comply with Apple's 4KB limit.
  * All Hebrew content is properly formatted and concise.
  * Uses universally-supported Unicode emojis for iOS compatibility.
+ * 
+ * CRITICAL: Apple APNS has a hard 4KB limit. HTTP 413 errors occur when exceeded.
+ * Solution: Store large data in database, send only data_id in notification.
  */
 
-// Maximum payload size for Apple Push Notification service (4KB)
-const MAX_PAYLOAD_SIZE = 4096
+// Maximum payload size for Apple Push Notification service (4KB = 4096 bytes)
+// We target 3.5KB (3584 bytes) to leave safety margin for encryption overhead
+const MAX_PAYLOAD_SIZE = 3584
+const ABSOLUTE_MAX_SIZE = 4096
+
+// Payload size warning threshold (90% of target)
+const WARNING_THRESHOLD = MAX_PAYLOAD_SIZE * 0.9
 
 /**
  * Universal Emojis - Compatible with iOS 12+ (Unicode 11.0+)
@@ -75,11 +83,13 @@ function formatDateShort(dateStr) {
 /**
  * Build notification payload for available appointments
  * Optimized for Apple's 4KB limit with engaging emojis
+ * ENHANCED: Uses data_id approach for large payloads to prevent HTTP 413 errors
  */
 export function buildAppointmentPayload({ 
   appointments, 
   subscriptionId,
-  bookingUrl 
+  bookingUrl,
+  dataId = null  // Optional: pre-stored data ID to avoid embedding large data
 }) {
   const count = appointments?.length || 0
   
@@ -113,19 +123,24 @@ export function buildAppointmentPayload({
       : `${EMOJIS.CALENDAR} ${dateList}`
   }
   
-  // Build URL for notification-action page with minimal appointment data
-  const appointmentData = appointments?.slice(0, 5).map(apt => ({
-    date: apt.date,
-    times: (apt.newTimes || apt.times || []).slice(0, 6)
-  })) || []
-  
-  // Build URL - redirect to notification-action page
+  // Build URL - use data_id if provided (for large payloads), otherwise minimal inline data
   let actionUrl = `/notification-action?subscription=${subscriptionId}`
   
-  // Add compact appointments data
-  if (appointmentData.length > 0) {
+  if (dataId) {
+    // Large payload stored in DB - just send ID (keeps payload tiny!)
+    actionUrl += `&data_id=${dataId}`
+  } else if (count <= 3) {
+    // Small payload - safe to inline (max 3 appointments with 6 times each)
+    const appointmentData = appointments.slice(0, 3).map(apt => ({
+      date: apt.date,
+      times: (apt.newTimes || apt.times || []).slice(0, 6)
+    }))
     const compactAppts = encodeURIComponent(JSON.stringify(appointmentData))
     actionUrl += `&appointments=${compactAppts}`
+  } else {
+    // Medium payload - send only dates, fetch details on click
+    const dates = appointments.slice(0, 10).map(apt => apt.date).join(',')
+    actionUrl += `&dates=${dates}`
   }
   
   // Build lightweight data
@@ -136,11 +151,14 @@ export function buildAppointmentPayload({
     cnt: count
   }
   
-  // Only include booking URL if available
+  // Only include data_id if present (for client to fetch full data)
+  if (dataId) {
+    data.data_id = dataId
+  }
+  
+  // Only include booking URL if available (but not in URL to save space)
   if (bookingUrl) {
     data.booking_url = bookingUrl
-    actionUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`
-    data.url = actionUrl
   }
   
   // Build actions (Book Now only if we have booking URL)
@@ -153,7 +171,14 @@ export function buildAppointmentPayload({
         { action: 'view', title: 'צפה' }
       ]
   
-  return buildPayload({ title, body, tag: 'appointment', actions, data })
+  return buildPayload({ 
+    title, 
+    body, 
+    tag: 'appointment', 
+    actions, 
+    data,
+    metadata: { count, has_data_id: !!dataId }
+  })
 }
 
 /**
@@ -398,7 +423,8 @@ export function buildOpportunityPayload({
 }
 
 /**
- * Core payload builder - ensures all payloads are under 4KB
+ * Core payload builder - ensures all payloads are under 4KB with aggressive optimization
+ * ENHANCED: Multi-stage reduction strategy to prevent HTTP 413 errors
  */
 function buildPayload({ 
   title, 
@@ -408,7 +434,8 @@ function buildPayload({
   data = {},
   requireInteraction = true,
   icon = '/icons/icon-192x192.png',
-  badge = '/icons/icon-72x72.png'
+  badge = '/icons/icon-72x72.png',
+  metadata = {}  // For logging/debugging only, not sent in payload
 }) {
   // Build the notification object
   const notification = {
@@ -434,21 +461,89 @@ function buildPayload({
     badgeCount: 1
   }
   
-  const payloadStr = JSON.stringify(payload)
+  // Stage 1: Check initial size
+  let payloadStr = JSON.stringify(payload)
+  let payloadSize = Buffer.byteLength(payloadStr, 'utf8')
   
-  // Check size and warn if close to limit
-  if (payloadStr.length > MAX_PAYLOAD_SIZE * 0.9) {
-    console.warn(`[PushPayload] Payload size ${payloadStr.length} approaching limit`)
+  // Log size for monitoring
+  console.log(`[PushPayload] Initial size: ${payloadSize} bytes (max: ${MAX_PAYLOAD_SIZE}, absolute: ${ABSOLUTE_MAX_SIZE})`, metadata)
+  
+  // Stage 2: Warn if approaching limit
+  if (payloadSize > WARNING_THRESHOLD) {
+    console.warn(`[PushPayload] ⚠️ Size ${payloadSize} approaching ${MAX_PAYLOAD_SIZE} limit`)
   }
   
-  if (payloadStr.length > MAX_PAYLOAD_SIZE) {
-    console.error(`[PushPayload] Payload size ${payloadStr.length} exceeds limit! Truncating...`)
-    // Remove non-essential data
-    delete notification.data
-    notification.data = { url: data.url || '/' }
+  // Stage 3: Reduction if exceeding target
+  if (payloadSize > MAX_PAYLOAD_SIZE) {
+    console.warn(`[PushPayload] 🔧 Reducing payload from ${payloadSize} bytes...`)
+    
+    // Reduction Step 1: Remove actions buttons
+    if (notification.actions && notification.actions.length > 1) {
+      notification.actions = [notification.actions[0]]  // Keep only first action
+      payloadStr = JSON.stringify(payload)
+      payloadSize = Buffer.byteLength(payloadStr, 'utf8')
+      console.log(`[PushPayload] After removing extra actions: ${payloadSize} bytes`)
+    }
+    
+    if (payloadSize > MAX_PAYLOAD_SIZE) {
+      // Reduction Step 2: Remove all actions
+      delete notification.actions
+      payloadStr = JSON.stringify(payload)
+      payloadSize = Buffer.byteLength(payloadStr, 'utf8')
+      console.log(`[PushPayload] After removing all actions: ${payloadSize} bytes`)
+    }
+    
+    if (payloadSize > MAX_PAYLOAD_SIZE) {
+      // Reduction Step 3: Shorten body
+      notification.body = truncate(notification.body, 50)
+      payloadStr = JSON.stringify(payload)
+      payloadSize = Buffer.byteLength(payloadStr, 'utf8')
+      console.log(`[PushPayload] After shortening body: ${payloadSize} bytes`)
+    }
+    
+    if (payloadSize > MAX_PAYLOAD_SIZE) {
+      // Reduction Step 4: Minimize data object
+      const essentialData = {
+        url: notification.data.url || '/',
+        type: notification.data.type,
+        ts: Date.now()
+      }
+      notification.data = essentialData
+      payloadStr = JSON.stringify(payload)
+      payloadSize = Buffer.byteLength(payloadStr, 'utf8')
+      console.log(`[PushPayload] After minimizing data: ${payloadSize} bytes`)
+    }
+    
+    if (payloadSize > MAX_PAYLOAD_SIZE) {
+      // Reduction Step 5: Emergency - strip to bare minimum
+      notification.body = truncate(notification.body, 30)
+      notification.title = truncate(notification.title, 30)
+      notification.data = { url: '/', ts: Date.now() }
+      payloadStr = JSON.stringify(payload)
+      payloadSize = Buffer.byteLength(payloadStr, 'utf8')
+      console.warn(`[PushPayload] 🚨 Emergency reduction: ${payloadSize} bytes`)
+    }
   }
   
-  return JSON.stringify(payload)
+  // Final check against absolute maximum
+  if (payloadSize > ABSOLUTE_MAX_SIZE) {
+    console.error(`[PushPayload] ❌ CRITICAL: Payload ${payloadSize} exceeds absolute limit ${ABSOLUTE_MAX_SIZE}!`)
+    // Last resort: bare minimum notification
+    return JSON.stringify({
+      notification: {
+        title: 'התראה חדשה',
+        body: 'יש עדכון חדש',
+        icon,
+        badge,
+        tag,
+        data: { url: '/', ts: Date.now() }
+      },
+      badgeCount: 1
+    })
+  }
+  
+  console.log(`[PushPayload] ✅ Final payload size: ${payloadSize} bytes`)
+  return payloadStr
 }
 
 /**

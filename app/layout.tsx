@@ -9,7 +9,6 @@ import { PWAProvider } from "@/components/pwa-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/bottom-nav";
 import { FontLoader } from "@/components/font-loader";
-import { SwUpdateBanner } from '@/components/sw-update-banner';
 import { PushNotificationBanner } from '@/components/push-notification-banner';
 import { Footer } from '@/components/footer';
 import { DynamicThemeColor } from '@/components/dynamic-theme-color';
@@ -111,7 +110,7 @@ export default function RootLayout({
                   </main>
                   <Footer />
                   <BottomNav />
-                  <SwUpdateBanner />
+                  {/* Only PushNotificationBanner - removed SwUpdateBanner duplicate */}
                   <PushNotificationBanner />
                 </div>
               </HeaderProvider>

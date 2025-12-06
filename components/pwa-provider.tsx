@@ -4,9 +4,10 @@ import { useEffect, ReactNode, useState } from 'react'
 import { useServiceWorker } from '@/hooks/use-service-worker'
 import { usePWAInstall } from '@/hooks/use-pwa-install'
 import { Button } from '@/components/ui/button'
-import { Download, RefreshCw, WifiOff, X } from 'lucide-react'
+import { Download, WifiOff, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import { UpdateModal } from '@/components/update-modal'
 
 interface PWAProviderProps {
   children: ReactNode
@@ -16,6 +17,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const { isUpdateAvailable, isOffline, skipWaiting } = useServiceWorker()
   const { isInstallable, promptInstall } = usePWAInstall()
   const [showInstallBanner, setShowInstallBanner] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Check if install banner should be shown
   useEffect(() => {
@@ -53,33 +55,25 @@ export function PWAProvider({ children }: PWAProviderProps) {
   }
 
   const handleUpdate = async () => {
+    setIsUpdating(true)
     await skipWaiting()
-    // Reload the page after updating
-    window.location.reload()
+    
+    // Give service worker time to activate
+    setTimeout(() => {
+      window.location.reload()
+    }, 500)
   }
 
   return (
     <>
       {children}
 
-      {/* Update Available Banner */}
-      {isUpdateAvailable && (
-        <div className="fixed bottom-20 left-4 right-4 z-50 animate-in slide-in-from-bottom-5">
-          <Alert className="border-primary">
-            <RefreshCw className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>עדכון חדש זמין לאפליקציה</span>
-              <Button
-                size="sm"
-                onClick={handleUpdate}
-                className="mr-4"
-              >
-                עדכן עכשיו
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+      {/* Modern Apple-style Update Modal */}
+      <UpdateModal 
+        isOpen={isUpdateAvailable} 
+        isUpdating={isUpdating}
+        onUpdate={handleUpdate}
+      />
 
       {/* Install Prompt */}
       {showInstallBanner && (
