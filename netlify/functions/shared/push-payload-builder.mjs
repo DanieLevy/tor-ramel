@@ -3,10 +3,45 @@
  * 
  * Builds lightweight, optimized payloads that comply with Apple's 4KB limit.
  * All Hebrew content is properly formatted and concise.
+ * Uses universally-supported Unicode emojis for iOS compatibility.
  */
 
 // Maximum payload size for Apple Push Notification service (4KB)
 const MAX_PAYLOAD_SIZE = 4096
+
+/**
+ * Universal Emojis - Compatible with iOS 12+ (Unicode 11.0+)
+ * These emojis are guaranteed to render correctly across all iOS devices.
+ * Using older Unicode versions ensures maximum compatibility.
+ */
+const EMOJIS = {
+  // Status & Actions (Unicode 6.0 - iOS 5+)
+  NEW: '🆕',           // New indicator - Unicode 6.0
+  CALENDAR: '📅',     // Calendar - Unicode 6.0
+  CLOCK: '⏰',        // Alarm clock - Unicode 6.0
+  FIRE: '🔥',         // Fire/Hot - Unicode 6.0
+  SPARKLES: '✨',     // Sparkles/New - Unicode 6.0
+  TADA: '🎉',         // Party/Celebration - Unicode 6.0
+  STAR: '⭐',        // Star - Unicode 5.1
+  
+  // Urgency & Attention (Unicode 6.0 - iOS 5+)
+  HOURGLASS: '⏳',   // Time running out - Unicode 6.0
+  BELL: '🔔',        // Bell/Notification - Unicode 6.0
+  WARNING: '⚠️',     // Warning sign - Unicode 4.0
+  ROCKET: '🚀',      // Fast/Launch - Unicode 6.0
+  
+  // Success & Confirmation (Unicode 6.0 - iOS 5+)
+  CHECK: '✅',       // Check mark - Unicode 6.0
+  THUMBS_UP: '👍',   // Thumbs up - Unicode 6.0
+  
+  // Time periods (Unicode 6.0 - iOS 5+)
+  SUNNY: '☀️',       // Morning/Day - Unicode 1.1
+  MOON: '🌙',        // Evening/Night - Unicode 6.0
+  
+  // Information (Unicode 6.0 - iOS 5+)
+  INFO: 'ℹ️',        // Information - Unicode 3.0
+  MEMO: '📝',        // Note/List - Unicode 6.0
+}
 
 /**
  * Hebrew day names (short)
@@ -39,7 +74,7 @@ function formatDateShort(dateStr) {
 
 /**
  * Build notification payload for available appointments
- * Optimized for Apple's 4KB limit
+ * Optimized for Apple's 4KB limit with engaging emojis
  */
 export function buildAppointmentPayload({ 
   appointments, 
@@ -48,34 +83,34 @@ export function buildAppointmentPayload({
 }) {
   const count = appointments?.length || 0
   
-  // Build concise title
+  // Build concise title with NEW emoji for better engagement
   let title
   if (count === 1) {
     const apt = appointments[0]
     const dayShort = getHebrewDayShort(apt.date)
     const dateShort = formatDateShort(apt.date)
-    title = `תור פנוי ${dayShort} ${dateShort}`
+    title = `${EMOJIS.NEW} תור פנוי ${dayShort} ${dateShort}`
   } else if (count <= 3) {
-    title = `${count} תורים פנויים`
+    title = `${EMOJIS.NEW} ${count} תורים פנויים`
   } else {
-    title = `נמצאו ${count} תורים פנויים`
+    title = `${EMOJIS.TADA} נמצאו ${count} תורים פנויים`
   }
   
-  // Build concise body
+  // Build concise body with urgency indicators
   let body
   if (count === 1) {
     const apt = appointments[0]
     const timesCount = apt.newTimes?.length || apt.times?.length || 0
     body = timesCount === 1 
-      ? `שעה אחת זמינה - הזמן עכשיו!`
-      : `${timesCount} שעות זמינות`
+      ? `${EMOJIS.CLOCK} שעה אחת זמינה - הזמן עכשיו!`
+      : `${EMOJIS.CALENDAR} ${timesCount} שעות זמינות`
   } else {
     // Show first 2-3 dates only
     const previewDates = appointments.slice(0, 3)
     const dateList = previewDates.map(apt => formatDateShort(apt.date)).join(', ')
     body = count > 3 
-      ? `${dateList} ועוד...`
-      : dateList
+      ? `${EMOJIS.CALENDAR} ${dateList} ועוד...`
+      : `${EMOJIS.CALENDAR} ${dateList}`
   }
   
   // Build URL for notification-action page with minimal appointment data
@@ -111,7 +146,7 @@ export function buildAppointmentPayload({
   // Build actions (Book Now only if we have booking URL)
   const actions = bookingUrl
     ? [
-        { action: 'book', title: 'הזמן' },
+        { action: 'book', title: `${EMOJIS.CALENDAR} הזמן` },
         { action: 'view', title: 'פרטים' }
       ]
     : [
@@ -123,6 +158,7 @@ export function buildAppointmentPayload({
 
 /**
  * Build notification payload for hot alerts (urgent appointments)
+ * Uses FIRE emoji for urgent, attention-grabbing notifications
  */
 export function buildHotAlertPayload({ 
   date, 
@@ -135,17 +171,17 @@ export function buildHotAlertPayload({
 }) {
   const dateShort = formatDateShort(date)
   
-  // Urgent, attention-grabbing title
+  // Urgent, attention-grabbing title with fire emoji
   const title = daysUntil === 0 
-    ? `היום! תור פנוי` 
+    ? `${EMOJIS.FIRE} היום! תור פנוי` 
     : daysUntil === 1 
-      ? `מחר! תור פנוי`
-      : `תור חם ב${dayName}`
+      ? `${EMOJIS.FIRE} מחר! תור פנוי`
+      : `${EMOJIS.FIRE} תור חם ב${dayName}`
   
-  // Concise body with urgency
+  // Concise body with urgency and rocket emoji
   const body = daysUntil <= 1
-    ? `${timesCount} שעות פנויות - מהר!`
-    : `${dateShort} - ${timesCount} שעות`
+    ? `${EMOJIS.ROCKET} ${timesCount} שעות פנויות - מהר!`
+    : `${EMOJIS.CALENDAR} ${dateShort} - ${timesCount} שעות`
   
   // Build action URL that includes appointment data for decision page
   const appointmentData = [{ date, times: (times || []).slice(0, 6) }]
@@ -174,7 +210,7 @@ export function buildHotAlertPayload({
   
   const actions = bookingUrl
     ? [
-        { action: 'book', title: 'הזמן עכשיו' },
+        { action: 'book', title: `${EMOJIS.ROCKET} הזמן עכשיו` },
         { action: 'view', title: 'פרטים' }
       ]
     : [
@@ -198,11 +234,11 @@ export function buildWeeklyDigestPayload({
   availableCount, 
   totalTimes 
 }) {
-  const title = 'סיכום שבועי'
+  const title = `${EMOJIS.MEMO} סיכום שבועי`
   
   const body = availableCount > 0
-    ? `${availableCount} ימים עם ${totalTimes} שעות פנויות`
-    : 'אין תורים פנויים השבוע'
+    ? `${EMOJIS.STAR} ${availableCount} ימים עם ${totalTimes} שעות פנויות`
+    : `${EMOJIS.INFO} אין תורים פנויים השבוע`
   
   return buildPayload({
     title,
@@ -225,10 +261,10 @@ export function buildExpiryReminderPayload({
   daysRemaining 
 }) {
   const title = daysRemaining === 0 
-    ? 'ההתראה מסתיימת היום'
-    : 'ההתראה מסתיימת מחר'
+    ? `${EMOJIS.HOURGLASS} ההתראה מסתיימת היום`
+    : `${EMOJIS.HOURGLASS} ההתראה מסתיימת מחר`
   
-  const body = 'רוצה להאריך את מעקב התורים?'
+  const body = `${EMOJIS.BELL} רוצה להאריך את מעקב התורים?`
   
   return buildPayload({
     title,
@@ -258,7 +294,7 @@ export function buildSubscriptionConfirmPayload({
   const startShort = formatDateShort(dateRangeStart)
   const endShort = formatDateShort(dateRangeEnd)
   
-  const title = 'התראה נוצרה בהצלחה'
+  const title = `${EMOJIS.CHECK} התראה נוצרה בהצלחה`
   
   const methodText = method === 'both' 
     ? 'פוש + מייל'
@@ -266,7 +302,7 @@ export function buildSubscriptionConfirmPayload({
       ? 'פוש'
       : 'מייל'
   
-  const body = `${startShort} - ${endShort} (${methodText})`
+  const body = `${EMOJIS.CALENDAR} ${startShort} - ${endShort} (${methodText})`
   
   return buildPayload({
     title,
@@ -294,8 +330,8 @@ export function buildOpportunityPayload({
 }) {
   const dateShort = formatDateShort(date)
   
-  const title = `הזדמנות ב${dayName}`
-  const body = `${dateShort} - ${timesCount} שעות נפתחו`
+  const title = `${EMOJIS.SPARKLES} הזדמנות ב${dayName}`
+  const body = `${EMOJIS.NEW} ${dateShort} - ${timesCount} שעות נפתחו`
   
   // Build action URL that redirects to notification-action page
   const appointmentData = [{ date, times: (times || []).slice(0, 6) }]
@@ -315,7 +351,7 @@ export function buildOpportunityPayload({
     body,
     tag: 'opportunity',
     actions: [
-      { action: 'book', title: 'הזמן' },
+      { action: 'book', title: `${EMOJIS.CALENDAR} הזמן` },
       { action: 'view', title: 'פרטים' }
     ],
     data: {

@@ -181,7 +181,7 @@ class PushNotificationService {
       // Build actions - include Book Now if booking_url is available
       const defaultActions = payload.booking_url
         ? [
-            { action: 'book', title: '🗓 הזמן עכשיו' },
+            { action: 'book', title: '📅 הזמן עכשיו' },
             { action: 'view', title: 'צפה בפרטים' },
             { action: 'dismiss', title: 'סגור' }
           ]
@@ -464,7 +464,7 @@ class PushNotificationService {
   }> {
     return this.sendToUser(userId, {
       title: '🔔 ברוך הבא!',
-      body: `שלום ${username}, התראות Push פעילות!`,
+      body: `שלום ${username}, התראות Push פעילות! ✅`,
       icon: '/icons/icon-192x192.png',
       badge: '/icons/icon-72x72.png',
       url: '/',
