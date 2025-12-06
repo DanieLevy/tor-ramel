@@ -268,7 +268,7 @@ export default function HomePage() {
         threshold={pullToRefresh.threshold}
       />
       
-      <div className="container mx-auto px-4 pt-4 pb-4 max-w-2xl space-y-4">
+      <div className="container mx-auto px-4 pt-4 pb-4 max-w-2xl space-y-4 page-content-bottom-spacing">
         {/* Hero: Appointment Banner */}
         <AppointmentBanner />
       

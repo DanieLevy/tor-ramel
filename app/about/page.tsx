@@ -18,7 +18,7 @@ export default function AboutPage() {
   }, [updateHeader])
 
   return (
-    <div className="container mx-auto px-4 py-6 pb-20 max-w-2xl">
+    <div className="container mx-auto px-4 py-6 pb-20 max-w-2xl page-content-bottom-spacing">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

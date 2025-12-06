@@ -151,6 +151,10 @@
   --glass-transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --glass-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --glass-transition-spring: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Bottom Navigation Height - for proper spacing */
+  --bottom-nav-height: 80px;
+  --bottom-nav-total-height: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .dark {
@@ -704,6 +708,17 @@ body.fonts-failed {
   backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
   border-top: 1px solid var(--glass-border-subtle);
+}
+
+/* Page content padding to avoid bottom nav overlap */
+.page-content-bottom-spacing {
+  padding-bottom: calc(var(--bottom-nav-total-height) + 1rem);
+}
+
+/* Fixed action buttons - should sit above content but below bottom nav */
+.fixed-action-buttons {
+  z-index: 40;
+  padding-bottom: calc(var(--bottom-nav-total-height) + 0.5rem);
 }
 
 /* ============================================

@@ -389,7 +389,7 @@ function SearchPage() {
   const loadingResults = results.filter(r => r.loading)
 
   return (
-    <div className="container max-w-md mx-auto p-4 pb-20">
+    <div className="container max-w-md mx-auto p-4 pb-20 page-content-bottom-spacing">
       {/* Header with animation */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}

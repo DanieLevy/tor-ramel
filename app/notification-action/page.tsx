@@ -410,7 +410,7 @@ function NotificationActionContent() {
       </div>
 
       {/* Fixed Bottom Action Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 safe-area-padding-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 fixed-action-buttons">
         <div className="max-w-lg mx-auto flex gap-3">
           <Button
             onClick={handleDecline}

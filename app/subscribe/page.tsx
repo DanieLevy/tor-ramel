@@ -280,7 +280,7 @@ function SubscribePage() {
 
   return (
     <div className="min-h-full bg-background">
-      <div className="container max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="container max-w-lg mx-auto px-4 py-6 space-y-6 page-content-bottom-spacing">
         
         {/* Hero Header - Clean minimal design */}
         <motion.div 
