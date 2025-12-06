@@ -378,7 +378,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
   const notificationData = event.notification.data || {};
-  const defaultUrl = notificationData.url || '/';
+  let targetUrl = notificationData.url || '/';
   
   // Handle different actions
   if (event.action === 'dismiss') {
@@ -389,35 +389,106 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
   
-  // Handle 'book' action - navigate to app with booking intent
-  if (event.action === 'book') {
-    console.log('[SW] 🗓 Book Now action triggered');
-    // Navigate to notification-action page with book intent, then redirect to booking
-    const bookingUrl = notificationData.booking_url;
-    const appointmentDate = notificationData.appointment_date || notificationData.appointments?.[0]?.date;
-    let targetUrl = '/notification-action?action=book';
+  // Handle 'extend' action for expiry notifications
+  if (event.action === 'extend') {
+    console.log('[SW] ⏳ Extend subscription action triggered');
+    const subscriptionId = notificationData.subscription_id;
+    const expiryDate = notificationData.expiry;
+    const remaining = notificationData.remaining || 0;
     
-    if (appointmentDate) {
-      targetUrl += `&date=${encodeURIComponent(appointmentDate)}`;
-    }
-    if (bookingUrl) {
-      targetUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`;
-    }
-    if (notificationData.subscription_id) {
-      targetUrl += `&subscription=${notificationData.subscription_id}`;
-    }
+    targetUrl = `/expiry-reminder?subscription=${subscriptionId}&expiry=${expiryDate}&remaining=${remaining}`;
     
     event.waitUntil(
       Promise.all([
         updateBadge(0),
-        trackNotificationEvent('clicked', { ...notificationData, action: 'book' }),
+        trackNotificationEvent('clicked', { ...notificationData, action: 'extend' }),
         openOrFocusWindow(targetUrl)
       ])
     );
     return;
   }
   
-  // For 'view' action or general click, open/focus app
+  // Handle 'book' action - navigate to app with booking intent
+  if (event.action === 'book') {
+    console.log('[SW] 🗓 Book Now action triggered');
+    // Navigate to notification-action page with book intent, then redirect to booking
+    const bookingUrl = notificationData.booking_url;
+    const appointmentDate = notificationData.appointment_date || notificationData.appointments?.[0]?.date;
+    let bookTargetUrl = '/notification-action?action=book';
+    
+    if (appointmentDate) {
+      bookTargetUrl += `&date=${encodeURIComponent(appointmentDate)}`;
+    }
+    if (bookingUrl) {
+      bookTargetUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`;
+    }
+    if (notificationData.subscription_id) {
+      bookTargetUrl += `&subscription=${notificationData.subscription_id}`;
+    }
+    
+    event.waitUntil(
+      Promise.all([
+        updateBadge(0),
+        trackNotificationEvent('clicked', { ...notificationData, action: 'book' }),
+        openOrFocusWindow(bookTargetUrl)
+      ])
+    );
+    return;
+  }
+  
+  // Handle notification type-specific routing
+  if (notificationData.type) {
+    console.log('[SW] 📱 Routing based on notification type:', notificationData.type);
+    
+    switch (notificationData.type) {
+      case 'expiry':
+        // Expiry reminder -> expiry-reminder page
+        if (notificationData.subscription_id) {
+          targetUrl = `/expiry-reminder?subscription=${notificationData.subscription_id}`;
+          if (notificationData.expiry) {
+            targetUrl += `&expiry=${notificationData.expiry}`;
+          }
+          if (notificationData.remaining !== undefined) {
+            targetUrl += `&remaining=${notificationData.remaining}`;
+          }
+        }
+        break;
+        
+      case 'digest':
+        // Weekly digest -> weekly-digest page
+        targetUrl = `/weekly-digest?count=${notificationData.available_count || 0}&times=${notificationData.total_times || 0}`;
+        if (notificationData.week_start && notificationData.week_end) {
+          targetUrl += `&start=${notificationData.week_start}&end=${notificationData.week_end}`;
+        }
+        break;
+        
+      case 'subscription':
+        // Subscription confirmation -> subscription-confirmed page
+        if (notificationData.date_start && notificationData.date_end) {
+          targetUrl = `/subscription-confirmed?start=${notificationData.date_start}&end=${notificationData.date_end}`;
+          if (notificationData.method) {
+            targetUrl += `&method=${notificationData.method}`;
+          }
+          if (notificationData.subscription_id) {
+            targetUrl += `&subscription=${notificationData.subscription_id}`;
+          }
+        }
+        break;
+        
+      case 'appointment':
+      case 'hot-alert':
+      case 'opportunity':
+        // Use URL from notification data (already set to /notification-action)
+        // No change needed - falls through to default handling
+        break;
+        
+      default:
+        // Use the URL from notification data or default
+        break;
+    }
+  }
+  
+  // For 'view' action or general click, open/focus app with determined URL
   event.waitUntil(
     Promise.all([
       // Clear badge when notification is opened
@@ -425,7 +496,7 @@ self.addEventListener('notificationclick', (event) => {
       // Track click event
       trackNotificationEvent('clicked', { ...notificationData, action: event.action || 'view' }),
       // Open/focus app window
-      openOrFocusWindow(defaultUrl)
+      openOrFocusWindow(targetUrl)
     ])
   );
 });

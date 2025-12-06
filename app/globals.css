@@ -847,6 +847,177 @@ body.fonts-failed {
   }
 }
 
+/* ============================================
+   Notification Pages Utilities
+   ============================================ */
+
+/* Notification page container - consistent styling */
+.notification-page-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* Success animation keyframes */
+@keyframes success-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes success-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confetti-burst {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--x), var(--y)) rotate(var(--rotate));
+    opacity: 0;
+  }
+}
+
+/* Success animation classes */
+.success-animation {
+  animation: success-bounce 0.6s ease-in-out;
+}
+
+.success-fade-in {
+  animation: success-fade-in 0.5s ease-out;
+}
+
+/* Countdown badge styling */
+.countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-foreground));
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Notification page gradient backgrounds */
+.notification-gradient-green {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.dark .notification-gradient-green {
+  background: linear-gradient(135deg, #0f1e13 0%, #0a1a0f 100%);
+}
+
+.notification-gradient-orange {
+  background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+}
+
+.dark .notification-gradient-orange {
+  background: linear-gradient(135deg, #1e1205 0%, #1a0f05 100%);
+}
+
+.notification-gradient-indigo {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+}
+
+.dark .notification-gradient-indigo {
+  background: linear-gradient(135deg, #0f0f1e 0%, #0a0a1a 100%);
+}
+
+/* Notification card with enhanced shadow */
+.notification-card {
+  background: var(--card);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+}
+
+/* Stat card animations */
+.stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.15);
+}
+
+/* Progress bar animation */
+@keyframes progress-fill {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.progress-bar-animated {
+  animation: progress-fill 1s ease-out;
+}
+
+/* Notification icon bounce */
+@keyframes icon-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.notification-icon-bounce {
+  animation: icon-bounce 1s ease-in-out infinite;
+}
+
+/* Sparkle animation for celebration */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2) rotate(180deg);
+  }
+}
+
+.sparkle-animation {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
 /* Print styles */
 @media print {
 

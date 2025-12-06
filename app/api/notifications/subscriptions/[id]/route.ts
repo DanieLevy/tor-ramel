@@ -70,6 +70,83 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
     
+    // Handle extend_by_days parameter for quick extension
+    if ('extend_by_days' in body) {
+      const days = parseInt(body.extend_by_days)
+      
+      if (isNaN(days) || days < 1 || days > 365) {
+        return NextResponse.json({ 
+          error: 'extend_by_days must be between 1 and 365' 
+        }, { status: 400 })
+      }
+      
+      // Fetch current subscription to get date range
+      const { data: currentSub, error: fetchError } = await supabase
+        .from('notification_subscriptions')
+        .select('subscription_date, date_range_start, date_range_end, user_id')
+        .eq('id', id)
+        .single()
+      
+      if (fetchError || !currentSub) {
+        return NextResponse.json({ error: 'Subscription not found' }, { status: 404 })
+      }
+      
+      if (currentSub.user_id !== user.userId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+      
+      // Calculate new end date
+      let newEndDate: string
+      
+      if (currentSub.subscription_date) {
+        // Single date - extend that date
+        const currentDate = new Date(currentSub.subscription_date + 'T00:00:00')
+        const extended = new Date(currentDate)
+        extended.setDate(extended.getDate() + days)
+        newEndDate = extended.toISOString().split('T')[0]
+        
+        // Update subscription_date
+        const { data: updated, error: updateError } = await supabase
+          .from('notification_subscriptions')
+          .update({ subscription_date: newEndDate })
+          .eq('id', id)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('Error extending subscription:', updateError)
+          return NextResponse.json({ error: 'Failed to extend subscription' }, { status: 500 })
+        }
+        
+        return NextResponse.json(updated)
+      } else if (currentSub.date_range_end) {
+        // Date range - extend the end date
+        const currentEnd = new Date(currentSub.date_range_end + 'T00:00:00')
+        const extended = new Date(currentEnd)
+        extended.setDate(extended.getDate() + days)
+        newEndDate = extended.toISOString().split('T')[0]
+        
+        // Update date_range_end
+        const { data: updated, error: updateError } = await supabase
+          .from('notification_subscriptions')
+          .update({ date_range_end: newEndDate })
+          .eq('id', id)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('Error extending subscription:', updateError)
+          return NextResponse.json({ error: 'Failed to extend subscription' }, { status: 500 })
+        }
+        
+        return NextResponse.json(updated)
+      } else {
+        return NextResponse.json({ 
+          error: 'Subscription has no date to extend' 
+        }, { status: 400 })
+      }
+    }
+    
     // Verify subscription belongs to user
     const { data: subscription, error: fetchError } = await supabase
       .from('notification_subscriptions')

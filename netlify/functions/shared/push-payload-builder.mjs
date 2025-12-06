@@ -232,13 +232,21 @@ export function buildHotAlertPayload({
  */
 export function buildWeeklyDigestPayload({ 
   availableCount, 
-  totalTimes 
+  totalTimes,
+  weekStart,
+  weekEnd
 }) {
   const title = `${EMOJIS.MEMO} סיכום שבועי`
   
   const body = availableCount > 0
     ? `${EMOJIS.STAR} ${availableCount} ימים עם ${totalTimes} שעות פנויות`
     : `${EMOJIS.INFO} אין תורים פנויים השבוע`
+  
+  // Build URL for weekly digest page
+  let url = `/weekly-digest?count=${availableCount}&times=${totalTimes}`
+  if (weekStart && weekEnd) {
+    url += `&start=${weekStart}&end=${weekEnd}`
+  }
   
   return buildPayload({
     title,
@@ -247,7 +255,11 @@ export function buildWeeklyDigestPayload({
     actions: [{ action: 'view', title: 'צפה' }],
     data: {
       type: 'digest',
-      url: '/search'
+      url,
+      available_count: availableCount,
+      total_times: totalTimes,
+      week_start: weekStart,
+      week_end: weekEnd
     },
     requireInteraction: false
   })
@@ -258,13 +270,20 @@ export function buildWeeklyDigestPayload({
  */
 export function buildExpiryReminderPayload({ 
   expiryDate, 
-  daysRemaining 
+  daysRemaining,
+  subscriptionId 
 }) {
   const title = daysRemaining === 0 
     ? `${EMOJIS.HOURGLASS} ההתראה מסתיימת היום`
     : `${EMOJIS.HOURGLASS} ההתראה מסתיימת מחר`
   
   const body = `${EMOJIS.BELL} רוצה להאריך את מעקב התורים?`
+  
+  // Build URL for expiry reminder page
+  let url = '/expiry-reminder'
+  if (subscriptionId) {
+    url += `?subscription=${subscriptionId}&expiry=${expiryDate}&remaining=${daysRemaining}`
+  }
   
   return buildPayload({
     title,
@@ -276,8 +295,10 @@ export function buildExpiryReminderPayload({
     ],
     data: {
       type: 'expiry',
-      url: '/subscribe',
-      expiry: expiryDate
+      url,
+      expiry: expiryDate,
+      remaining: daysRemaining,
+      subscription_id: subscriptionId
     },
     requireInteraction: true
   })
@@ -289,7 +310,8 @@ export function buildExpiryReminderPayload({
 export function buildSubscriptionConfirmPayload({ 
   dateRangeStart, 
   dateRangeEnd,
-  method 
+  method,
+  subscriptionId
 }) {
   const startShort = formatDateShort(dateRangeStart)
   const endShort = formatDateShort(dateRangeEnd)
@@ -304,6 +326,12 @@ export function buildSubscriptionConfirmPayload({
   
   const body = `${EMOJIS.CALENDAR} ${startShort} - ${endShort} (${methodText})`
   
+  // Build URL for subscription confirmed page
+  let url = `/subscription-confirmed?start=${dateRangeStart}&end=${dateRangeEnd}&method=${method}`
+  if (subscriptionId) {
+    url += `&subscription=${subscriptionId}`
+  }
+  
   return buildPayload({
     title,
     body,
@@ -311,7 +339,11 @@ export function buildSubscriptionConfirmPayload({
     actions: [{ action: 'view', title: 'צפה' }],
     data: {
       type: 'subscription',
-      url: '/subscribe'
+      url,
+      subscription_id: subscriptionId,
+      date_start: dateRangeStart,
+      date_end: dateRangeEnd,
+      method
     },
     requireInteraction: false
   })
