@@ -1180,25 +1180,22 @@ export async function processNotificationQueue(limit = 10) {
           }
         }
 
-        // Get notification method preference (default to 'email' for backward compatibility)
-        let notificationMethod = subscription.notification_method || 'email'
-        console.log(`📬 [Queue] Notification method for subscription ${subscription.id}: ${notificationMethod}`)
+        // CRITICAL CHANGE: Use user preferences as single source of truth
+        // Get user's default notification method from preferences
+        const { data: userPrefs } = await supabase
+          .from('user_preferences')
+          .select('default_notification_method')
+          .eq('user_id', subscription.user_id)
+          .single()
+        
+        // Use user preference as THE source of truth (subscription.notification_method is deprecated)
+        let notificationMethod = userPrefs?.default_notification_method || 'email'
+        console.log(`📬 [Queue] Using user preference as source of truth: ${notificationMethod}`)
         console.log(`📬 [Queue] User: ${userEmail}, User ID: ${subscription.user_id}`)
-
-        // ENHANCEMENT: If method is 'push' only, check user preferences for fallback capability
-        // This handles cases where subscription was created with wrong method
-        let canFallbackToEmail = false
-        if (notificationMethod === 'push') {
-          const { data: userPrefs } = await supabase
-            .from('user_preferences')
-            .select('default_notification_method')
-            .eq('user_id', subscription.user_id)
-            .single()
-          
-          if (userPrefs?.default_notification_method === 'both' || userPrefs?.default_notification_method === 'email') {
-            canFallbackToEmail = true
-            console.log(`📋 [Queue] User preference allows email fallback: ${userPrefs.default_notification_method}`)
-          }
+        
+        // Log if subscription has different method (for migration tracking)
+        if (subscription.notification_method && subscription.notification_method !== notificationMethod) {
+          console.log(`⚠️ [Queue] Subscription method (${subscription.notification_method}) differs from user preference (${notificationMethod}) - using user preference`)
         }
 
         // Send notifications based on preference
@@ -1274,9 +1271,9 @@ export async function processNotificationQueue(limit = 10) {
               pushError = 'No active push subscriptions found for user'
               console.error(`❌ [Queue] Push notification failed: ${pushError}`)
               
-              // ENHANCEMENT: Fallback to email if push fails and user allows email
-              if (canFallbackToEmail && !emailSent) {
-                console.log(`📧 [Queue] Attempting email fallback for push-only subscription...`)
+              // SMART FALLBACK: If push fails and user preference is 'both', try email
+              if (notificationMethod === 'both' && !emailSent) {
+                console.log(`📧 [Queue] Push failed but user wants 'both' - attempting email fallback...`)
                 try {
                   const emailTimeout = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Email timeout')), 8000)
@@ -1286,12 +1283,6 @@ export async function processNotificationQueue(limit = 10) {
                   
                   if (emailSent) {
                     console.log(`✅ [Queue] Email fallback sent successfully to ${userEmail}`)
-                    // Update subscription to use 'both' since user clearly wants email too
-                    await supabase
-                      .from('notification_subscriptions')
-                      .update({ notification_method: 'both' })
-                      .eq('id', subscription.id)
-                    console.log(`📋 [Queue] Updated subscription to 'both' for future notifications`)
                   } else {
                     emailError = 'Email fallback sending returned false'
                     console.error(`❌ [Queue] Email fallback failed`)
@@ -1310,10 +1301,9 @@ export async function processNotificationQueue(limit = 10) {
           console.log(`📱 [Queue] Push not required for method: ${notificationMethod}`)
         }
 
-        // Check if at least one notification method succeeded
-        // ENHANCED: Include email fallback success for push-only subscriptions
+        // Check if at least one notification method succeeded based on user preference
         const notificationSent = (notificationMethod === 'email' && emailSent) || 
-                                  (notificationMethod === 'push' && (pushSent || emailSent)) || 
+                                  (notificationMethod === 'push' && pushSent) || 
                                   (notificationMethod === 'both' && (emailSent || pushSent))
         
         // Log detailed results

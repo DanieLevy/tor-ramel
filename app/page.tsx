@@ -11,6 +11,7 @@ import { AppointmentBanner } from '@/components/appointment-banner'
 import { QuickActionCard, QuickActionGrid } from '@/components/quick-action-card'
 import { QuickSubscribe } from '@/components/quick-subscribe'
 import { IgnoredTimesCard } from '@/components/ignored-times-card'
+import { NotificationPreferenceBanner } from '@/components/notification-preference-banner'
 import { useHaptics } from '@/hooks/use-haptics'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
 import { PullToRefreshIndicator } from '@/components/pull-to-refresh'
@@ -271,6 +272,9 @@ export default function HomePage() {
       <div className="container mx-auto px-4 pt-4 pb-4 max-w-2xl space-y-4 page-content-bottom-spacing">
         {/* Hero: Appointment Banner */}
         <AppointmentBanner />
+        
+        {/* Notification Preference Banner */}
+        <NotificationPreferenceBanner />
       
       {/* Quick Actions Grid */}
       <QuickActionGrid>

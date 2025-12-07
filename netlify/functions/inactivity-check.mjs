@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { ISRAEL_TIMEZONE, getDayNameHebrew } from './shared/date-utils.mjs'
 import { isWithinQuietHours, getDaysUntil } from './shared/proactive-notifications.mjs'
+import { sendInactivityEmail } from './shared/email-service.mjs'
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -35,10 +36,10 @@ async function getInactiveUsers() {
   const cutoffDate = new Date()
   cutoffDate.setDate(cutoffDate.getDate() - INACTIVITY_DAYS)
   
-  // Users with preferences and last_app_open older than cutoff
+  // Users with preferences and last_app_open older than cutoff - include notification method
   const { data: inactiveWithPrefs, error: prefError } = await supabase
     .from('user_preferences')
-    .select('user_id, last_app_open, quiet_hours_start, quiet_hours_end, inactivity_alerts_enabled, notification_cooldown_hours, last_proactive_notification_at')
+    .select('user_id, last_app_open, quiet_hours_start, quiet_hours_end, inactivity_alerts_enabled, notification_cooldown_hours, last_proactive_notification_at, default_notification_method')
     .lt('last_app_open', cutoffDate.toISOString())
     .eq('inactivity_alerts_enabled', true)
   
@@ -49,27 +50,38 @@ async function getInactiveUsers() {
   // Also get users without preferences (default behavior)
   const { data: allUsers } = await supabase
     .from('users')
-    .select('id, last_login')
+    .select('id, email, last_login')
     .eq('is_active', true)
     .or(`last_login.lt.${cutoffDate.toISOString()},last_login.is.null`)
   
   // Users with preferences
   const userIdsWithPrefs = new Set((inactiveWithPrefs || []).map(u => u.user_id))
   
+  // Create a map to get user emails
+  const userEmailMap = new Map((allUsers || []).map(u => [u.id, u.email]))
+  
+  // Add email to users with preferences
+  const inactiveWithPrefsAndEmail = (inactiveWithPrefs || []).map(u => ({
+    ...u,
+    email: userEmailMap.get(u.user_id)
+  }))
+  
   // Users without preferences who are inactive
   const inactiveWithoutPrefs = (allUsers || [])
     .filter(u => !userIdsWithPrefs.has(u.id))
     .map(u => ({
       user_id: u.id,
+      email: u.email,
       last_app_open: u.last_login,
       quiet_hours_start: '22:00',
       quiet_hours_end: '07:00',
       inactivity_alerts_enabled: true,
       notification_cooldown_hours: 4,
-      last_proactive_notification_at: null
+      last_proactive_notification_at: null,
+      default_notification_method: 'email'
     }))
   
-  return [...(inactiveWithPrefs || []), ...inactiveWithoutPrefs]
+  return [...inactiveWithPrefsAndEmail, ...inactiveWithoutPrefs]
 }
 
 /**
@@ -224,7 +236,7 @@ async function createInAppNotification(userId, title, body, data = {}) {
 /**
  * Log proactive notification
  */
-async function logProactiveNotification(userId, relatedDates) {
+async function logProactiveNotification(userId, relatedDates, emailSent = false, pushSent = false) {
   try {
     const dedupKey = `inactivity-${new Date().toISOString().split('T')[0]}`
     
@@ -235,7 +247,8 @@ async function logProactiveNotification(userId, relatedDates) {
         notification_type: 'inactivity',
         related_dates: relatedDates,
         dedup_key: dedupKey,
-        push_sent: true,
+        data: { email_sent: emailSent },
+        push_sent: pushSent,
         in_app_created: true
       })
     
@@ -300,6 +313,13 @@ async function processInactivityCheck() {
   
   for (const user of inactiveUsers) {
     const userId = user.user_id
+    const userEmail = user.email
+    
+    if (!userEmail) {
+      console.log(`[Inactivity] No email found for user ${userId}, skipping`)
+      totalSkipped++
+      continue
+    }
     
     // Check quiet hours
     if (isWithinQuietHours(user.quiet_hours_start, user.quiet_hours_end)) {
@@ -330,14 +350,53 @@ async function processInactivityCheck() {
       continue
     }
     
-    // Send push notification
-    const pushResult = await sendPushToUser(userId, title, body, {
-      type: 'inactivity',
-      appointments_count: appointments.length,
-      closest_date: closest.check_date
-    })
+    // Get user's notification method preference
+    const method = user.default_notification_method || 'email'
+    console.log(`[Inactivity] Sending to ${userEmail} via ${method}`)
     
-    if (pushResult.sent > 0) {
+    let emailSent = false
+    let pushSent = false
+    
+    // Calculate days since last visit for email
+    const daysSinceLastVisit = user.last_app_open 
+      ? Math.floor((Date.now() - new Date(user.last_app_open).getTime()) / (1000 * 60 * 60 * 24))
+      : INACTIVITY_DAYS
+    
+    // Send email if method is 'email' or 'both'
+    if (method === 'email' || method === 'both') {
+      try {
+        emailSent = await sendInactivityEmail(userEmail, {
+          userName: userEmail.split('@')[0],
+          daysSinceLastVisit,
+          availableAppointments: appointments.length
+        })
+        if (emailSent) {
+          console.log(`✅ [Inactivity] Email sent to ${userEmail}`)
+        }
+      } catch (error) {
+        console.error(`❌ [Inactivity] Email failed for ${userEmail}:`, error.message)
+      }
+    }
+    
+    // Send push notification if method is 'push' or 'both'
+    if (method === 'push' || method === 'both') {
+      const pushResult = await sendPushToUser(userId, title, body, {
+        type: 'inactivity',
+        appointments_count: appointments.length,
+        closest_date: closest.check_date
+      })
+      pushSent = pushResult.sent > 0
+      if (pushSent) {
+        console.log(`✅ [Inactivity] Push sent to ${userEmail}`)
+      }
+    }
+    
+    // Check if at least one notification was sent based on preference
+    const success = (method === 'email' && emailSent) ||
+                    (method === 'push' && pushSent) ||
+                    (method === 'both' && (emailSent || pushSent))
+    
+    if (success) {
       // Create in-app notification
       await createInAppNotification(userId, title, body, {
         appointments_count: appointments.length,
@@ -350,9 +409,11 @@ async function processInactivityCheck() {
       })
       
       // Log the notification
-      await logProactiveNotification(userId, relatedDates)
+      await logProactiveNotification(userId, relatedDates, emailSent, pushSent)
       
       totalSent++
+    } else {
+      totalSkipped++
     }
   }
   
