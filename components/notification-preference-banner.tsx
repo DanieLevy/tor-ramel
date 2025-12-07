@@ -31,7 +31,9 @@ export function NotificationPreferenceBanner({ className }: NotificationPreferen
       
       if (response.ok) {
         const data = await response.json()
-        setMethod(data.default_notification_method || 'email')
+        // API returns { success: true, preferences: { ... } }
+        const prefs = data.preferences || data
+        setMethod(prefs.default_notification_method || 'email')
       }
     } catch (error) {
       console.error('Failed to fetch notification preferences:', error)
@@ -49,7 +51,8 @@ export function NotificationPreferenceBanner({ className }: NotificationPreferen
       case 'email':
         return {
           icon: Mail,
-          text: 'התראות במייל',
+          title: 'העדפת קבלת התראות',
+          text: 'מייל בלבד',
           bgColor: 'bg-blue-50 dark:bg-blue-950/20',
           borderColor: 'border-blue-200 dark:border-blue-800/30',
           iconColor: 'text-blue-600 dark:text-blue-400',
@@ -58,7 +61,8 @@ export function NotificationPreferenceBanner({ className }: NotificationPreferen
       case 'push':
         return {
           icon: BellRing,
-          text: 'התראות Push',
+          title: 'העדפת קבלת התראות',
+          text: 'התראות Push בלבד',
           bgColor: 'bg-purple-50 dark:bg-purple-950/20',
           borderColor: 'border-purple-200 dark:border-purple-800/30',
           iconColor: 'text-purple-600 dark:text-purple-400',
@@ -67,7 +71,8 @@ export function NotificationPreferenceBanner({ className }: NotificationPreferen
       case 'both':
         return {
           icon: null,
-          text: 'התראות במייל + Push',
+          title: 'העדפת קבלת התראות',
+          text: 'מייל + Push (שניהם)',
           bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
           borderColor: 'border-emerald-200 dark:border-emerald-800/30',
           iconColor: 'text-emerald-600 dark:text-emerald-400',
@@ -126,14 +131,14 @@ export function NotificationPreferenceBanner({ className }: NotificationPreferen
             ) : null}
             
             <div className="flex flex-col min-w-0">
+              <p className="text-[10px] text-muted-foreground truncate">
+                {config.title}
+              </p>
               <p className={cn(
-                "text-xs font-medium truncate",
+                "text-xs font-semibold truncate",
                 config.textColor
               )}>
                 {config.text}
-              </p>
-              <p className="text-[10px] text-muted-foreground truncate">
-                לחץ לשינוי
               </p>
             </div>
           </div>
