@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Loader2, Zap, Calendar, CalendarRange } from 'lucide-react'
+import { Loader2, Zap, Calendar, CalendarRange, CheckCircle2 } from 'lucide-react'
 import { cn, pwaFetch } from '@/lib/utils'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useHaptics } from '@/hooks/use-haptics'
 import { useRouter } from 'next/navigation'
+import { Interactive } from '@/components/page-transition'
 
 interface QuickSubscribePreset {
   id: string
@@ -15,7 +16,8 @@ interface QuickSubscribePreset {
   sublabel: string
   icon: typeof Calendar
   daysAhead: number
-  variant: 'default' | 'secondary' | 'outline'
+  color: string
+  hoverColor: string
 }
 
 const PRESETS: QuickSubscribePreset[] = [
@@ -25,7 +27,8 @@ const PRESETS: QuickSubscribePreset[] = [
     sublabel: '7 ימים',
     icon: Calendar,
     daysAhead: 7,
-    variant: 'default',
+    color: 'bg-blue-500',
+    hoverColor: 'hover:bg-blue-600',
   },
   {
     id: 'two-weeks',
@@ -33,7 +36,8 @@ const PRESETS: QuickSubscribePreset[] = [
     sublabel: '14 ימים',
     icon: CalendarRange,
     daysAhead: 14,
-    variant: 'secondary',
+    color: 'bg-indigo-500',
+    hoverColor: 'hover:bg-indigo-600',
   },
   {
     id: 'month',
@@ -41,7 +45,8 @@ const PRESETS: QuickSubscribePreset[] = [
     sublabel: '30 ימים',
     icon: CalendarRange,
     daysAhead: 30,
-    variant: 'outline',
+    color: 'bg-violet-500',
+    hoverColor: 'hover:bg-violet-600',
   },
 ]
 
@@ -52,6 +57,7 @@ interface QuickSubscribeProps {
 
 export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps) {
   const [loading, setLoading] = useState<string | null>(null)
+  const [successId, setSuccessId] = useState<string | null>(null)
   const haptics = useHaptics()
   const router = useRouter()
 
@@ -67,7 +73,6 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
       const startDateStr = today.toISOString().split('T')[0]
       const endDateStr = endDate.toISOString().split('T')[0]
 
-      // Don't pass notification_method - let API use user's default preference
       const response = await pwaFetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,15 +84,22 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
 
       if (response.ok) {
         haptics.success()
-        toast.success(`נרשמת להתראות עבור ${preset.label}!`)
-        onSubscribed?.()
+        setSuccessId(preset.id)
+        toast.success(`נרשמת להתראות עבור ${preset.label}!`, {
+          icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        })
+        
+        // Show success state briefly then callback
+        setTimeout(() => {
+          setSuccessId(null)
+          onSubscribed?.()
+        }, 1000)
       } else {
         const data = await response.json()
         haptics.error()
         toast.error(data.error || 'שגיאה ביצירת ההתראה')
       }
-    } catch (error) {
-      console.error('Quick subscribe error:', error)
+    } catch {
       haptics.error()
       toast.error('שגיאה ביצירת ההתראה')
     } finally {
@@ -95,78 +107,115 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
     }
   }
 
+  const handleCustomClick = () => {
+    haptics.light()
+    router.push('/subscribe')
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn('rounded-2xl border border-border bg-card p-4', className)}
+      className={cn('rounded-2xl border border-border bg-card overflow-hidden', className)}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="p-1.5 rounded-lg bg-amber-500">
-          <Zap className="h-4 w-4 text-white" />
+      <div className="p-4 pb-0">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-amber-500">
+            <Zap className="h-4 w-4 text-white" />
+          </div>
+          <h3 className="font-semibold text-sm">התראה מהירה</h3>
         </div>
-        <h3 className="font-semibold text-sm">התראה מהירה</h3>
       </div>
 
       {/* Preset Buttons */}
-      <div className="grid grid-cols-3 gap-2">
-        {PRESETS.map((preset) => {
-          const Icon = preset.icon
-          const isLoading = loading === preset.id
+      <div className="p-4 pt-0">
+        <div className="grid grid-cols-3 gap-2">
+          {PRESETS.map((preset, index) => {
+            const Icon = preset.icon
+            const isLoading = loading === preset.id
+            const isSuccess = successId === preset.id
+            const isDisabled = loading !== null || successId !== null
 
-          return (
-            <Button
-              key={preset.id}
-              variant={preset.variant}
-              size="sm"
-              disabled={loading !== null}
-              onClick={() => handleQuickSubscribe(preset)}
-              className={cn(
-                'h-auto flex-col gap-1 py-3 touch-manipulation',
-                preset.variant === 'default' && 'bg-blue-500 hover:bg-blue-600 text-white',
-                preset.variant === 'secondary' && 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200 dark:hover:bg-indigo-900/60',
-                preset.variant === 'outline' && 'bg-gray-50 dark:bg-gray-800/50'
-              )}
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Icon className={cn(
-                  'h-4 w-4',
-                  preset.variant === 'default' ? 'text-white' : ''
-                )} />
-              )}
-              <span className={cn(
-                'text-xs font-medium',
-                preset.variant === 'default' ? 'text-white' : ''
-              )}>
-                {preset.label}
-              </span>
-              <span className={cn(
-                'text-[10px] opacity-70',
-                preset.variant === 'default' ? 'text-white/80' : 'text-muted-foreground'
-              )}>
-                {preset.sublabel}
-              </span>
-            </Button>
-          )
-        })}
-      </div>
+            return (
+              <motion.div
+                key={preset.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Interactive disabled={isDisabled}>
+                  <button
+                    disabled={isDisabled}
+                    onClick={() => handleQuickSubscribe(preset)}
+                    className={cn(
+                      'w-full flex flex-col items-center gap-1.5 py-3.5 px-2 rounded-xl',
+                      'text-white font-medium transition-all duration-200',
+                      'touch-manipulation active:scale-95',
+                      'disabled:opacity-70 disabled:cursor-not-allowed',
+                      preset.color,
+                      !isDisabled && preset.hoverColor,
+                      isSuccess && 'bg-emerald-500'
+                    )}
+                    aria-label={`הרשמה להתראות עבור ${preset.label}`}
+                  >
+                    <AnimatePresence mode="wait">
+                      {isLoading ? (
+                        <motion.div
+                          key="loading"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                        >
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        </motion.div>
+                      ) : isSuccess ? (
+                        <motion.div
+                          key="success"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                        >
+                          <CheckCircle2 className="h-5 w-5" />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="icon"
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    <span className="text-xs font-semibold">
+                      {isSuccess ? 'נרשמת!' : preset.label}
+                    </span>
+                    
+                    {!isSuccess && (
+                      <span className="text-[10px] opacity-80">
+                        {preset.sublabel}
+                      </span>
+                    )}
+                  </button>
+                </Interactive>
+              </motion.div>
+            )
+          })}
+        </div>
 
-      {/* Custom Link */}
-      <div className="mt-3 text-center">
-        <Button
-          variant="link"
-          size="sm"
-          className="text-xs text-muted-foreground h-auto p-0"
-          onClick={() => {
-            haptics.light()
-            router.push('/subscribe')
-          }}
-        >
-          או בחר תאריכים מותאמים אישית →
-        </Button>
+        {/* Custom Link */}
+        <div className="mt-3 text-center">
+          <Button
+            variant="link"
+            size="sm"
+            className="text-xs text-muted-foreground h-auto p-0 hover:text-primary transition-colors"
+            onClick={handleCustomClick}
+          >
+            או בחר תאריכים מותאמים אישית →
+          </Button>
+        </div>
       </div>
     </motion.div>
   )

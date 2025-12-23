@@ -14,6 +14,7 @@ import { IgnoredTimesCard } from '@/components/ignored-times-card'
 import { NotificationPreferenceBanner } from '@/components/notification-preference-banner'
 import { useHaptics } from '@/hooks/use-haptics'
 import { usePullToRefresh } from '@/hooks/use-pull-to-refresh'
+import { useApi } from '@/hooks/use-api'
 import { PullToRefreshIndicator } from '@/components/pull-to-refresh'
 import Link from 'next/link'
 import { format, isPast } from 'date-fns'
@@ -52,20 +53,44 @@ export default function HomePage() {
   const updateHeader = useHeader()
   const { user, isLoading } = useAuth()
   const haptics = useHaptics()
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
-  const [fetchingSubscriptions, setFetchingSubscriptions] = useState(true)
-  const [homeStats, setHomeStats] = useState<HomeStats | null>(null)
   const [nextCheckCountdown, setNextCheckCountdown] = useState(300)
+
+  // Use optimized API hooks with stale-while-revalidate caching
+  const { 
+    data: homeStats, 
+    refetch: refetchStats
+  } = useApi<HomeStats>(
+    user ? '/api/home/stats' : null,
+    { 
+      staleTime: 10000,   // 10 seconds - show cached data for 10s
+      cacheTime: 60000,   // 60 seconds - keep in cache for 1 minute
+      refetchOnFocus: true,
+      refetchOnReconnect: true
+    }
+  )
+
+  const { 
+    data: subscriptions, 
+    isLoading: fetchingSubscriptions,
+    refetch: refetchSubscriptions
+  } = useApi<Subscription[]>(
+    user ? '/api/notifications/subscriptions' : null,
+    { 
+      staleTime: 15000,   // 15 seconds
+      cacheTime: 120000,  // 2 minutes
+      refetchOnFocus: true
+    }
+  )
 
   // Pull-to-refresh handler
   const handleRefresh = useCallback(async () => {
     toast.info('מרענן נתונים...')
     await Promise.all([
-      fetchHomeStats(),
-      fetchSubscriptions()
+      refetchStats(),
+      refetchSubscriptions()
     ])
     toast.success('הנתונים עודכנו')
-  }, [])
+  }, [refetchStats, refetchSubscriptions])
 
   // Pull-to-refresh hook
   const pullToRefresh = usePullToRefresh({
@@ -81,32 +106,19 @@ export default function HomePage() {
     })
   }, [updateHeader])
 
+  // Initialize countdown from API response
   useEffect(() => {
-    if (user) {
-      fetchSubscriptions()
-      fetchHomeStats()
+    if (homeStats?.nextCheckIn) {
+      setNextCheckCountdown(homeStats.nextCheckIn)
     }
-  }, [user])
-
-  const fetchHomeStats = async () => {
-    try {
-      const response = await pwaFetch('/api/home/stats')
-      if (response.ok) {
-        const data = await response.json()
-        setHomeStats(data)
-        setNextCheckCountdown(data.nextCheckIn)
-      }
-    } catch (error) {
-      console.error('Failed to fetch home stats:', error)
-    }
-  }
+  }, [homeStats?.nextCheckIn])
 
   // Countdown timer
   useEffect(() => {
     const interval = setInterval(() => {
       setNextCheckCountdown(prev => {
         if (prev <= 1) {
-          fetchHomeStats()
+          refetchStats()
           return 300
         }
         return prev - 1
@@ -114,25 +126,7 @@ export default function HomePage() {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [])
-
-  const fetchSubscriptions = async () => {
-    try {
-      const response = await pwaFetch('/api/notifications/subscriptions', {
-        method: 'GET',
-        credentials: 'include'
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setSubscriptions(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch subscriptions:', error)
-    } finally {
-      setFetchingSubscriptions(false)
-    }
-  }
+  }, [refetchStats])
 
   const handleDelete = async (id: string) => {
     haptics.medium()
@@ -144,14 +138,13 @@ export default function HomePage() {
       if (response.ok) {
         haptics.success()
         toast.success('המנוי בוטל בהצלחה')
-        fetchSubscriptions()
-        fetchHomeStats()
+        // Refetch both - optimized with caching
+        await Promise.all([refetchSubscriptions(), refetchStats()])
       } else {
         haptics.error()
         toast.error('שגיאה בביטול המנוי')
       }
-    } catch (error) {
-      console.error('Delete error:', error)
+    } catch {
       haptics.error()
       toast.error('שגיאה בביטול המנוי')
     }
@@ -171,13 +164,12 @@ export default function HomePage() {
       if (response.ok) {
         haptics.success()
         toast.success(newStatus === 'paused' ? 'המנוי הושהה' : 'המנוי חודש')
-        fetchSubscriptions()
+        await refetchSubscriptions()
       } else {
         haptics.error()
         toast.error('שגיאה בעדכון המנוי')
       }
-    } catch (error) {
-      console.error('Pause/Resume error:', error)
+    } catch {
       haptics.error()
       toast.error('שגיאה בעדכון המנוי')
     }
@@ -217,7 +209,7 @@ export default function HomePage() {
     return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
   }
 
-  const activeSubscriptions = subscriptions.filter(sub => sub.is_active)
+  const activeSubscriptions = (subscriptions ?? []).filter(sub => sub.is_active)
 
   if (isLoading) {
     return (
@@ -316,8 +308,8 @@ export default function HomePage() {
       {activeSubscriptions.length === 0 && (
         <QuickSubscribe 
           onSubscribed={() => {
-            fetchSubscriptions()
-            fetchHomeStats()
+            // Optimistic refetch with caching
+            Promise.all([refetchSubscriptions(), refetchStats()])
           }}
         />
       )}

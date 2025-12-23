@@ -1,60 +1,81 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ExternalLink, AlertCircle, Sparkles, CalendarCheck, Flame, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { AppointmentBannerSkeleton } from '@/components/ui/loading-states'
+import { AsyncErrorFallback } from '@/components/error-boundary'
 import { cn } from '@/lib/utils'
 import { useHaptics } from '@/hooks/use-haptics'
+import { useApi } from '@/hooks/use-api'
 import { motion } from 'framer-motion'
+import type { AppointmentStats } from '@/lib/types/api'
 
-interface Appointment {
-  date: string
-  dayName: string
-  times: string[]
-  bookingUrl: string
-}
+// Scan interval in milliseconds (5 minutes - syncs with Netlify auto-check)
+const SCAN_INTERVAL_MS = 5 * 60 * 1000
 
-interface Stats {
-  lastCheckTime: string | null
-  todayChecks: number
-  availableAppointments: number
-  nearestAppointment: Appointment | null
-}
-
+/**
+ * AppointmentBanner Component
+ * Displays the nearest available appointment with smart urgency indicators
+ * Auto-refreshes on new scan completion (every 5 minutes)
+ */
 export function AppointmentBanner() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const haptics = useHaptics()
+  const lastCheckTimeRef = useRef<string | null>(null)
 
+  // Use optimized API hook with stale-while-revalidate
+  const { 
+    data: stats, 
+    isLoading, 
+    error,
+    refetch 
+  } = useApi<AppointmentStats>('/api/appointments/stats', {
+    staleTime: 30000,     // Show cached data for 30s
+    cacheTime: 120000,    // Keep in cache for 2 minutes
+    refetchOnFocus: true, // Refresh when user returns to tab
+    refetchOnReconnect: true
+  })
+
+  // Auto-refresh when scan completes (check every minute for new scans)
   useEffect(() => {
-    fetchStats()
-    // Refresh every 2 minutes
-    const interval = setInterval(fetchStats, 2 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const fetchStats = async () => {
-    try {
-      const response = await fetch('/api/appointments/stats', {
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch stats')
+    const checkForNewScan = () => {
+      if (stats?.lastCheckTime && stats.lastCheckTime !== lastCheckTimeRef.current) {
+        // New scan detected - trigger haptic and refresh
+        if (lastCheckTimeRef.current !== null) {
+          haptics.light()
+        }
+        lastCheckTimeRef.current = stats.lastCheckTime
       }
-      
-      const data = await response.json()
-      setStats(data)
-      setError(false)
-    } catch (err) {
-      console.error('Failed to fetch stats:', err)
-      setError(true)
-    } finally {
-      setLoading(false)
     }
-  }
+
+    // Check immediately when stats change
+    checkForNewScan()
+
+    // Set up interval to poll for new scans (every 60 seconds)
+    const pollInterval = setInterval(() => {
+      refetch()
+    }, 60000)
+
+    // Also set up a sync with the 5-minute scan cycle
+    const now = new Date()
+    const currentMinutes = now.getMinutes()
+    const currentSeconds = now.getSeconds()
+    const nextScanMinute = Math.ceil(currentMinutes / 5) * 5
+    const msUntilNextScan = ((nextScanMinute - currentMinutes) * 60 - currentSeconds) * 1000
+
+    // Refetch slightly after scan completes (10 seconds after)
+    const scanSyncTimeout = setTimeout(() => {
+      refetch()
+      // Then continue every 5 minutes
+      const scanInterval = setInterval(refetch, SCAN_INTERVAL_MS)
+      return () => clearInterval(scanInterval)
+    }, msUntilNextScan + 10000)
+
+    return () => {
+      clearInterval(pollInterval)
+      clearTimeout(scanSyncTimeout)
+    }
+  }, [stats?.lastCheckTime, refetch, haptics])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00')
@@ -77,7 +98,7 @@ export function AppointmentBanner() {
     return `בעוד ${diffInDays} ימים`
   }
 
-  const getUrgencyLevel = (dateStr: string) => {
+  const getUrgencyLevel = (dateStr: string): 'urgent' | 'soon' | 'normal' => {
     const date = new Date(dateStr + 'T00:00:00')
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -92,25 +113,29 @@ export function AppointmentBanner() {
     haptics.medium()
   }
 
-  if (loading) {
+  // Loading state with skeleton
+  if (isLoading) {
+    return <AppointmentBannerSkeleton />
+  }
+
+  // Error state with retry
+  if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full"
-      >
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <Skeleton className="h-24 w-full rounded-xl" />
-        </div>
-      </motion.div>
+      <AsyncErrorFallback 
+        error={error} 
+        resetError={refetch}
+      />
     )
   }
 
-  if (error || !stats) {
+  // No data state
+  if (!stats) {
     return null
   }
 
-  const urgency = stats.nearestAppointment ? getUrgencyLevel(stats.nearestAppointment.date) : 'normal'
+  const urgency = stats.nearestAppointment 
+    ? getUrgencyLevel(stats.nearestAppointment.date) 
+    : 'normal'
 
   return (
     <motion.div
@@ -156,7 +181,7 @@ export function AppointmentBanner() {
             {/* Header with icon and status */}
             <div className="flex items-start gap-3">
               <div className={cn(
-                "flex h-12 w-12 items-center justify-center rounded-xl",
+                "flex h-12 w-12 items-center justify-center rounded-xl transition-transform hover:scale-105",
                 urgency === 'urgent'
                   ? "bg-orange-500"
                   : "bg-green-500"
@@ -189,8 +214,11 @@ export function AppointmentBanner() {
                 שעות:
               </span>
               {stats.nearestAppointment.times.slice(0, 4).map((time, idx) => (
-                <span 
-                  key={idx} 
+                <motion.span 
+                  key={idx}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.05 }}
                   className={cn(
                     "text-xs font-semibold px-2.5 py-1 rounded-lg",
                     "bg-white dark:bg-gray-900 border",
@@ -200,7 +228,7 @@ export function AppointmentBanner() {
                   )}
                 >
                   {time}
-                </span>
+                </motion.span>
               ))}
               {stats.nearestAppointment.times.length > 4 && (
                 <span className={cn(
@@ -228,9 +256,10 @@ export function AppointmentBanner() {
               asChild
             >
               <a
-                href={stats.nearestAppointment.bookingUrl}
+                href={stats.nearestAppointment.bookingUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={urgency === 'urgent' ? 'הזמן תור עכשיו - דחוף' : 'הזמן תור עכשיו'}
               >
                 <span>{urgency === 'urgent' ? 'הזמן עכשיו!' : 'הזמן עכשיו'}</span>
                 <ExternalLink className="mr-2 h-4 w-4" />
