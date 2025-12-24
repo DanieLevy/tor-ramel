@@ -3,7 +3,7 @@
  * Provides native-feeling tactile feedback for PWA interactions
  */
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 
 type HapticPattern = VibratePattern
 
@@ -48,6 +48,7 @@ const PATTERNS: Record<string, HapticPattern> = {
 /**
  * Hook for haptic feedback on iOS and Android devices
  * Falls back gracefully on unsupported devices
+ * Returns a stable object reference to prevent unnecessary re-renders
  */
 export const useHaptics = (): HapticFeedback => {
   const isSupported = typeof navigator !== 'undefined' && 'vibrate' in navigator
@@ -74,7 +75,9 @@ export const useHaptics = (): HapticFeedback => {
   const notification = useCallback(() => vibrate(PATTERNS.notification), [vibrate])
   const custom = useCallback((pattern: HapticPattern) => vibrate(pattern), [vibrate])
 
-  return {
+  // Return a stable object reference using useMemo to prevent re-renders
+  // when this hook's return value is used in dependency arrays
+  return useMemo(() => ({
     light,
     medium,
     heavy,
@@ -86,7 +89,7 @@ export const useHaptics = (): HapticFeedback => {
     notification,
     custom,
     isSupported,
-  }
+  }), [light, medium, heavy, success, error, warning, selection, impact, notification, custom, isSupported])
 }
 
 /**

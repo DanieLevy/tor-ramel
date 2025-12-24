@@ -203,12 +203,16 @@ export const useApi = <T>(
     }
   }, [url, fetchData])
 
+  // Use a ref to always have access to the latest fetchData without adding it as a dependency
+  const fetchDataRef = useRef(fetchData)
+  fetchDataRef.current = fetchData
+
   const refetch = useCallback(async () => {
     if (url) {
       cache.delete(url)
     }
-    await fetchData()
-  }, [url, fetchData])
+    await fetchDataRef.current()
+  }, [url]) // Only depends on url, not fetchData - stable reference
 
   return {
     data,

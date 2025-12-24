@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { ExternalLink, AlertCircle, Sparkles, CalendarCheck, Flame, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AppointmentBannerSkeleton } from '@/components/ui/loading-states'
@@ -11,9 +11,6 @@ import { useApi } from '@/hooks/use-api'
 import { motion } from 'framer-motion'
 import type { AppointmentStats } from '@/lib/types/api'
 
-// Scan interval in milliseconds (5 minutes - syncs with Netlify auto-check)
-const SCAN_INTERVAL_MS = 5 * 60 * 1000
-
 /**
  * AppointmentBanner Component
  * Displays the nearest available appointment with smart urgency indicators
@@ -22,6 +19,7 @@ const SCAN_INTERVAL_MS = 5 * 60 * 1000
 export function AppointmentBanner() {
   const haptics = useHaptics()
   const lastCheckTimeRef = useRef<string | null>(null)
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Use optimized API hook with stale-while-revalidate
   const { 
@@ -36,46 +34,60 @@ export function AppointmentBanner() {
     refetchOnReconnect: true
   })
 
-  // Auto-refresh when scan completes (check every minute for new scans)
+  // Stable reference for haptic feedback
+  const triggerHaptic = useCallback(() => {
+    haptics.light()
+  }, [haptics])
+
+  // Check for new scan and trigger haptic - runs when stats change
   useEffect(() => {
-    const checkForNewScan = () => {
-      if (stats?.lastCheckTime && stats.lastCheckTime !== lastCheckTimeRef.current) {
-        // New scan detected - trigger haptic and refresh
-        if (lastCheckTimeRef.current !== null) {
-          haptics.light()
-        }
-        lastCheckTimeRef.current = stats.lastCheckTime
+    if (stats?.lastCheckTime && stats.lastCheckTime !== lastCheckTimeRef.current) {
+      // New scan detected - trigger haptic only if we had a previous value (not initial load)
+      if (lastCheckTimeRef.current !== null) {
+        triggerHaptic()
       }
+      lastCheckTimeRef.current = stats.lastCheckTime
     }
+  }, [stats?.lastCheckTime, triggerHaptic])
 
-    // Check immediately when stats change
-    checkForNewScan()
-
-    // Set up interval to poll for new scans (every 60 seconds)
+  // Set up polling interval - runs once on mount
+  useEffect(() => {
+    // Poll for new data every 60 seconds (background refresh)
     const pollInterval = setInterval(() => {
       refetch()
     }, 60000)
 
-    // Also set up a sync with the 5-minute scan cycle
+    // Calculate time until next 5-minute scan cycle
     const now = new Date()
     const currentMinutes = now.getMinutes()
     const currentSeconds = now.getSeconds()
-    const nextScanMinute = Math.ceil(currentMinutes / 5) * 5
-    const msUntilNextScan = ((nextScanMinute - currentMinutes) * 60 - currentSeconds) * 1000
+    const nextScanMinute = Math.ceil((currentMinutes + 1) / 5) * 5
+    const minutesUntilNext = nextScanMinute > currentMinutes 
+      ? nextScanMinute - currentMinutes 
+      : 5 - (currentMinutes % 5)
+    const msUntilNextScan = Math.max(
+      (minutesUntilNext * 60 - currentSeconds) * 1000,
+      10000 // Minimum 10 seconds
+    )
 
-    // Refetch slightly after scan completes (10 seconds after)
+    // Sync with scan cycle - refetch 10 seconds after scheduled scan completes
     const scanSyncTimeout = setTimeout(() => {
       refetch()
-      // Then continue every 5 minutes
-      const scanInterval = setInterval(refetch, SCAN_INTERVAL_MS)
-      return () => clearInterval(scanInterval)
+      
+      // Set up recurring 5-minute interval
+      scanIntervalRef.current = setInterval(() => {
+        refetch()
+      }, 5 * 60 * 1000)
     }, msUntilNextScan + 10000)
 
     return () => {
       clearInterval(pollInterval)
       clearTimeout(scanSyncTimeout)
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current)
+      }
     }
-  }, [stats?.lastCheckTime, refetch, haptics])
+  }, [refetch]) // Only depends on refetch - runs once on mount
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00')
