@@ -83,13 +83,14 @@ function formatDateShort(dateStr) {
 /**
  * Build notification payload for available appointments
  * Optimized for Apple's 4KB limit with engaging emojis
- * ENHANCED: Uses data_id approach for large payloads to prevent HTTP 413 errors
+ * 
+ * IMPORTANT: Always includes appointment data to ensure notification-action page works.
+ * Limits data to prevent HTTP 413 errors while maintaining functionality.
  */
 export function buildAppointmentPayload({ 
   appointments, 
   subscriptionId,
-  bookingUrl,
-  dataId = null  // Optional: pre-stored data ID to avoid embedding large data
+  bookingUrl
 }) {
   const count = appointments?.length || 0
   
@@ -123,40 +124,37 @@ export function buildAppointmentPayload({
       : `${EMOJIS.CALENDAR} ${dateList}`
   }
   
-  // Build URL - use data_id if provided (for large payloads), otherwise minimal inline data
-  let actionUrl = `/notification-action?subscription=${subscriptionId}`
+  // ALWAYS include appointment data in URL - limit to 5 appointments with 4 times each
+  // This ensures the notification-action page can always display the data
+  const maxAppointments = 5
+  const maxTimesPerAppointment = 4
   
-  if (dataId) {
-    // Large payload stored in DB - just send ID (keeps payload tiny!)
-    actionUrl += `&data_id=${dataId}`
-  } else if (count <= 3) {
-    // Small payload - safe to inline (max 3 appointments with 6 times each)
-    const appointmentData = appointments.slice(0, 3).map(apt => ({
-      date: apt.date,
-      times: (apt.newTimes || apt.times || []).slice(0, 6)
-    }))
-    const compactAppts = encodeURIComponent(JSON.stringify(appointmentData))
-    actionUrl += `&appointments=${compactAppts}`
-  } else {
-    // Medium payload - send only dates, fetch details on click
-    const dates = appointments.slice(0, 10).map(apt => apt.date).join(',')
-    actionUrl += `&dates=${dates}`
+  const appointmentData = appointments.slice(0, maxAppointments).map(apt => ({
+    date: apt.date,
+    times: (apt.newTimes || apt.times || []).slice(0, maxTimesPerAppointment)
+  }))
+  
+  const compactAppts = encodeURIComponent(JSON.stringify(appointmentData))
+  let actionUrl = `/notification-action?subscription=${subscriptionId}&appointments=${compactAppts}`
+  
+  // Add booking URL to the notification page URL if available
+  if (bookingUrl) {
+    actionUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`
   }
   
-  // Build lightweight data
+  // Build lightweight data for service worker
+  // Include appointments array for service worker action handlers
   const data = {
     type: 'appointment',
     url: actionUrl,
     subscription_id: subscriptionId,
-    cnt: count
+    cnt: count,
+    // Include first appointment info for service worker book action
+    appointment_date: appointments[0]?.date,
+    appointments: appointmentData
   }
   
-  // Only include data_id if present (for client to fetch full data)
-  if (dataId) {
-    data.data_id = dataId
-  }
-  
-  // Only include booking URL if available (but not in URL to save space)
+  // Only include booking URL if available
   if (bookingUrl) {
     data.booking_url = bookingUrl
   }
@@ -177,7 +175,7 @@ export function buildAppointmentPayload({
     tag: 'appointment', 
     actions, 
     data,
-    metadata: { count, has_data_id: !!dataId }
+    metadata: { count, appointmentCount: appointmentData.length }
   })
 }
 

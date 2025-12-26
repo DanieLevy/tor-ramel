@@ -41,39 +41,80 @@ function NotificationActionContent() {
 
   // Parse URL params
   const subscriptionId = searchParams.get('subscription')
-  const bookingUrl = searchParams.get('booking_url')
+  const bookingUrlParam = searchParams.get('booking_url')
   const notificationType = searchParams.get('type') || 'appointment'
   const appointmentsParam = searchParams.get('appointments')
   const dateParam = searchParams.get('date')
   const timesParam = searchParams.get('times')
+  const datesParam = searchParams.get('dates') // For legacy support - plural dates
+  const actionParam = searchParams.get('action') // For email links that specify action
   
-  // Parse appointments data
+  // Decode booking URL if present
+  const bookingUrl = bookingUrlParam ? decodeURIComponent(bookingUrlParam) : null
+  
+  // Parse appointments data with multiple fallback strategies
   const appointments = useMemo<AppointmentData[]>(() => {
+    // Strategy 1: Full appointments JSON array
     if (appointmentsParam) {
       try {
-        return JSON.parse(decodeURIComponent(appointmentsParam))
+        const parsed = JSON.parse(decodeURIComponent(appointmentsParam))
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          console.log('[NotificationAction] Parsed appointments from JSON:', parsed.length)
+          return parsed
+        }
       } catch (e) {
-        console.error('Failed to parse appointments:', e)
+        console.error('[NotificationAction] Failed to parse appointments JSON:', e)
       }
     }
     
-    // Fallback to single date/times params
+    // Strategy 2: Single date + times params (legacy email format)
     if (dateParam && timesParam) {
+      console.log('[NotificationAction] Using single date/times params')
       return [{
         date: dateParam,
-        times: timesParam.split(',')
+        times: timesParam.split(',').map(t => t.trim()).filter(Boolean)
       }]
     }
     
+    // Strategy 3: Multiple dates param (legacy - dates without times)
+    // Note: This is a fallback that shows dates but no times
+    if (datesParam) {
+      console.log('[NotificationAction] Using dates param (no times available)')
+      const dates = datesParam.split(',').map(d => d.trim()).filter(Boolean)
+      return dates.map(date => ({
+        date,
+        times: [] // No times available in this format
+      }))
+    }
+    
+    console.log('[NotificationAction] No appointment data found in URL')
     return []
-  }, [appointmentsParam, dateParam, timesParam])
+  }, [appointmentsParam, dateParam, timesParam, datesParam])
 
-  // Initialize page
+  // Initialize page and handle auto-actions from email links
   useEffect(() => {
-    // Short delay to show loading state
-    const timer = setTimeout(() => setInitialLoading(false), 500)
+    // Short delay to show loading state, then check for auto-action
+    const timer = setTimeout(() => {
+      setInitialLoading(false)
+      
+      // Auto-trigger action if specified in URL (from email links)
+      if (actionParam && subscriptionId && !actionComplete) {
+        console.log('[NotificationAction] Auto-triggering action from URL:', actionParam)
+        
+        if (actionParam === 'approve') {
+          // Auto-approve - mark subscription as complete
+          handleApprove()
+        } else if (actionParam === 'decline' && appointments.length > 0) {
+          // Auto-decline - ignore these times (requires appointments data)
+          handleDecline()
+        } else if (actionParam === 'unsubscribe') {
+          // Unsubscribe action - redirect to unsubscribe flow
+          router.push(`/unsubscribe?subscription=${subscriptionId}`)
+        }
+      }
+    }, 500)
     return () => clearTimeout(timer)
-  }, [])
+  }, [actionParam, subscriptionId, appointments, actionComplete, handleApprove, handleDecline, router])
 
   // Handle approve action - user found a suitable appointment
   const handleApprove = useCallback(async () => {
@@ -217,7 +258,10 @@ function NotificationActionContent() {
     )
   }
 
-  // No appointments state
+  // Check if we have appointments with no times (dates-only fallback)
+  const hasAppointmentsWithNoTimes = appointments.length > 0 && appointments.every(apt => apt.times.length === 0)
+
+  // No appointments state - show error only if truly no data
   if (appointments.length === 0 && !actionComplete) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
@@ -231,10 +275,16 @@ function NotificationActionContent() {
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">חסרים פרטים</h1>
           <p className="text-muted-foreground mb-6">לא ניתן לטעון את פרטי ההתראה</p>
-          <Button onClick={() => router.push('/')} className="w-full">
-            <Home className="ml-2 h-4 w-4" />
-            לדף הבית
-          </Button>
+          <div className="space-y-3">
+            <Button onClick={() => router.push('/search')} className="w-full" variant="default">
+              <Calendar className="ml-2 h-4 w-4" />
+              חפש תורים פנויים
+            </Button>
+            <Button onClick={() => router.push('/')} className="w-full" variant="outline">
+              <Home className="ml-2 h-4 w-4" />
+              לדף הבית
+            </Button>
+          </div>
         </motion.div>
       </div>
     )
@@ -352,24 +402,35 @@ function NotificationActionContent() {
                   </div>
                   
                   {/* Times Grid */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {apt.times.slice(0, 9).map((time, timeIndex) => (
-                      <div 
-                        key={timeIndex}
-                        className="text-center py-2.5 px-2 rounded-xl bg-gray-100 dark:bg-gray-800 border-2 border-transparent hover:border-blue-500 transition-colors cursor-default"
-                      >
-                        <Clock className="h-4 w-4 mx-auto mb-1 text-gray-500 dark:text-gray-400" />
-                        <span className="text-sm font-bold text-foreground">{time}</span>
-                      </div>
-                    ))}
-                    {apt.times.length > 9 && (
-                      <div className="text-center py-2.5 px-2 rounded-xl bg-gray-50 dark:bg-gray-800/50">
-                        <span className="text-sm text-muted-foreground font-medium">
-                          +{apt.times.length - 9}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  {apt.times.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {apt.times.slice(0, 9).map((time, timeIndex) => (
+                        <div 
+                          key={timeIndex}
+                          className="text-center py-2.5 px-2 rounded-xl bg-gray-100 dark:bg-gray-800 border-2 border-transparent hover:border-blue-500 transition-colors cursor-default"
+                        >
+                          <Clock className="h-4 w-4 mx-auto mb-1 text-gray-500 dark:text-gray-400" />
+                          <span className="text-sm font-bold text-foreground">{time}</span>
+                        </div>
+                      ))}
+                      {apt.times.length > 9 && (
+                        <div className="text-center py-2.5 px-2 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+                          <span className="text-sm text-muted-foreground font-medium">
+                            +{apt.times.length - 9}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        יש תורים פנויים בתאריך זה
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        לחץ על &quot;פתח אתר הזמנות&quot; לצפייה בכל השעות
+                      </p>
+                    </div>
+                  )}
                 </motion.div>
               )
             })}
@@ -401,11 +462,19 @@ function NotificationActionContent() {
           transition={{ delay: 0.4 }}
           className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800"
         >
-          <p className="text-sm text-blue-800 dark:text-blue-200 text-center">
-            <span className="font-semibold">מצאת תור מתאים?</span> לחץ על &quot;מצאתי תור&quot; והמעקב יסתיים.
-            <br />
-            <span className="text-xs opacity-80">לחיצה על &quot;לא מתאים&quot; תמנע התראות עתידיות על שעות אלו בלבד.</span>
-          </p>
+          {hasAppointmentsWithNoTimes ? (
+            <p className="text-sm text-blue-800 dark:text-blue-200 text-center">
+              <span className="font-semibold">נמצאו תורים פנויים!</span> לחץ על &quot;פתח אתר הזמנות&quot; לצפייה בכל השעות.
+              <br />
+              <span className="text-xs opacity-80">לאחר שתזמין, לחץ על &quot;מצאתי תור&quot; לסגירת המעקב.</span>
+            </p>
+          ) : (
+            <p className="text-sm text-blue-800 dark:text-blue-200 text-center">
+              <span className="font-semibold">מצאת תור מתאים?</span> לחץ על &quot;מצאתי תור&quot; והמעקב יסתיים.
+              <br />
+              <span className="text-xs opacity-80">לחיצה על &quot;לא מתאים&quot; תמנע התראות עתידיות על שעות אלו בלבד.</span>
+            </p>
+          )}
         </motion.div>
       </div>
 

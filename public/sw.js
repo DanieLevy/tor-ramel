@@ -1,6 +1,6 @@
 // Service Worker for Tor-Ramel PWA
 // iOS 26 Optimized - Navigation Preload + Badge API
-const VERSION = 'v5.5';
+const VERSION = 'v5.6';
 const BUILD_TIME = new Date().toISOString();
 const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
@@ -408,22 +408,32 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
   
-  // Handle 'book' action - navigate to app with booking intent
+  // Handle 'book' action - open booking URL directly or navigate to notification page
   if (event.action === 'book') {
     console.log('[SW] 🗓 Book Now action triggered');
-    // Navigate to notification-action page with book intent, then redirect to booking
-    const bookingUrl = notificationData.booking_url;
-    const appointmentDate = notificationData.appointment_date || notificationData.appointments?.[0]?.date;
-    let bookTargetUrl = '/notification-action?action=book';
     
-    if (appointmentDate) {
-      bookTargetUrl += `&date=${encodeURIComponent(appointmentDate)}`;
-    }
+    const bookingUrl = notificationData.booking_url;
+    
+    // If we have a booking URL, open it directly for the fastest user experience
     if (bookingUrl) {
-      bookTargetUrl += `&booking_url=${encodeURIComponent(bookingUrl)}`;
+      console.log('[SW] Opening booking URL directly:', bookingUrl);
+      event.waitUntil(
+        Promise.all([
+          updateBadge(0),
+          trackNotificationEvent('clicked', { ...notificationData, action: 'book' }),
+          clients.openWindow(bookingUrl)
+        ])
+      );
+      return;
     }
-    if (notificationData.subscription_id) {
-      bookTargetUrl += `&subscription=${notificationData.subscription_id}`;
+    
+    // Fallback: Navigate to notification-action page with the data
+    // Use the URL from notification data which already contains all the info
+    let bookTargetUrl = notificationData.url || '/notification-action';
+    
+    // Ensure subscription ID is in the URL
+    if (notificationData.subscription_id && !bookTargetUrl.includes('subscription=')) {
+      bookTargetUrl += (bookTargetUrl.includes('?') ? '&' : '?') + `subscription=${notificationData.subscription_id}`;
     }
     
     event.waitUntil(
