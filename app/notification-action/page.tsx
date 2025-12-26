@@ -91,32 +91,8 @@ function NotificationActionContent() {
     return []
   }, [appointmentsParam, dateParam, timesParam, datesParam])
 
-  // Initialize page and handle auto-actions from email links
-  useEffect(() => {
-    // Short delay to show loading state, then check for auto-action
-    const timer = setTimeout(() => {
-      setInitialLoading(false)
-      
-      // Auto-trigger action if specified in URL (from email links)
-      if (actionParam && subscriptionId && !actionComplete) {
-        console.log('[NotificationAction] Auto-triggering action from URL:', actionParam)
-        
-        if (actionParam === 'approve') {
-          // Auto-approve - mark subscription as complete
-          handleApprove()
-        } else if (actionParam === 'decline' && appointments.length > 0) {
-          // Auto-decline - ignore these times (requires appointments data)
-          handleDecline()
-        } else if (actionParam === 'unsubscribe') {
-          // Unsubscribe action - redirect to unsubscribe flow
-          router.push(`/unsubscribe?subscription=${subscriptionId}`)
-        }
-      }
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [actionParam, subscriptionId, appointments, actionComplete, handleApprove, handleDecline, router])
-
   // Handle approve action - user found a suitable appointment
+  // NOTE: Declared before useEffect that uses it to avoid "used before declaration" error
   const handleApprove = useCallback(async () => {
     if (!subscriptionId) {
       toast.error('חסר מזהה התראה')
@@ -219,9 +195,35 @@ function NotificationActionContent() {
   // Handle book action - redirect to external booking
   const handleBook = useCallback(() => {
     if (bookingUrl) {
-      window.open(decodeURIComponent(bookingUrl), '_blank')
+      window.open(bookingUrl, '_blank')
     }
   }, [bookingUrl])
+
+  // Initialize page and handle auto-actions from email links
+  // NOTE: Must be after handleApprove/handleDecline declarations
+  useEffect(() => {
+    // Short delay to show loading state, then check for auto-action
+    const timer = setTimeout(() => {
+      setInitialLoading(false)
+      
+      // Auto-trigger action if specified in URL (from email links)
+      if (actionParam && subscriptionId && !actionComplete) {
+        console.log('[NotificationAction] Auto-triggering action from URL:', actionParam)
+        
+        if (actionParam === 'approve') {
+          // Auto-approve - mark subscription as complete
+          handleApprove()
+        } else if (actionParam === 'decline' && appointments.length > 0) {
+          // Auto-decline - ignore these times (requires appointments data)
+          handleDecline()
+        } else if (actionParam === 'unsubscribe') {
+          // Unsubscribe action - redirect to unsubscribe flow
+          router.push(`/unsubscribe?subscription=${subscriptionId}`)
+        }
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [actionParam, subscriptionId, appointments, actionComplete, handleApprove, handleDecline, router])
 
   // Format date for display
   const formatDate = (dateStr: string) => {
@@ -240,6 +242,9 @@ function NotificationActionContent() {
   // Get total times count
   const totalTimes = appointments.reduce((sum, apt) => sum + apt.times.length, 0)
 
+  // Check if we have appointments with no times (dates-only fallback)
+  const hasAppointmentsWithNoTimes = appointments.length > 0 && appointments.every(apt => apt.times.length === 0)
+
   // Loading state
   if (initialLoading) {
     return (
@@ -257,9 +262,6 @@ function NotificationActionContent() {
       </div>
     )
   }
-
-  // Check if we have appointments with no times (dates-only fallback)
-  const hasAppointmentsWithNoTimes = appointments.length > 0 && appointments.every(apt => apt.times.length === 0)
 
   // No appointments state - show error only if truly no data
   if (appointments.length === 0 && !actionComplete) {

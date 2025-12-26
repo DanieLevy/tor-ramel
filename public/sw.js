@@ -1,6 +1,6 @@
 // Service Worker for Tor-Ramel PWA
 // iOS 26 Optimized - Navigation Preload + Badge API
-const VERSION = 'v5.6';
+const VERSION = 'v5.8';
 const BUILD_TIME = new Date().toISOString();
 const SW_VERSION = VERSION
 const CACHE_NAME = `tor-ramel-${SW_VERSION}`
