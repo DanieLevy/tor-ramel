@@ -65,7 +65,7 @@ export const springs = {
 /** Creates a reduced-motion safe variant */
 export const createSafeVariant = (
   full: Variants,
-  reduced: Variants = { initial: {}, animate: {}, exit: {} }
+  _reduced: Variants = { initial: {}, animate: {}, exit: {} }
 ): Variants => {
   return full // Reduced motion is handled via CSS media query
 }

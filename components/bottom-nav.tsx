@@ -23,7 +23,6 @@ const navItems: NavItem[] = [
 // Scroll thresholds
 const SCROLL_THRESHOLD = 50 // px to start hiding
 const HIDE_DISTANCE = 100 // px of scroll to fully hide
-const SHOW_DELAY = 150 // ms delay for showing
 
 export function BottomNav() {
   const pathname = usePathname()

@@ -5,7 +5,7 @@ import { Clock, Trash2, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from 'l
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { pwaFetch, cn } from '@/lib/utils'
+import { pwaFetch } from '@/lib/utils'
 
 interface IgnoredTime {
   id: string

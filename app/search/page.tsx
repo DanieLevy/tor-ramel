@@ -535,7 +535,7 @@ function SearchPage() {
             </div>
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
 
       {/* Results with better animations */}
       <AnimatePresence>
@@ -682,7 +682,7 @@ function SearchPage() {
                 >
                   רענן
                 </Button>
-              </div>
+              </motion.div>
             )}
 
             {/* Available Appointments with enhanced design */}
@@ -798,7 +798,7 @@ function SearchPage() {
                     </div>
                   </CardContent>
                 </Card>
-              </div>
+              </motion.div>
             )}
 
             {/* Unavailable Days - Enhanced compact view */}
