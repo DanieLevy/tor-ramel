@@ -283,11 +283,7 @@ function SubscribePage() {
       <div className="container max-w-lg mx-auto px-4 py-6 space-y-6 page-content-bottom-spacing">
         
         {/* Hero Header - Clean minimal design */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-3 pt-2"
-        >
+        <div className="text-center space-y-3 pt-2 animate-fade-up">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-500">
             <Bell className="h-8 w-8 text-white" />
           </div>
@@ -299,14 +295,12 @@ function SubscribePage() {
               קבל עדכון מיידי כשמתפנה תור
             </p>
           </div>
-        </motion.div>
+        </div>
 
         {/* Quick Subscribe Section - Solid color cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-3"
+        <div
+          className="space-y-3 animate-fade-up"
+          style={{ animationDelay: '50ms' }}
         >
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-amber-500" />
@@ -314,20 +308,21 @@ function SubscribePage() {
           </div>
           
           <div className="grid grid-cols-3 gap-3">
-            {QUICK_PRESETS.map((preset) => {
+            {QUICK_PRESETS.map((preset, index) => {
               const isLoading = quickLoading === preset.id
               return (
-                <motion.button
+                <button
                   key={preset.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => handleQuickSubscribe(preset)}
                   disabled={quickLoading !== null}
                   className={cn(
-                    "relative rounded-2xl p-4 text-center transition-all shadow-sm",
+                    "relative rounded-2xl p-4 text-center shadow-sm",
+                    "transition-all duration-150 active:scale-[0.97]",
                     preset.color,
-                    isLoading && "opacity-70"
+                    isLoading && "opacity-70",
+                    "animate-fade-up"
                   )}
+                  style={{ animationDelay: `${index * 30}ms` }}
                 >
                   <div className="relative">
                     {isLoading ? (
@@ -342,18 +337,16 @@ function SubscribePage() {
                       {preset.days} ימים
                     </span>
                   </div>
-                </motion.button>
+                </button>
               )
             })}
           </div>
-        </motion.div>
+        </div>
 
         {/* Advanced Date Picker - Collapsible */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-2xl border border-border bg-card overflow-hidden"
+        <div
+          className="rounded-2xl border border-border bg-card overflow-hidden animate-fade-up"
+          style={{ animationDelay: '100ms' }}
         >
           <button
             onClick={() => {
@@ -371,24 +364,17 @@ function SubscribePage() {
                 <span className="block text-xs text-muted-foreground">בחר תאריך או טווח ספציפי</span>
               </div>
             </div>
-            <motion.div
-              animate={{ rotate: showAdvanced ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-            </motion.div>
+            <ChevronDown 
+              className={cn(
+                "h-5 w-5 text-muted-foreground transition-transform duration-200",
+                showAdvanced && "rotate-180"
+              )} 
+            />
           </button>
 
-          <AnimatePresence>
-            {showAdvanced && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="px-4 pb-4 space-y-4 border-t border-border">
+          {showAdvanced && (
+            <div className="overflow-hidden animate-fade-in">
+              <div className="px-4 pb-4 space-y-4 border-t border-border">
                   {/* Date Mode Toggle */}
                   <div className="pt-4 grid grid-cols-2 gap-2">
                     {[
@@ -453,14 +439,8 @@ function SubscribePage() {
                   )}
                   
                   {/* Date Picker */}
-                  <AnimatePresence mode="wait">
-                    {dateMode === 'single' ? (
-                      <motion.div
-                        key="single"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 20 }}
-                      >
+                  {dateMode === 'single' ? (
+                    <div className="animate-fade-in">
                         {useNativePicker ? (
                           <NativeDatePicker
                             value={selectedDate}
@@ -499,14 +479,9 @@ function SubscribePage() {
                             </PopoverContent>
                           </Popover>
                         )}
-                      </motion.div>
-                    ) : (
-                      <motion.div 
-                        key="range"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                      >
+                    </div>
+                  ) : (
+                    <div className="animate-fade-in">
                         {useNativePicker ? (
                           <NativeDateRangePicker
                             value={dateRange}
@@ -551,9 +526,8 @@ function SubscribePage() {
                             </PopoverContent>
                           </Popover>
                         )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <Button
@@ -574,17 +548,14 @@ function SubscribePage() {
                     )}
                   </Button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+            </div>
+          )}
+        </div>
 
         {/* Active Subscriptions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-3"
+        <div
+          className="space-y-3 animate-fade-up"
+          style={{ animationDelay: '150ms' }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -614,8 +585,8 @@ function SubscribePage() {
             </div>
           ) : (
             <div className="space-y-2">
-              <AnimatePresence>
-                {activeSubscriptions.map((sub) => {
+              <AnimatePresence initial={false}>
+                {activeSubscriptions.map((sub, index) => {
                   const isExpired = isSubscriptionExpired(sub)
                   const isPaused = sub.subscription_status === 'paused'
                   const isDeleting = deletingIds.has(sub.id)
@@ -624,10 +595,10 @@ function SubscribePage() {
                   return (
                     <motion.div
                       key={sub.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95, x: -100 }}
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 12 }}
+                      transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.1) }}
                       className={cn(
                         "rounded-2xl border bg-card p-4 transition-all",
                         isExpired && "border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20",
@@ -724,15 +695,13 @@ function SubscribePage() {
               </AnimatePresence>
             </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Completed Subscriptions */}
         {completedSubscriptions.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="space-y-3"
+          <div
+            className="space-y-3 animate-fade-up"
+            style={{ animationDelay: '200ms' }}
           >
             <span className="text-sm font-semibold text-muted-foreground">
               היסטוריה ({completedSubscriptions.length})
@@ -766,7 +735,7 @@ function SubscribePage() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
 

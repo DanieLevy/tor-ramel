@@ -8,7 +8,6 @@ import { AsyncErrorFallback } from '@/components/error-boundary'
 import { cn } from '@/lib/utils'
 import { useHaptics } from '@/hooks/use-haptics'
 import { useApi } from '@/hooks/use-api'
-import { motion } from 'framer-motion'
 import type { AppointmentStats } from '@/lib/types/api'
 
 /**
@@ -150,11 +149,7 @@ export function AppointmentBanner() {
     : 'normal'
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full"
-    >
+    <div className="w-full animate-fade-up gpu-accelerated">
       {stats.nearestAppointment ? (
         /* Available Appointment - Clean Card */
         <div className={cn(
@@ -226,21 +221,19 @@ export function AppointmentBanner() {
                 שעות:
               </span>
               {stats.nearestAppointment.times.slice(0, 4).map((time, idx) => (
-                <motion.span 
+                <span 
                   key={idx}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: idx * 0.05 }}
                   className={cn(
-                    "text-xs font-semibold px-2.5 py-1 rounded-lg",
+                    "text-xs font-semibold px-2.5 py-1 rounded-lg animate-scale-in",
                     "bg-white dark:bg-gray-900 border",
                     urgency === 'urgent'
                       ? "border-orange-200 dark:border-orange-800 text-orange-800 dark:text-orange-200"
                       : "border-green-200 dark:border-green-800 text-green-800 dark:text-green-200"
                   )}
+                  style={{ animationDelay: `${idx * 50}ms` }}
                 >
                   {time}
-                </motion.span>
+                </span>
               ))}
               {stats.nearestAppointment.times.length > 4 && (
                 <span className={cn(
@@ -305,6 +298,6 @@ export function AppointmentBanner() {
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
   )
 }

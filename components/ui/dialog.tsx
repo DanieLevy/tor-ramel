@@ -38,7 +38,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40 backdrop-blur-sm",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40 backdrop-blur-sm gpu-accelerated",
         className
       )}
       {...props}
@@ -62,12 +62,12 @@ function DialogContent({
         className={cn(
           // Apple-style glass dialog
           "bg-white/80 dark:bg-gray-900/80",
-          "backdrop-blur-2xl",
+          "backdrop-blur-2xl gpu-accelerated",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4",
           "rounded-2xl border border-white/30 dark:border-white/10",
           "p-6 shadow-2xl shadow-black/15 dark:shadow-black/40",
-          "duration-200 sm:max-w-md",
+          "duration-150 sm:max-w-md",
           className
         )}
         style={{

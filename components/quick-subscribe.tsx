@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Zap, Calendar, CalendarRange, CheckCircle2 } from 'lucide-react'
 import { cn, pwaFetch } from '@/lib/utils'
 import { toast } from 'sonner'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useHaptics } from '@/hooks/use-haptics'
 import { useRouter } from 'next/navigation'
-import { Interactive } from '@/components/page-transition'
 
 interface QuickSubscribePreset {
   id: string
@@ -113,10 +111,8 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn('rounded-2xl border border-border bg-card overflow-hidden', className)}
+    <div
+      className={cn('rounded-2xl border border-border bg-card overflow-hidden animate-fade-up', className)}
     >
       {/* Header */}
       <div className="p-4 pb-0">
@@ -138,69 +134,44 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
             const isDisabled = loading !== null || successId !== null
 
             return (
-              <motion.div
+              <div
                 key={preset.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                className="animate-fade-up"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
-                <Interactive disabled={isDisabled}>
-                  <button
-                    disabled={isDisabled}
-                    onClick={() => handleQuickSubscribe(preset)}
-                    className={cn(
-                      'w-full flex flex-col items-center gap-1.5 py-3.5 px-2 rounded-xl',
-                      'text-white font-medium transition-all duration-200',
-                      'touch-manipulation active:scale-95',
-                      'disabled:opacity-70 disabled:cursor-not-allowed',
-                      preset.color,
-                      !isDisabled && preset.hoverColor,
-                      isSuccess && 'bg-emerald-500'
-                    )}
-                    aria-label={`הרשמה להתראות עבור ${preset.label}`}
-                  >
-                    <AnimatePresence mode="wait">
-                      {isLoading ? (
-                        <motion.div
-                          key="loading"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                        >
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        </motion.div>
-                      ) : isSuccess ? (
-                        <motion.div
-                          key="success"
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                        >
-                          <CheckCircle2 className="h-5 w-5" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="icon"
-                          initial={{ scale: 0.8 }}
-                          animate={{ scale: 1 }}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    
-                    <span className="text-xs font-semibold">
-                      {isSuccess ? 'נרשמת!' : preset.label}
+                <button
+                  disabled={isDisabled}
+                  onClick={() => handleQuickSubscribe(preset)}
+                  className={cn(
+                    'w-full flex flex-col items-center gap-1.5 py-3.5 px-2 rounded-xl',
+                    'text-white font-medium transition-all duration-150',
+                    'touch-manipulation active:scale-95',
+                    'disabled:opacity-70 disabled:cursor-not-allowed',
+                    preset.color,
+                    !isDisabled && preset.hoverColor,
+                    isSuccess && 'bg-emerald-500'
+                  )}
+                  aria-label={`הרשמה להתראות עבור ${preset.label}`}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : isSuccess ? (
+                    <CheckCircle2 className="h-5 w-5 animate-scale-in" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
+                  
+                  <span className="text-xs font-semibold">
+                    {isSuccess ? 'נרשמת!' : preset.label}
+                  </span>
+                  
+                  {!isSuccess && (
+                    <span className="text-[10px] opacity-80">
+                      {preset.sublabel}
                     </span>
-                    
-                    {!isSuccess && (
-                      <span className="text-[10px] opacity-80">
-                        {preset.sublabel}
-                      </span>
-                    )}
-                  </button>
-                </Interactive>
-              </motion.div>
+                  )}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -217,6 +188,6 @@ export function QuickSubscribe({ onSubscribed, className }: QuickSubscribeProps)
           </Button>
         </div>
       </div>
-    </motion.div>
+    </div>
   )
 }

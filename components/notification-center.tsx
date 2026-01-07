@@ -355,20 +355,20 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50"
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 gpu-accelerated"
               onClick={() => setOpen(false)}
             />
             
             {/* Floating Panel - iOS PWA safe positioning */}
             <motion.div
               ref={panelRef}
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
-                'fixed z-50',
+                'fixed z-50 gpu-accelerated',
                 // Position: Below header with safe area margin on mobile
                 'left-3 right-3',
                 'sm:left-auto sm:right-4 sm:w-96',
@@ -467,15 +467,14 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence initial={false}>
                       {notifications.map((notification, index) => (
                         <motion.div
                           key={notification.id}
-                          layout
-                          initial={{ opacity: 0, x: -20 }}
+                          initial={{ opacity: 0, x: -12 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20, scale: 0.9 }}
-                          transition={{ delay: index * 0.03 }}
+                          exit={{ opacity: 0, x: 12 }}
+                          transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.1) }}
                           className={cn(
                             'relative rounded-xl p-3 transition-all cursor-pointer',
                             'border backdrop-blur-sm',

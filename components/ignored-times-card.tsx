@@ -5,8 +5,7 @@ import { Clock, Trash2, RefreshCw, ChevronDown, ChevronUp, AlertCircle } from 'l
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { motion, AnimatePresence } from 'framer-motion'
-import { pwaFetch } from '@/lib/utils'
+import { pwaFetch, cn } from '@/lib/utils'
 
 interface IgnoredTime {
   id: string
@@ -112,11 +111,7 @@ export function IgnoredTimesCard() {
   const totalIgnoredTimes = ignoredTimes.reduce((sum, item) => sum + item.ignored_times.length, 0)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden"
-    >
+    <div className="bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-200 dark:border-orange-800 overflow-hidden animate-fade-up">
       {/* Header - Always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -146,16 +141,9 @@ export function IgnoredTimesCard() {
       </button>
 
       {/* Expanded content */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pb-4 space-y-3">
+      {expanded && (
+        <div className="overflow-hidden animate-fade-in">
+          <div className="px-4 pb-4 space-y-3">
               {/* Clear all button */}
               <div className="flex justify-end">
                 <Button
@@ -205,10 +193,9 @@ export function IgnoredTimesCard() {
                 שעות אלו לא יכללו בהתראות עתידיות. הסר אותן כדי לקבל שוב עדכונים.
               </p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          </div>
+      )}
+    </div>
   )
 }
 

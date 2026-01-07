@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 /* Hebrew Font Faces with optimal loading strategy */
 @font-face {
@@ -264,10 +263,7 @@
     font-size: 16px !important;
   }
   
-  /* Smooth transitions for theme switching */
-  * {
-    @apply transition-colors duration-200;
-  }
+  /* Smooth transitions for theme switching - applied only to interactive elements */
 }
 
 /* Custom animations */
@@ -496,7 +492,7 @@ body.fonts-failed {
   .backdrop-blur-xl,
   .backdrop-blur-md {
     transform: translateZ(0);
-    will-change: backdrop-filter;
+    backface-visibility: hidden;
   }
 }
 
@@ -507,7 +503,7 @@ body.fonts-failed {
    Reference: https://github.com/WebKit/WebKit
    ============================================ */
 
-/* Base Glass Effect */
+/* Base Glass Effect - GPU Optimized */
 .glass {
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(180%);
@@ -515,6 +511,9 @@ body.fonts-failed {
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: var(--glass-radius-lg);
+  /* GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 /* Apple Native Liquid Glass - Progressive Enhancement */
@@ -581,16 +580,19 @@ body.fonts-failed {
   border-radius: var(--glass-radius-xl);
 }
 
-/* Navigation Glass - for headers and navbars */
+/* Navigation Glass - for headers and navbars - GPU Optimized */
 .glass-nav {
   background: var(--glass-bg-strong);
   backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
   border-bottom: 1px solid var(--glass-border-subtle);
   box-shadow: var(--glass-shadow-subtle);
+  /* GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-/* Card Glass - for content cards */
+/* Card Glass - for content cards - GPU Optimized */
 .glass-card {
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(180%);
@@ -599,14 +601,17 @@ body.fonts-failed {
   box-shadow: var(--glass-shadow);
   border-radius: var(--glass-radius-2xl);
   transition: transform var(--glass-transition), box-shadow var(--glass-transition);
+  /* GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .glass-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0);
   box-shadow: var(--glass-shadow-elevated);
 }
 
-/* Modal Glass - for dialogs and overlays */
+/* Modal Glass - for dialogs and overlays - GPU Optimized */
 .glass-modal {
   background: var(--glass-bg-strong);
   backdrop-filter: blur(var(--glass-blur-intense)) saturate(200%);
@@ -614,6 +619,9 @@ body.fonts-failed {
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow-elevated);
   border-radius: var(--glass-radius-3xl);
+  /* GPU acceleration */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 /* Button Glass - for glass-style buttons */
@@ -751,14 +759,22 @@ body.fonts-failed {
     scroll-behavior: auto !important;
   }
   
+  /* Disable Framer Motion transforms */
+  [style*="transform"],
+  [style*="opacity"] {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  /* Keep glass backgrounds but remove blur for performance */
   .glass,
   .glass-subtle,
   .glass-strong,
   .glass-nav,
   .glass-card,
   .glass-modal {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
 }
 
@@ -1016,6 +1032,99 @@ body.fonts-failed {
 
 .sparkle-animation {
   animation: sparkle 2s ease-in-out infinite;
+}
+
+/* ============================================
+   GPU Acceleration Utilities
+   Apply to animated elements for better performance
+   ============================================ */
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* ============================================
+   Interactive Element Transitions
+   Targeted transitions instead of global * selector
+   ============================================ */
+
+button,
+a,
+input,
+textarea,
+select,
+[role="button"],
+[role="link"],
+[tabindex]:not([tabindex="-1"]) {
+  transition: 
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+/* Transform transitions for hover/active states */
+.interactive-scale {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.interactive-scale:hover {
+  transform: scale(1.02) translateZ(0);
+}
+
+.interactive-scale:active {
+  transform: scale(0.98) translateZ(0);
+}
+
+/* Optimized animation timing for common patterns */
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.25s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.15s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px) translateZ(0); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) translateZ(0); 
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0; 
+    transform: scale(0.95) translateZ(0); 
+  }
+  to { 
+    opacity: 1; 
+    transform: scale(1) translateZ(0); 
+  }
 }
 
 /* Print styles */

@@ -390,11 +390,7 @@ function SearchPage() {
   return (
     <div className="container max-w-md mx-auto p-4 pb-20 page-content-bottom-spacing">
       {/* Header with animation */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-6"
-      >
+      <div className="text-center mb-6 animate-fade-up">
         <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
           <Search className="h-10 w-10 text-primary" />
         </div>
@@ -404,14 +400,12 @@ function SearchPage() {
         <p className="text-sm text-muted-foreground">
           סריקה מהירה של תורים פנויים
         </p>
-      </motion.div>
+      </div>
 
       {/* Search Controls with better design */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="space-y-4 mb-6"
+      <div 
+        className="space-y-4 mb-6 animate-fade-up"
+        style={{ animationDelay: '50ms' }}
       >
         <Card className="border-2 shadow-lg">
           <CardContent className="p-6">
@@ -432,13 +426,12 @@ function SearchPage() {
                   { value: 'two-weeks', label: 'שבועיים', icon: '14', bg: 'bg-indigo-500' },
                   { value: 'month', label: 'חודש', icon: '30', bg: 'bg-green-500' }
                 ].map((option) => (
-                  <motion.button
+                  <button
                     key={option.value}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSearchType(option.value as any)}
                     className={cn(
-                      "relative py-3 px-3 rounded-xl text-sm font-medium transition-all overflow-hidden",
+                      "relative py-3 px-3 rounded-xl text-sm font-medium overflow-hidden",
+                      "transition-all duration-150 active:scale-[0.97]",
                       searchType === option.value
                         ? `text-white shadow-lg ${option.bg}`
                         : "bg-muted/50 hover:bg-muted"
@@ -450,7 +443,7 @@ function SearchPage() {
                         {option.icon} ימים
                       </span>
                     </span>
-                  </motion.button>
+                  </button>
                 ))}
               </div>
 
@@ -494,13 +487,12 @@ function SearchPage() {
                       { value: 'list', label: 'רשימה', icon: List, bg: 'bg-blue-500' },
                       { value: 'calendar', label: 'לוח שנה', icon: Grid, bg: 'bg-indigo-500' }
                     ].map((option) => (
-                      <motion.button
+                      <button
                         key={option.value}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
                         onClick={() => setViewType(option.value as any)}
                         className={cn(
-                          "py-2.5 px-3 rounded-lg text-sm font-medium transition-all border",
+                          "py-2.5 px-3 rounded-lg text-sm font-medium border",
+                          "transition-all duration-150 active:scale-[0.97]",
                           viewType === option.value
                             ? `text-white shadow-lg border-transparent ${option.bg}`
                             : "bg-background/50 hover:bg-background border-border/50 text-foreground hover:shadow-sm"
@@ -510,7 +502,7 @@ function SearchPage() {
                           <option.icon className="h-4 w-4" />
                           {option.label}
                         </span>
-                      </motion.button>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -546,22 +538,19 @@ function SearchPage() {
       </motion.div>
 
       {/* Results with better animations */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {results.length > 0 && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="space-y-4"
           >
             {/* Calendar View */}
             {viewType === 'calendar' && (
               <TooltipProvider>
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
-                >
+                <div className="space-y-4 animate-fade-up">
                   <Card className="border-2 shadow-lg">
                     <CardContent className="p-6">
                       <div className="space-y-4">
@@ -661,7 +650,7 @@ function SearchPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </motion.div>
+                </div>
               </TooltipProvider>
             )}
 
@@ -693,16 +682,12 @@ function SearchPage() {
                 >
                   רענן
                 </Button>
-              </motion.div>
+              </div>
             )}
 
             {/* Available Appointments with enhanced design */}
             {availableResults.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
-              >
+              <div className="space-y-3 animate-fade-up">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-green-600 flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4" />
@@ -717,11 +702,10 @@ function SearchPage() {
                   {availableResults.map((result, index) => {
                     const dateInfo = getDayNameHebrew(result.date)
                     return (
-                      <motion.div
+                      <div
                         key={result.date}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        className="animate-fade-up"
+                        style={{ animationDelay: `${Math.min(index * 30, 150)}ms` }}
                       >
                         <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 hover:shadow-md transition-all">
                           <CardContent className="p-4">
@@ -774,11 +758,11 @@ function SearchPage() {
                             </div>
                           </CardContent>
                         </Card>
-                      </motion.div>
+                      </div>
                     )
                   })}
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* Loading States with better animation */}
@@ -801,34 +785,25 @@ function SearchPage() {
                     </div>
                     <div className="space-y-3">
                       {loadingResults.slice(0, 3).map((result, index) => (
-                        <motion.div
+                        <div
                           key={result.date}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
+                          className="animate-fade-up"
+                          style={{ animationDelay: `${index * 50}ms` }}
                         >
                           <Skeleton 
                             className="h-16 w-full rounded-xl bg-blue-100 dark:bg-blue-900/40"
-                            style={{ 
-                              animationDelay: `${index * 100}ms`,
-                            }}
                           />
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             )}
 
             {/* Unavailable Days - Enhanced compact view */}
             {unavailableResults.length > 0 && !loadingResults.length && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="space-y-4"
-              >
+              <div className="space-y-4 animate-fade-up" style={{ animationDelay: '100ms' }}>
                 <Card className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -875,7 +850,7 @@ function SearchPage() {
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             )}
 
             {/* No results message */}

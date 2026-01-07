@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { LucideIcon, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHaptics } from '@/hooks/use-haptics'
-import { motion } from 'framer-motion'
 
 interface QuickActionCardProps {
   /** Icon component from lucide-react */
@@ -125,37 +124,39 @@ export const QuickActionCard = React.forwardRef<HTMLDivElement, QuickActionCardP
     }
     
     const CardContent = (
-      <motion.div
+      <div
         ref={ref}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay, duration: 0.3 }}
-        whileTap={isClickable ? { scale: 0.97 } : undefined}
-        whileHover={isClickable ? { scale: 1.02 } : undefined}
         onClick={!href ? handleClick : undefined}
         className={cn(
           // Base styling
           'relative overflow-hidden rounded-2xl p-4',
-          'border transition-all duration-200 ease-out',
-          'touch-manipulation',
+          'border ease-out',
+          'touch-manipulation gpu-accelerated',
+          // Animation
+          'animate-fade-up',
           // Variant colors
           styles.bg,
           styles.border,
-          // Interactive states for clickable cards
+          // Interactive states for clickable cards - using CSS
           isClickable && [
             'cursor-pointer',
-            'shadow-sm hover:shadow-md',
+            'shadow-sm',
+            'transition-all duration-150',
+            'hover:shadow-md active:scale-[0.97]',
             `hover:ring-2 ${styles.ring}`,
           ],
           className
         )}
+        style={{
+          animationDelay: `${delay * 1000}ms`,
+          animationFillMode: 'backwards',
+        }}
       >
         <div className="relative flex items-center gap-3">
           {/* Icon with solid background */}
           <div className={cn(
             'flex h-11 w-11 items-center justify-center rounded-xl',
             'shadow-sm',
-            'transition-all duration-200',
             styles.iconBg
           )}>
             <Icon className={cn('h-5 w-5', styles.iconColor)} />
@@ -179,16 +180,12 @@ export const QuickActionCard = React.forwardRef<HTMLDivElement, QuickActionCardP
           
           {/* Clickable indicator arrow */}
           {isClickable && (
-            <motion.div
-              initial={{ opacity: 0.5, x: 4 }}
-              whileHover={{ opacity: 1, x: 0 }}
-              className={cn('flex-shrink-0', styles.subtitleColor)}
-            >
+            <div className={cn('flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity', styles.subtitleColor)}>
               <ChevronLeft className="h-4 w-4" />
-            </motion.div>
+            </div>
           )}
         </div>
-      </motion.div>
+      </div>
     )
     
     if (href) {

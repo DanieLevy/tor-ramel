@@ -20,7 +20,7 @@ import Link from 'next/link'
 import { format, isPast } from 'date-fns'
 import { cn, pwaFetch } from '@/lib/utils'
 import { toast } from 'sonner'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 
 interface Subscription {
   id: string
@@ -315,11 +315,9 @@ export default function HomePage() {
       )}
 
       {/* Active Subscriptions - Enhanced Design */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="glass rounded-2xl p-4 space-y-3"
+      <div
+        className="glass rounded-2xl p-4 space-y-3 animate-fade-up"
+        style={{ animationDelay: '100ms' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -360,7 +358,7 @@ export default function HomePage() {
           </Link>
         ) : (
           <div className="space-y-2">
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {activeSubscriptions.map((sub, index) => {
                 const isExpired = isSubscriptionExpired(sub)
                 const isPaused = sub.subscription_status === 'paused'
@@ -368,10 +366,10 @@ export default function HomePage() {
                 return (
                   <motion.div
                     key={sub.id}
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: -12 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ delay: index * 0.05 }}
+                    exit={{ opacity: 0, x: 12 }}
+                    transition={{ duration: 0.15, delay: Math.min(index * 0.02, 0.1) }}
                     className={cn(
                       "rounded-xl p-3 flex items-center gap-3",
                       "border transition-all duration-200",
@@ -480,18 +478,16 @@ export default function HomePage() {
             </AnimatePresence>
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* Ignored Times Card - Shows expandable list with clear options */}
       <IgnoredTimesCard />
 
       {/* Minimal Status Footer */}
       {homeStats && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="flex items-center justify-center gap-3 text-xs text-muted-foreground py-1"
+        <div
+          className="flex items-center justify-center gap-3 text-xs text-muted-foreground py-1 animate-fade-in"
+          style={{ animationDelay: '200ms' }}
         >
           <span className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -499,7 +495,7 @@ export default function HomePage() {
           </span>
           <span className="text-muted-foreground/40">•</span>
           <span>{homeStats.todayChecks} בדיקות היום</span>
-        </motion.div>
+        </div>
       )}
     </div>
     </>
